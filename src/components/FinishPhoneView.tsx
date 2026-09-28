@@ -1,0 +1,662 @@
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Camera, SwitchCamera, Flashlight, Sliders, Award, Crosshair, RotateCcw, Zap, BellRing, Film, Globe } from 'lucide-react';
+import { Runner, RaceStatus, RaceSettings } from '../types/race';
+import { opticalGateDetector, OpticalLaneResult } from '../services/motionDetector';
+import { slitScanEngine } from '../services/slitScanEngine';
+import { athleticsAudio } from '../services/audioService';
+import { burstCaptureService } from '../services/burstCaptureService';
+
+interface FinishPhoneViewProps {
+  raceStatus: RaceStatus;
+  runners: Runner[];
+  clockTimeMs: number;
+  settings: RaceSettings;
+  onLaneFinish: (lane: number, timeMs: number, snapshotUrl?: string) => void;
+  onFinishRace: (panoramaUrl?: string) => void;
+  onSharedResetRace: () => void;
+  onViewPhotoFinish: () => void;
+  onOpenSettings?: () => void;
+  onOpenInternetBridge?: () => void;
+  onStartBellSignal?: () => void;
+  onStopBellSignal?: () => void;
+  isHoldingBell?: boolean;
+  isPeerSirenRinging?: boolean;
+}
+
+export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
+  raceStatus,
+  runners,
+  clockTimeMs,
+  settings,
+  onLaneFinish,
+  onFinishRace,
+  onSharedResetRace,
+  onViewPhotoFinish,
+  onOpenSettings,
+  onOpenInternetBridge,
+  onStartBellSignal,
+  onStopBellSignal,
+  isHoldingBell,
+  isPeerSirenRinging
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const slitCanvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [cameraActive, setCameraActive] = useState<boolean>(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [torchEnabled, setTorchEnabled] = useState<boolean>(false);
+  const [finishLineX, setFinishLineX] = useState<number>(settings.finishLineXPercent || 0.35);
+  const [laneResults, setLaneResults] = useState<OpticalLaneResult[]>([]);
+  const [cameraError, setCameraError] = useState<string>('');
+  const [showCalibration, setShowCalibration] = useState<boolean>(false);
+
+  // حالات التصوير المتتالي فائق السرعة (Burst Capture)
+  const [isBurstActive, setIsBurstActive] = useState<boolean>(false);
+  const [burstFrameCount, setBurstFrameCount] = useState<number>(0);
+
+  // مراجع ثابتة لقراءة أحدث القيم داخل حلقة requestAnimationFrame
+  const clockTimeMsRef = useRef<number>(clockTimeMs);
+  clockTimeMsRef.current = clockTimeMs;
+  const finishLineXRef = useRef<number>(finishLineX);
+  finishLineXRef.current = finishLineX;
+  const settingsRef = useRef<RaceSettings>(settings);
+  settingsRef.current = settings;
+  const runnersRef = useRef<Runner[]>(runners);
+  runnersRef.current = runners;
+  const onLaneFinishRef = useRef(onLaneFinish);
+  onLaneFinishRef.current = onLaneFinish;
+  const onFinishRaceRef = useRef(onFinishRace);
+  onFinishRaceRef.current = onFinishRace;
+
+  // تشغيل الكاميرا
+  const startCamera = useCallback(async () => {
+    try {
+      setCameraError('');
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('واجهة الكاميرا WebRTC غير مدعومة أو غير مفعلة في هذا النظام.');
+        setCameraActive(false);
+        return;
+      }
+
+      let stream: MediaStream | null = null;
+      
+      // 1. محاولة طلب الكاميرا الخلفية بدقة HD
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false
+        });
+      } catch (firstErr) {
+        console.warn('HD camera request failed, trying simple facingMode:', firstErr);
+      }
+
+      // 2. محاولة بديلة بقيود facingMode فقط
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode },
+            audio: false
+          });
+        } catch (secondErr) {
+          console.warn('facingMode request failed, trying basic video:', secondErr);
+        }
+      }
+
+      // 3. محاولة بديلة نهائية: أي كاميرا متاحة بالجهاز
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
+
+      if (videoRef.current && stream) {
+        const video = videoRef.current;
+        video.srcObject = stream;
+        video.muted = true;
+        video.defaultMuted = true;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        
+        try {
+          await video.play();
+          setCameraActive(true);
+          setCameraError('');
+        } catch (playErr) {
+          console.warn('Auto video play failed, waiting for user gesture:', playErr);
+        }
+        streamRef.current = stream;
+      }
+    } catch (e: any) {
+      console.error('Camera access error:', e);
+      const name = e?.name || '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setCameraError('يرجى منح إذن الكاميرا من إعدادات الهاتف لتطبيق Photo Finish.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setCameraError('لم يتم العثور على كاميرا في الهاتف.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setCameraError('الكاميرا قيد الاستخدام بواسطة تطبيق آخر أو حدث تعارض في العتاد.');
+      } else {
+        setCameraError('تعذر فتح الكاميرا: ' + (e?.message || 'يرجى مراجعة الصلاحيات'));
+      }
+      setCameraActive(false);
+    }
+  }, [facingMode]);
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, [startCamera]);
+
+  // التحكم بفلاش الكاميرا
+  const toggleTorch = async () => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    try {
+      const capabilities = track.getCapabilities?.() as any;
+      if (capabilities && capabilities.torch) {
+        await (track as any).applyConstraints({
+          advanced: [{ torch: !torchEnabled }]
+        });
+        setTorchEnabled(!torchEnabled);
+      } else {
+        alert('فلاش الكاميرا غير مدعوم على هذا المتصفح/الجهاز.');
+      }
+    } catch (e) {
+      console.warn('Torch error:', e);
+    }
+  };
+
+  // حلقة معالجة إطارات الكاميرا وحساس خط النهاية (60 FPS)
+  useEffect(() => {
+    let animId: number;
+
+    const loop = () => {
+      if (videoRef.current && videoRef.current.readyState >= 2) {
+        const video = videoRef.current;
+
+        if (raceStatus === 'racing') {
+          const currentClock = clockTimeMsRef.current;
+          const currentX = finishLineXRef.current;
+          const currentSettings = settingsRef.current;
+          const currentRunners = runnersRef.current;
+
+          // 1. التقاط شريحة المسح الشريطي المتواصل
+          slitScanEngine.captureSlice(video, currentX, currentClock);
+
+          // عرض الشريط على شاشة المعاينة
+          if (slitCanvasRef.current) {
+            const previewCtx = slitCanvasRef.current.getContext('2d');
+            const mainCanvas = slitScanEngine.getCanvas();
+            const currW = slitScanEngine.getCurrentWidth();
+            
+            if (previewCtx && currW > 0) {
+              const displayW = slitCanvasRef.current.width;
+              const displayH = slitCanvasRef.current.height;
+              previewCtx.clearRect(0, 0, displayW, displayH);
+              const sourceX = Math.max(0, currW - displayW);
+              previewCtx.drawImage(
+                mainCanvas,
+                sourceX, 0, displayW, mainCanvas.height,
+                0, 0, displayW, displayH
+              );
+            }
+          }
+
+          // 2. كشف الحساس الضوئي لكل رواق
+          const detected = opticalGateDetector.scan(
+            video,
+            currentSettings.laneCount,
+            currentX,
+            currentSettings.motionThreshold
+          );
+          setLaneResults(detected);
+
+          const triggeredLanes = detected.filter(r => r.isTriggered).map(r => r.lane);
+
+          // بدء التصوير المتتالي فائق السرعة تلقائياً فور وصول أول عداء يلامس خط النهاية
+          if (triggeredLanes.length > 0 && !burstCaptureService.isCapturing) {
+            burstCaptureService.startCapture();
+            setIsBurstActive(true);
+          }
+
+          // التقاط الإطارات المتتالية فائقة السرعة مع توثيق خط النهاية وترتيب العدائين
+          if (burstCaptureService.isCapturing) {
+            const frame = burstCaptureService.captureFrame(
+              video,
+              currentX,
+              currentClock,
+              triggeredLanes,
+              currentRunners
+            );
+            if (frame) {
+              setBurstFrameCount(burstCaptureService.frames.length);
+            }
+          }
+
+          // رصد لحظة قطع شعاع الحساس
+          detected.forEach((res) => {
+            const runner = currentRunners.find(r => r.lane === res.lane);
+            if (res.isTriggered && runner && runner.finishTime === 0) {
+              // تنبيه صوتي للحساس
+              athleticsAudio.playSensorCutBeep(res.lane);
+
+              const formatted = `${(currentClock / 1000).toFixed(3)}s`;
+              const alreadyFinished = currentRunners.filter(r => r.finishTime > 0).length;
+              const currentRank = alreadyFinished + 1;
+
+              const snap = opticalGateDetector.captureSnapshot(
+                video,
+                res.lane,
+                formatted,
+                currentX,
+                runner.name,
+                runner.bib,
+                currentRank
+              );
+              onLaneFinishRef.current(res.lane, currentClock, snap || undefined);
+            }
+          });
+
+          // التوقف التلقائي للتصوير المتتالي عند وصول جميع العدائين
+          const allFinished = currentRunners.length > 0 && currentRunners.every(r => r.finishTime > 0);
+          if (allFinished && burstCaptureService.isCapturing) {
+            burstCaptureService.stopCapture();
+            setIsBurstActive(false);
+          }
+          if (allFinished && currentSettings.autoStopAfterLastRunner) {
+            const panorama = slitScanEngine.exportCroppedPhotoFinishDataUrl(currentSettings.laneCount, currentRunners);
+            setTimeout(() => onFinishRaceRef.current(panorama || undefined), 400);
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [raceStatus]);
+
+  useEffect(() => {
+    if (raceStatus === 'racing') {
+      slitScanEngine.startCapture(Date.now());
+      burstCaptureService.reset();
+      setBurstFrameCount(0);
+      setIsBurstActive(false);
+      opticalGateDetector.reset();
+    } else if (raceStatus === 'finished') {
+      slitScanEngine.stopCapture();
+      burstCaptureService.stopCapture();
+      setIsBurstActive(false);
+    }
+  }, [raceStatus]);
+
+  const formatClock = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(ms % 1000);
+    return `${s}.${String(m).padStart(3, '0')}s`;
+  };
+
+  return (
+    <div className="max-w-lg mx-auto p-2 sm:p-4 space-y-2.5 sm:space-y-3" dir="rtl">
+      {/* نافذة الكاميرا وخطوط الأروقة وخط النهاية */}
+      <div 
+        onClick={() => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(console.warn);
+          }
+          if (!cameraActive) {
+            startCamera();
+          }
+        }}
+        className="relative bg-black rounded-3xl overflow-hidden aspect-[16/10] border border-slate-800 shadow-2xl cursor-pointer"
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ pointerEvents: 'none' }}
+          onPlay={() => {
+            setCameraActive(true);
+            setCameraError('');
+          }}
+          onPlaying={() => {
+            setCameraActive(true);
+            setCameraError('');
+          }}
+          onLoadedMetadata={async () => {
+            if (videoRef.current) {
+              try {
+                await videoRef.current.play();
+                setCameraActive(true);
+                setCameraError('');
+              } catch (err) {
+                console.warn('Play on loadedmetadata failed:', err);
+              }
+            }
+          }}
+          className="w-full h-full object-cover"
+        />
+
+        {/* تنبيه إذا لم تبدأ الكاميرا تلقائياً أو حدث خطأ */}
+        {(!cameraActive || cameraError) && (
+          <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-4 text-center gap-2.5 z-20">
+            <Camera className="w-10 h-10 text-amber-400 animate-pulse" />
+            <span className="text-xs font-bold text-white max-w-[250px]">
+              {cameraError || 'الكاميرا بانتظار إذن التشغيل في الهاتف'}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                startCamera();
+              }}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 cursor-pointer active:scale-95 transition-all"
+            >
+              اضغط هنا لتفعيل وبدء الكاميرا 📷
+            </button>
+          </div>
+        )}
+
+        {/* خطوط تقسيم الأروقة بالمضمار (Lanes Dividers) */}
+        <div className="absolute inset-0 pointer-events-none flex flex-col">
+          {Array.from({ length: settings.laneCount }).map((_, i) => {
+            const isCut = laneResults[i]?.isTriggered;
+            const runner = runners.find(r => r.lane === i + 1);
+            return (
+              <div
+                key={i}
+                className={`flex-1 border-b border-dashed flex items-center justify-between px-3 transition-colors ${
+                  isCut ? 'border-red-500 bg-red-500/20' : 'border-white/20'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded bg-black/60 text-white border border-white/20">
+                    رواق L{i + 1}
+                  </span>
+                  {runner && (
+                    <span className="text-[10px] font-bold text-white/80 bg-black/40 px-1.5 py-0.5 rounded truncate max-w-[90px]">
+                      {runner.name}
+                    </span>
+                  )}
+                </div>
+
+                {laneResults[i]?.motionScore !== undefined && (
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                    isCut ? 'bg-red-600 text-white animate-pulse' : 'bg-black/60 text-slate-300'
+                  }`}>
+                    {isCut ? '⚡ قطع الحساس!' : `${laneResults[i].motionScore}%`}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* خط النهاية والحساس الضوئي (Optical Laser Finish Gate) */}
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none transition-all"
+          style={{
+            left: `${finishLineX * 100}%`,
+            width: `${settings.finishLineWidth}px`,
+            backgroundColor: settings.finishLineColor || '#EF4444',
+            boxShadow: `0 0 15px ${settings.finishLineColor || '#EF4444'}`,
+          }}
+        >
+          <div
+            className="absolute -top-1 left-1/2 -translate-x-1/2 font-mono text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap text-black font-bold"
+            style={{ backgroundColor: settings.finishLineColor || '#EF4444' }}
+          >
+            FINISH GATE
+          </div>
+        </div>
+
+        {/* رأس مؤشرات الكاميرا في الأعلى */}
+        <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-auto">
+          <div className="bg-black/70 backdrop-blur-md px-3 py-1 rounded-full text-white font-mono font-bold text-xs flex items-center gap-2 border border-white/10 shadow-lg">
+            <span className={`w-2.5 h-2.5 rounded-full ${raceStatus === 'racing' ? 'bg-red-500 animate-ping' : 'bg-emerald-400'}`} />
+            <span>{formatClock(clockTimeMs)}</span>
+          </div>
+
+          {/* مؤشر التصوير المتتالي فائق السرعة فور وصول أول عداء */}
+          {isBurstActive && (
+            <div className="bg-red-600/90 backdrop-blur-md px-2.5 py-1 rounded-full text-white font-black text-[11px] flex items-center gap-1.5 border border-yellow-300 animate-pulse shadow-lg shadow-red-600/50">
+              <span className="w-2 h-2 rounded-full bg-yellow-300 animate-ping" />
+              <span>📸 تصوير متتالي فائق ({burstFrameCount} إطار)</span>
+            </div>
+          )}
+
+          <div className="flex gap-1.5">
+            {onOpenInternetBridge && (
+              <button
+                onClick={onOpenInternetBridge}
+                className="p-1.5 rounded-lg bg-black/60 border border-white/10 text-cyan-300 hover:text-cyan-200 backdrop-blur-md flex items-center gap-1 text-[11px] font-bold"
+                title="جسر الإنترنت للمسافات البعيدة"
+              >
+                <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">الجسر</span>
+              </button>
+            )}
+            <button
+              onClick={toggleTorch}
+              className={`p-1.5 rounded-lg border backdrop-blur-md ${
+                torchEnabled ? 'bg-amber-500 border-amber-400 text-black' : 'bg-black/60 border-white/10 text-white'
+              }`}
+              title="فلاش الكاميرا"
+            >
+              <Flashlight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')}
+              className="p-1.5 rounded-lg bg-black/60 border border-white/10 text-white backdrop-blur-md"
+              title="تبديل الكاميرا"
+            >
+              <SwitchCamera className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowCalibration(!showCalibration)}
+              className={`p-1.5 rounded-lg border backdrop-blur-md ${
+                showCalibration ? 'bg-cyan-500 border-cyan-400 text-black' : 'bg-black/60 border-white/10 text-white'
+              }`}
+              title="محاذاة خط النهاية"
+            >
+              <Sliders className="w-4 h-4" />
+            </button>
+            {onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="p-1.5 rounded-lg bg-black/60 border border-white/10 text-amber-400 hover:text-amber-300 backdrop-blur-md"
+                title="إعدادات السباق والأروقة"
+              >
+                <Sliders className="w-4 h-4 text-amber-400" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* لوحة محاذاة ومعايرة خط النهاية وإعدادات الأروقة */}
+      {showCalibration && (
+        <div className="bg-slate-900 border border-cyan-900/60 rounded-2xl p-3 space-y-2.5 text-xs shadow-xl">
+          <div className="flex justify-between items-center text-slate-300 font-bold">
+            <span className="flex items-center gap-1.5 text-cyan-400">
+              <Crosshair className="w-4 h-4" />
+              موقع خط النهاية والحساس في الكاميرا:
+            </span>
+            <span className="font-mono text-cyan-400 font-bold">{Math.round(finishLineX * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0.1"
+            max="0.9"
+            step="0.01"
+            value={finishLineX}
+            onChange={(e) => setFinishLineX(parseFloat(e.target.value))}
+            className="w-full accent-cyan-400 cursor-pointer"
+          />
+          <p className="text-[10px] text-slate-400">
+            حرّك المؤشر ليتطابق الخط الملون في الشاشة مع خط النهاية الفعلي على أرضية المضمار لجميع الأروقة.
+          </p>
+        </div>
+      )}
+
+      {/* شريط المسح الشريطي التراكمي المباشر (Live Photo Finish Ribbon) */}
+      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 space-y-1.5 shadow-inner">
+        <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+          <span className="flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            شريط المسح الشريطي اللحظي (Slit-Scan Stream):
+          </span>
+          <span className="text-[10px] text-cyan-400 font-mono">1 بكسل = ~1ms</span>
+        </div>
+        <div className="w-full h-16 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+          <canvas
+            ref={slitCanvasRef}
+            width={400}
+            height={70}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      </div>
+
+      {/* أزرار إنهاء السباق ومعاينة الصور المتتالية */}
+      <div className="space-y-2">
+        {/* زر معاينة الصور المتتالية فائقة السرعة وترتيب العدائين */}
+        {burstCaptureService.frames.length > 0 && (
+          <button
+            onClick={onViewPhotoFinish}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:from-amber-400 hover:to-red-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 border border-amber-300 cursor-pointer active:scale-95 transition-all"
+          >
+            <Film className="w-4 h-4 fill-slate-950" />
+            <span>📸 معاينة الصور المتتالية وترتيب العدائين ({burstCaptureService.frames.length} إطار متتالي)</span>
+          </button>
+        )}
+
+        {raceStatus === 'racing' && (
+          <button
+            onClick={() => {
+              const panorama = slitScanEngine.exportCroppedPhotoFinishDataUrl(settings.laneCount, runners);
+              onFinishRace(panorama || undefined);
+            }}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-red-600 via-amber-600 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-slate-950 font-black text-base shadow-xl flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+          >
+            <span>🏁 إنهاء السباق واعتماد Photo Finish</span>
+          </button>
+        )}
+
+        {raceStatus === 'finished' && (
+          <button
+            onClick={onViewPhotoFinish}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-base shadow-xl flex items-center justify-center gap-2"
+          >
+            <Award className="w-5 h-5 text-amber-300" />
+            <span>فحص وتدقيق صورة Photo Finish الرسمية</span>
+          </button>
+        )}
+
+        {/* زر جرس لفت الانتباه وفحص إشارة هاتف البداية (Signal Check) */}
+        {onStartBellSignal && onStopBellSignal && (
+          <button
+            type="button"
+            onPointerDown={onStartBellSignal}
+            onPointerUp={onStopBellSignal}
+            onPointerLeave={onStopBellSignal}
+            onPointerCancel={onStopBellSignal}
+            className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 select-none transition-all cursor-pointer shadow-lg active:scale-95 ${
+              isHoldingBell
+                ? isPeerSirenRinging
+                  ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white shadow-rose-600/40 border-2 border-yellow-300 animate-pulse scale-[1.02]'
+                  : 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-amber-600/30 border border-amber-400 animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-750 text-amber-300 border border-amber-500/40 hover:border-amber-400'
+            }`}
+          >
+            <BellRing className={`w-4 h-4 ${isHoldingBell ? 'animate-bounce text-yellow-300' : 'text-amber-400'}`} />
+            <span>
+              {isHoldingBell
+                ? isPeerSirenRinging
+                  ? '🚨 هاتف البداية يرن الآن بصوت الشرطة! (اتركه لإيقاف الرنين)'
+                  : '📡 جاري إرسال إشارة الرنين إلى هاتف البداية...'
+                : '🔔 جرس لفت انتباه هاتف البداية (اضغط مطولاً لتشغيل صفارة الشرطة)'}
+            </span>
+          </button>
+        )}
+
+        {/* زر مشترك لإعادة البدء في سباق آخر على الهاتفين معاً */}
+        <button
+          onClick={onSharedResetRace}
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-slate-800 via-slate-750 to-slate-800 hover:from-slate-700 hover:to-slate-700 text-cyan-300 hover:text-white font-bold text-xs flex items-center justify-center gap-2 border border-cyan-500/40 shadow-lg active:scale-95 transition-all"
+          title="يقوم بإعادة تعيين الساعة وحساس الكاميرا في كلا الهاتفين معاً في نفس اللحظة"
+        >
+          <RotateCcw className="w-4 h-4 text-cyan-400" />
+          <span>🔄 إعادة ضبط وبدء سباق جديد (مشترك في الهواتف الثلاثة)</span>
+        </button>
+      </div>
+
+      {/* لوحة تسجيل وصول العدائين حسب الأروقة مع صور الوصول */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-xl">
+        <div className="text-[11px] font-bold text-slate-400 mb-2 flex justify-between">
+          <span>حساسية الأروقة وتوثيق الوصول التلقائي:</span>
+          <span className="text-[10px] text-amber-400 font-mono">
+            {settings.heatName || `قائمة ${settings.heatNumber}`} • {runners.filter(r => r.finishTime > 0).length}/{runners.length} وصلوا
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {runners.map((r) => {
+            const finished = r.finishTime > 0;
+            return (
+              <button
+                key={r.id}
+                disabled={finished || raceStatus !== 'racing'}
+                onClick={() => onLaneFinish(r.lane, clockTimeMs)}
+                className={`p-2.5 rounded-xl text-right font-mono border transition-all overflow-hidden relative ${
+                  finished
+                    ? 'bg-emerald-950/60 border-emerald-600 text-emerald-400'
+                    : raceStatus === 'racing'
+                    ? 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-white active:scale-95'
+                    : 'bg-slate-900/70 border-slate-800 text-slate-600 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-white">رواق L{r.lane}</span>
+                  {r.rank && r.rank > 0 && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1 rounded font-black">
+                      #{r.rank}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-300 truncate font-sans">{r.name}</div>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-[11px] font-bold text-amber-400">
+                    {finished ? `${(r.finishTime / 1000).toFixed(3)}s` : 'قطع الحساس 🏃'}
+                  </div>
+                  {r.crossingSnapshot && (
+                    <img
+                      src={r.crossingSnapshot}
+                      alt="finish"
+                      className="w-8 h-5 object-cover rounded border border-cyan-400/50"
+                    />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
