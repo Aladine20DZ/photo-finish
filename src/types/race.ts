@@ -58,9 +58,13 @@ export interface RaceSettings {
   heatNumber: number;            // رقم القائمة الحالية (1، 2، 3...)
   heatName: string;              // اسم القائمة الحالية (تصفية 1، النهائي...)
   laneCount: number;             // عدد الأروقة (2، 4، 6، 8)
-  finishLineXPercent: number;    // موقع خط النهاية (مثلاً 35%)
+  finishLineXPercent: number;    // موقع خط النهاية الرسمي (مثلاً 35%)
   finishLineColor: string;       // لون خط النهاية
   finishLineWidth: number;       // سُمك خط النهاية
+  preFinishLineXPercent?: number;  // موقع خط ما قبل النهاية (بدء التصوير التلقائي)
+  preFinishLineColor?: string;     // لون خط ما قبل النهاية
+  postFinishLineXPercent?: number; // موقع خط ما بعد النهاية (انتهاء التصوير)
+  postFinishLineColor?: string;    // لون خط ما بعد النهاية
   motionThreshold: number;       // حساسية حساس خط النهاية
   laserBeamVisible: boolean;     // إظهار شعاع الحساس الضوئي
   gunSoundType: GunSoundType;    // نوع صوت طلقة الانطلاق
@@ -96,6 +100,7 @@ export interface NetworkPeerMessage {
     | 'JUDGE_UPDATE_RUNNER'     // تعديل النتيجة أو الترتيب من هاتف الحكم
     | 'HEAT_CHANGE'             // تبديل القائمة النشطة (قائمة 1، قائمة 2...)
     | 'HEAT_DISPATCH'           // أمر "إلى خط الانطلاق (Au Départ)" من هاتف البداية
+    | 'HEAT_CANCEL_DISPATCH'    // إلغاء أمر خط الانطلاق وسحب القائمة
     | 'HEATS_SYNC'              // مزامنة جميع القوائم والعدائين
     | 'HEATS_REORDER'           // إعادة ترتيب القوائم يدوياً أو تلقائياً
     | 'DELETE_HEAT'             // حذف قائمة/سلسلة

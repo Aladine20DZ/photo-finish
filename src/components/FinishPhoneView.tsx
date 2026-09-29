@@ -47,6 +47,8 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [torchEnabled, setTorchEnabled] = useState<boolean>(false);
   const [finishLineX, setFinishLineX] = useState<number>(settings.finishLineXPercent || 0.35);
+  const [preFinishLineX, setPreFinishLineX] = useState<number>(settings.preFinishLineXPercent || 0.22);
+  const [postFinishLineX, setPostFinishLineX] = useState<number>(settings.postFinishLineXPercent || 0.52);
   const [laneResults, setLaneResults] = useState<OpticalLaneResult[]>([]);
   const [cameraError, setCameraError] = useState<string>('');
   const [showCalibration, setShowCalibration] = useState<boolean>(false);
@@ -54,6 +56,8 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
   // حالات التصوير المتتالي فائق السرعة (Burst Capture)
   const [isBurstActive, setIsBurstActive] = useState<boolean>(false);
   const [burstFrameCount, setBurstFrameCount] = useState<number>(0);
+  const [preGateTriggered, setPreGateTriggered] = useState<boolean>(false);
+  const [postGateTriggered, setPostGateTriggered] = useState<boolean>(false);
 
   // مراجع ثابتة لقراءة أحدث القيم داخل حلقة requestAnimationFrame
   const clockTimeMsRef = useRef<number>(clockTimeMs);
@@ -227,8 +231,28 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
 
           const triggeredLanes = detected.filter(r => r.isTriggered).map(r => r.lane);
 
-          // بدء التصوير المتتالي فائق السرعة تلقائياً فور وصول أول عداء يلامس خط النهاية
-          if (triggeredLanes.length > 0 && !burstCaptureService.isCapturing) {
+          // فحص خط ما قبل النهاية (Pre-Finish Gate) - يبدأ التصوير المتتالي
+          const preGate = opticalGateDetector.checkPreGateMotion(
+            video,
+            currentSettings.preFinishLineXPercent || 0.22,
+            currentSettings.motionThreshold
+          );
+          if (preGate.isTriggered) {
+            setPreGateTriggered(true);
+          }
+
+          // فحص خط ما بعد النهاية (Post-Finish Gate)
+          const postGate = opticalGateDetector.checkPostGateMotion(
+            video,
+            currentSettings.postFinishLineXPercent || 0.52,
+            currentSettings.motionThreshold
+          );
+          if (postGate.isTriggered) {
+            setPostGateTriggered(true);
+          }
+
+          // بدء التصوير المتتالي فائق السرعة تلقائياً عند قطع خط ما قبل النهاية أو خط النهاية
+          if ((preGate.isTriggered || triggeredLanes.length > 0) && !burstCaptureService.isCapturing) {
             burstCaptureService.startCapture();
             setIsBurstActive(true);
           }
@@ -408,7 +432,26 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
           })}
         </div>
 
-        {/* خط النهاية والحساس الضوئي (Optical Laser Finish Gate) */}
+        {/* خط ما قبل النهاية (Pre-Finish Gate) - بدء التصوير */}
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none transition-all"
+          style={{
+            left: `${preFinishLineX * 100}%`,
+            width: '2px',
+            backgroundColor: settings.preFinishLineColor || '#00E5FF',
+            boxShadow: `0 0 12px ${settings.preFinishLineColor || '#00E5FF'}`,
+            opacity: preGateTriggered ? 1 : 0.7,
+          }}
+        >
+          <div
+            className="absolute -top-1 left-1/2 -translate-x-1/2 font-mono text-[8px] font-black px-1 py-0.5 rounded shadow whitespace-nowrap text-black"
+            style={{ backgroundColor: settings.preFinishLineColor || '#00E5FF' }}
+          >
+            PRE-GATE • بدء التصوير
+          </div>
+        </div>
+
+        {/* خط النهاية الرسمي والحساس الضوئي (Official Finish Gate) */}
         <div
           className="absolute top-0 bottom-0 pointer-events-none transition-all"
           style={{
@@ -423,6 +466,25 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             style={{ backgroundColor: settings.finishLineColor || '#EF4444' }}
           >
             FINISH GATE
+          </div>
+        </div>
+
+        {/* خط ما بعد النهاية (Post-Finish Gate) - انتهاء التصوير */}
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none transition-all"
+          style={{
+            left: `${postFinishLineX * 100}%`,
+            width: '2px',
+            backgroundColor: settings.postFinishLineColor || '#A855F7',
+            boxShadow: `0 0 12px ${settings.postFinishLineColor || '#A855F7'}`,
+            opacity: postGateTriggered ? 1 : 0.7,
+          }}
+        >
+          <div
+            className="absolute -top-1 left-1/2 -translate-x-1/2 font-mono text-[8px] font-black px-1 py-0.5 rounded shadow whitespace-nowrap text-black"
+            style={{ backgroundColor: settings.postFinishLineColor || '#A855F7' }}
+          >
+            POST-GATE • انتهاء التصوير
           </div>
         </div>
 
@@ -492,26 +554,74 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
 
       {/* لوحة محاذاة ومعايرة خط النهاية وإعدادات الأروقة */}
       {showCalibration && (
-        <div className="bg-slate-900 border border-cyan-900/60 rounded-2xl p-3 space-y-2.5 text-xs shadow-xl">
-          <div className="flex justify-between items-center text-slate-300 font-bold">
-            <span className="flex items-center gap-1.5 text-cyan-400">
-              <Crosshair className="w-4 h-4" />
-              موقع خط النهاية والحساس في الكاميرا:
-            </span>
-            <span className="font-mono text-cyan-400 font-bold">{Math.round(finishLineX * 100)}%</span>
+        <div className="bg-slate-900 border border-cyan-900/60 rounded-2xl p-3 space-y-3 text-xs shadow-xl">
+          <div className="text-cyan-400 font-black flex items-center gap-1.5">
+            <Crosshair className="w-4 h-4" />
+            منظومة الخطوط الثلاثية (Triple Gate System):
           </div>
-          <input
-            type="range"
-            min="0.1"
-            max="0.9"
-            step="0.01"
-            value={finishLineX}
-            onChange={(e) => setFinishLineX(parseFloat(e.target.value))}
-            className="w-full accent-cyan-400 cursor-pointer"
-          />
-          <p className="text-[10px] text-slate-400">
-            حرّك المؤشر ليتطابق الخط الملون في الشاشة مع خط النهاية الفعلي على أرضية المضمار لجميع الأروقة.
-          </p>
+
+          {/* خط ما قبل النهاية (Pre-Finish Gate) */}
+          <div className="space-y-1 p-2.5 rounded-xl border" style={{ borderColor: (settings.preFinishLineColor || '#00E5FF') + '60', backgroundColor: (settings.preFinishLineColor || '#00E5FF') + '08' }}>
+            <div className="flex justify-between items-center font-bold">
+              <span className="flex items-center gap-1.5" style={{ color: settings.preFinishLineColor || '#00E5FF' }}>
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: settings.preFinishLineColor || '#00E5FF' }} />
+                خط بدء التصوير (Pre-Finish Gate):
+              </span>
+              <span className="font-mono" style={{ color: settings.preFinishLineColor || '#00E5FF' }}>{Math.round(preFinishLineX * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.05"
+              max="0.9"
+              step="0.01"
+              value={preFinishLineX}
+              onChange={(e) => setPreFinishLineX(parseFloat(e.target.value))}
+              className="w-full accent-cyan-400 cursor-pointer"
+            />
+            <p className="text-[9px] text-slate-500">عند اقتراب العداء من هذا الخط يبدأ التصوير المتتالي فائق السرعة تلقائياً</p>
+          </div>
+
+          {/* خط النهاية الرسمي (Official Finish Line) */}
+          <div className="space-y-1 p-2.5 rounded-xl border" style={{ borderColor: (settings.finishLineColor || '#EF4444') + '60', backgroundColor: (settings.finishLineColor || '#EF4444') + '08' }}>
+            <div className="flex justify-between items-center font-bold">
+              <span className="flex items-center gap-1.5" style={{ color: settings.finishLineColor || '#EF4444' }}>
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: settings.finishLineColor || '#EF4444' }} />
+                خط النهاية الرسمي (Official Finish):
+              </span>
+              <span className="font-mono" style={{ color: settings.finishLineColor || '#EF4444' }}>{Math.round(finishLineX * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="0.9"
+              step="0.01"
+              value={finishLineX}
+              onChange={(e) => setFinishLineX(parseFloat(e.target.value))}
+              className="w-full accent-red-500 cursor-pointer"
+            />
+            <p className="text-[9px] text-slate-500">خط التوقيت الرسمي ومحور المسح الشريطي (Slit-Scan Axis)</p>
+          </div>
+
+          {/* خط ما بعد النهاية (Post-Finish Gate) */}
+          <div className="space-y-1 p-2.5 rounded-xl border" style={{ borderColor: (settings.postFinishLineColor || '#A855F7') + '60', backgroundColor: (settings.postFinishLineColor || '#A855F7') + '08' }}>
+            <div className="flex justify-between items-center font-bold">
+              <span className="flex items-center gap-1.5" style={{ color: settings.postFinishLineColor || '#A855F7' }}>
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: settings.postFinishLineColor || '#A855F7' }} />
+                خط انتهاء التصوير (Post-Finish Gate):
+              </span>
+              <span className="font-mono" style={{ color: settings.postFinishLineColor || '#A855F7' }}>{Math.round(postFinishLineX * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="0.95"
+              step="0.01"
+              value={postFinishLineX}
+              onChange={(e) => setPostFinishLineX(parseFloat(e.target.value))}
+              className="w-full accent-purple-500 cursor-pointer"
+            />
+            <p className="text-[9px] text-slate-500">بعد عبور العداء هذا الخط يتوقف التصوير المتتالي لهذا العداء</p>
+          </div>
         </div>
       )}
 

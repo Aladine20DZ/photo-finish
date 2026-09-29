@@ -11,7 +11,9 @@ import {
   BellRing, 
   Globe, 
   Flag, 
-  ListOrdered
+  ListOrdered,
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { Runner, RaceStatus, RaceSettings, Heat } from '../types/race';
 import { athleticsNetwork } from '../services/networkService';
@@ -25,6 +27,7 @@ interface StartPhoneViewProps {
   currentHeatIndex?: number;
   onSelectHeat?: (index: number) => void;
   onDispatchHeat?: (heatId: string) => void;
+  onCancelDispatchHeat?: (heatId?: string) => void;
   onOpenSchedulePanel?: () => void;
   onCommandOnMarks: () => void;
   onCommandSet: () => void;
@@ -49,6 +52,7 @@ export const StartPhoneView: React.FC<StartPhoneViewProps> = ({
   currentHeatIndex = 0,
   onSelectHeat,
   onDispatchHeat,
+  onCancelDispatchHeat,
   onOpenSchedulePanel,
   onCommandOnMarks,
   onCommandSet,
@@ -112,6 +116,16 @@ export const StartPhoneView: React.FC<StartPhoneViewProps> = ({
       setTimeout(() => setIsDispatchedLocally(false), 5000);
     }
   };
+
+  // إلغاء أمر خط الانطلاق وسحب القائمة في حالة الخطأ
+  const handleCancelDispatch = () => {
+    if (onCancelDispatchHeat) {
+      onCancelDispatchHeat(currentHeat?.id);
+      setIsDispatchedLocally(false);
+    }
+  };
+
+  const isDispatched = currentHeat?.isDispatched || isDispatchedLocally;
 
   useEffect(() => {
     return () => {
@@ -195,24 +209,50 @@ export const StartPhoneView: React.FC<StartPhoneViewProps> = ({
           </div>
         )}
 
-        {/* الزر الرئيسي المطلوب: "إلى خط الانطلاق (Au Départ) 🏁" */}
-        <div className="pt-1">
+        {/* الزر الرئيسي المطلوب: "إلى خط الانطلاق (Au Départ) 🏁" + زر الإلغاء */}
+        <div className="pt-1 space-y-2">
           <button
             type="button"
             onClick={handleDispatchCurrentHeat}
+            disabled={isDispatched && raceStatus !== 'waiting'}
             className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all shadow-xl active:scale-95 cursor-pointer ${
-              (currentHeat?.isDispatched || isDispatchedLocally)
+              isDispatched
                 ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white shadow-emerald-600/40 border-2 border-yellow-300 animate-pulse'
                 : 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:from-amber-400 hover:to-red-400 text-slate-950 shadow-amber-500/30'
             }`}
           >
-            <Flag className="w-5 h-5 text-slate-950" />
+            <Flag className="w-5 h-5" />
             <span>
-              {(currentHeat?.isDispatched || isDispatchedLocally)
+              {isDispatched
                 ? '✅ تم الإرسال لجميع الهواتف: العداؤون على خط الانطلاق (Au Départ) 🏁'
                 : 'إلى خط الانطلاق (Au Départ) 🏁 • بث القائمة فورياً'}
             </span>
           </button>
+
+          {/* زر إلغاء أمر خط الانطلاق / سحب القائمة (يظهر فقط بعد الإرسال) */}
+          {isDispatched && raceStatus === 'waiting' && onCancelDispatchHeat && (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleCancelDispatch}
+                className="py-3 px-3 rounded-2xl bg-gradient-to-r from-rose-700 via-red-600 to-rose-700 hover:from-rose-600 hover:to-red-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-700/30 border border-rose-400/50 cursor-pointer active:scale-95 transition-all"
+              >
+                <XCircle className="w-5 h-5 text-white" />
+                <span>❌ إلغاء أمر الانطلاق / سحب القائمة (Rappel)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleCancelDispatch();
+                  // يتم تبديل القائمة عبر شريط القوائم أعلاه بعد الإلغاء
+                }}
+                className="py-3 px-3 rounded-2xl bg-gradient-to-r from-cyan-700 via-blue-600 to-cyan-700 hover:from-cyan-600 hover:to-blue-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-700/30 border border-cyan-400/50 cursor-pointer active:scale-95 transition-all"
+              >
+                <RefreshCw className="w-5 h-5 text-white" />
+                <span>🔄 تبديل القائمة (Changer la Série)</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

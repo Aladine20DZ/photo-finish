@@ -10,24 +10,134 @@ export interface OpticalLaneResult {
   isTriggered: boolean;
 }
 
+export interface MultiGateScanResult {
+  laneResults: OpticalLaneResult[];
+  isPreGateTriggered: boolean;
+  preGateScore: number;
+  isPostGateTriggered: boolean;
+  postGateScore: number;
+}
+
 export class OpticalGateDetector {
   private prevFrameData: Uint8ClampedArray | null = null;
+  private prevPreGateData: Uint8ClampedArray | null = null;
+  private prevPostGateData: Uint8ClampedArray | null = null;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private preCanvas: HTMLCanvasElement;
+  private preCtx: CanvasRenderingContext2D;
+  private postCanvas: HTMLCanvasElement;
+  private postCtx: CanvasRenderingContext2D;
   private triggeredLanes: Set<number> = new Set();
 
   constructor() {
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
+    this.preCanvas = document.createElement('canvas');
+    this.preCtx = this.preCanvas.getContext('2d', { willReadFrequently: true })!;
+    this.postCanvas = document.createElement('canvas');
+    this.postCtx = this.postCanvas.getContext('2d', { willReadFrequently: true })!;
   }
 
   public reset() {
     this.prevFrameData = null;
+    this.prevPreGateData = null;
+    this.prevPostGateData = null;
     this.triggeredLanes.clear();
   }
 
   /**
-   * فحص الحساس الضوئي لكل رواق عند خط النهاية
+   * فحص حركة خط ما قبل النهاية (Pre-Finish Gate) لبدء التصوير المتتالي
+   */
+  public checkPreGateMotion(
+    video: HTMLVideoElement,
+    preLineXPercent: number = 0.22,
+    threshold: number = 20
+  ): { motionScore: number; isTriggered: boolean } {
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) return { motionScore: 0, isTriggered: false };
+
+    const bandWidth = 20;
+    const lineX = Math.floor(width * preLineXPercent);
+    const startX = Math.max(0, lineX - Math.floor(bandWidth / 2));
+
+    this.preCanvas.width = bandWidth;
+    this.preCanvas.height = height;
+    this.preCtx.drawImage(video, startX, 0, bandWidth, height, 0, 0, bandWidth, height);
+    const frame = this.preCtx.getImageData(0, 0, bandWidth, height);
+    const currData = frame.data;
+
+    if (!this.prevPreGateData || this.prevPreGateData.length !== currData.length) {
+      this.prevPreGateData = new Uint8ClampedArray(currData);
+      return { motionScore: 0, isTriggered: false };
+    }
+
+    const prev = this.prevPreGateData;
+    let changed = 0;
+    let total = 0;
+    for (let i = 0; i < currData.length; i += 16) {
+      const gCurr = currData[i] * 0.299 + currData[i + 1] * 0.587 + currData[i + 2] * 0.114;
+      const gPrev = prev[i] * 0.299 + prev[i + 1] * 0.587 + prev[i + 2] * 0.114;
+      if (Math.abs(gCurr - gPrev) > threshold) changed++;
+      total++;
+    }
+
+    const score = total > 0 ? (changed / total) * 100 : 0;
+    this.prevPreGateData.set(currData);
+    return {
+      motionScore: Math.round(score),
+      isTriggered: score > 12 // حساسية مناسبة لرصد مقدمة العداء أو ظله قبل خط النهاية
+    };
+  }
+
+  /**
+   * فحص حركة خط ما بعد النهاية (Post-Finish Gate)
+   */
+  public checkPostGateMotion(
+    video: HTMLVideoElement,
+    postLineXPercent: number = 0.52,
+    threshold: number = 20
+  ): { motionScore: number; isTriggered: boolean } {
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) return { motionScore: 0, isTriggered: false };
+
+    const bandWidth = 20;
+    const lineX = Math.floor(width * postLineXPercent);
+    const startX = Math.max(0, lineX - Math.floor(bandWidth / 2));
+
+    this.postCanvas.width = bandWidth;
+    this.postCanvas.height = height;
+    this.postCtx.drawImage(video, startX, 0, bandWidth, height, 0, 0, bandWidth, height);
+    const frame = this.postCtx.getImageData(0, 0, bandWidth, height);
+    const currData = frame.data;
+
+    if (!this.prevPostGateData || this.prevPostGateData.length !== currData.length) {
+      this.prevPostGateData = new Uint8ClampedArray(currData);
+      return { motionScore: 0, isTriggered: false };
+    }
+
+    const prev = this.prevPostGateData;
+    let changed = 0;
+    let total = 0;
+    for (let i = 0; i < currData.length; i += 16) {
+      const gCurr = currData[i] * 0.299 + currData[i + 1] * 0.587 + currData[i + 2] * 0.114;
+      const gPrev = prev[i] * 0.299 + prev[i + 1] * 0.587 + prev[i + 2] * 0.114;
+      if (Math.abs(gCurr - gPrev) > threshold) changed++;
+      total++;
+    }
+
+    const score = total > 0 ? (changed / total) * 100 : 0;
+    this.prevPostGateData.set(currData);
+    return {
+      motionScore: Math.round(score),
+      isTriggered: score > 14
+    };
+  }
+
+  /**
+   * فحص الحساس الضوئي لكل رواق عند خط النهاية الرسمي
    */
   public scan(
     video: HTMLVideoElement,

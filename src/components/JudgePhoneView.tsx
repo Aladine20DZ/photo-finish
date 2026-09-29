@@ -23,7 +23,8 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
-  AlertCircle
+  AlertCircle,
+  Flag
 } from 'lucide-react';
 import { Runner, RaceStatus, RaceSettings, Heat } from '../types/race';
 import { CertificateExporter } from '../utils/certificateExporter';
@@ -43,6 +44,7 @@ interface JudgePhoneViewProps {
   onReorderHeats?: (newHeats: Heat[]) => void;
   onUpdateRunner: (lane: number, updates: Partial<Runner>) => void;
   onUpdateRunnersList: (newRunners: Runner[]) => void;
+  onFinishRace?: (panoramaUrl?: string) => void;
   onSharedResetRace: () => void;
   onViewPhotoFinish: () => void;
   onOpenSettings?: () => void;
@@ -63,6 +65,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
   onReorderHeats,
   onUpdateRunner,
   onUpdateRunnersList,
+  onFinishRace,
   onSharedResetRace,
   onViewPhotoFinish,
   onOpenSettings,
@@ -572,6 +575,29 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* زر إنهاء السباق واعتماد النتائج من هاتف الحكم (Clôturer l'Arrivée & Valider) */}
+        {onFinishRace && (raceStatus === 'racing' || (raceStatus === 'finished' && finishedRunners.length > 0)) && (
+          <button
+            type="button"
+            onClick={() => {
+              const panorama = currentSlitPanorama || undefined;
+              onFinishRace(panorama);
+            }}
+            className={`w-full py-4 px-4 rounded-2xl font-black text-base flex items-center justify-center gap-3 transition-all shadow-2xl active:scale-95 cursor-pointer ${
+              raceStatus === 'racing'
+                ? 'bg-gradient-to-r from-red-600 via-amber-500 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-slate-950 border-2 border-yellow-300 animate-pulse shadow-amber-500/40'
+                : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white border-2 border-emerald-300 shadow-emerald-500/30'
+            }`}
+          >
+            <Flag className="w-6 h-6" />
+            <span>
+              {raceStatus === 'racing'
+                ? '🏁 خط النهاية: إنهاء السباق ومعاينة النتائج (Clôturer l\'Arrivée & Valider)'
+                : '✅ اعتماد نتائج القائمة ومعاينة Photo Finish'}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* شريط التبويبات الرئيسي (Tabs) متجاوب مع تمرير سلس للهواتف */}

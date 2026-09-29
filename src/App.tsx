@@ -73,6 +73,10 @@ const DEFAULT_SETTINGS: RaceSettings = {
   finishLineXPercent: 0.35,
   finishLineColor: '#EF4444',
   finishLineWidth: 2,
+  preFinishLineXPercent: 0.22,
+  preFinishLineColor: '#00E5FF',
+  postFinishLineXPercent: 0.52,
+  postFinishLineColor: '#A855F7',
   motionThreshold: 20,
   laserBeamVisible: true,
   gunSoundType: 'official_starter_gun',
@@ -434,6 +438,18 @@ export const App: React.FC = () => {
           setCurrentHeatIndex(heatIndex);
         }
         athleticsAudio.playWhistle(0.3, 1, 1.2, 1.2);
+        break;
+      }
+
+      case 'HEAT_CANCEL_DISPATCH': {
+        setDispatchedHeatId(null);
+        setHeats(prev => prev.map(h => ({
+          ...h,
+          isDispatched: false,
+          dispatchedAt: undefined
+        })));
+        setRaceStatus('waiting');
+        athleticsAudio.playBeep(300, 0.3);
         break;
       }
 
@@ -887,6 +903,34 @@ export const App: React.FC = () => {
     });
   };
 
+  // إلغاء أمر خط الانطلاق وسحب القائمة (Annuler / Rappel)
+  const handleCancelDispatchHeat = (heatId?: string) => {
+    setDispatchedHeatId(null);
+    setRaceStatus('waiting');
+    const updated = heats.map(h => ({
+      ...h,
+      isDispatched: false,
+      dispatchedAt: undefined
+    }));
+    setHeats(updated);
+
+    athleticsAudio.playBeep(300, 0.3);
+
+    athleticsNetwork.sendMessage({
+      type: 'HEAT_CANCEL_DISPATCH',
+      timestamp: Date.now(),
+      senderTime: Date.now(),
+      payload: { heatId }
+    });
+
+    athleticsNetwork.sendMessage({
+      type: 'HEATS_SYNC',
+      timestamp: Date.now(),
+      senderTime: Date.now(),
+      payload: { heats: updated }
+    });
+  };
+
   // تعديل حكم الهاتف الثالث لعداء محدد
   const handleJudgeUpdateRunner = (lane: number, updates: Partial<Runner>) => {
     setRunners(prev => {
@@ -1034,6 +1078,7 @@ export const App: React.FC = () => {
             currentHeatIndex={currentHeatIndex}
             onSelectHeat={handleSelectHeat}
             onDispatchHeat={handleDispatchHeat}
+            onCancelDispatchHeat={handleCancelDispatchHeat}
             onOpenSchedulePanel={() => setShowSchedulePanel(true)}
             onCommandOnMarks={handleCommandOnMarks}
             onCommandSet={handleCommandSet}
@@ -1083,6 +1128,7 @@ export const App: React.FC = () => {
             onReorderHeats={handleReorderHeats}
             onUpdateRunner={handleJudgeUpdateRunner}
             onUpdateRunnersList={handleUpdateRunnersList}
+            onFinishRace={handleFinishRace}
             onSharedResetRace={handleSharedResetRace}
             onViewPhotoFinish={() => setShowPhotoFinishViewer(true)}
             onOpenSettings={() => setShowSettingsModal(true)}
