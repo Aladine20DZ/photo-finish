@@ -124,16 +124,28 @@ export const App: React.FC = () => {
     try {
       if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
+        const currentRole = url.searchParams.get('role');
+        const currentRoom = url.searchParams.get('room');
+        const currentToken = url.searchParams.get('token');
+
+        let changed = false;
         if (role) {
-          url.searchParams.set('role', role);
+          if (currentRole !== role) { url.searchParams.set('role', role); changed = true; }
         } else {
-          url.searchParams.delete('role');
+          if (currentRole) { url.searchParams.delete('role'); changed = true; }
         }
-        url.searchParams.set('room', roomCode);
-        if (athleticsNetwork.sessionToken) {
+        if (currentRoom !== roomCode) {
+          url.searchParams.set('room', roomCode);
+          changed = true;
+        }
+        if (athleticsNetwork.sessionToken && currentToken !== athleticsNetwork.sessionToken) {
           url.searchParams.set('token', athleticsNetwork.sessionToken);
+          changed = true;
         }
-        window.history.replaceState({}, '', url.toString());
+
+        if (changed) {
+          window.history.replaceState({}, '', url.toString());
+        }
       }
     } catch (e) {}
   }, [role, roomCode]);

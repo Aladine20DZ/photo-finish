@@ -82,9 +82,15 @@ function raceRelayPlugin(): Plugin {
     // ██ WebSocket Server (الطبقة الأساسية الجديدة) ██
     // ═══════════════════════════════════════════════════
     if (server.httpServer) {
-      const wss = new WebSocketServer({ 
-        server: server.httpServer, 
-        path: '/ws/relay'
+      const wss = new WebSocketServer({ noServer: true });
+
+      server.httpServer.on('upgrade', (req: IncomingMessage, socket: any, head: Buffer) => {
+        const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+        if (url.pathname === '/ws/relay') {
+          wss.handleUpgrade(req, socket, head, (ws) => {
+            wss.emit('connection', ws, req);
+          });
+        }
       });
 
       wss.on('connection', (ws: WsWebSocket, req: IncomingMessage) => {
