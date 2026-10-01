@@ -20,6 +20,9 @@ import { athleticsNetwork } from './services/networkService';
 import { slitScanEngine } from './services/slitScanEngine';
 import { opticalGateDetector } from './services/motionDetector';
 import { burstCaptureService } from './services/burstCaptureService';
+import { athleticsArchive } from './services/archiveService';
+import { ArchiveModal } from './components/ArchiveModal';
+import { PwaInstallButton } from './components/PwaInstallButton';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -238,6 +241,7 @@ export const App: React.FC = () => {
   const [activeLicense, setActiveLicense] = useState(() => licenseManager.activeLicense);
   const [sharedPoolLicense, setSharedPoolLicense] = useState<LicensePoolInfo | null>(() => licenseManager.sharedPoolLicense);
   const [isTrialExpired, setIsTrialExpired] = useState<boolean>(() => pricingService.isTrialExpired());
+  const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubLicense = licenseManager.subscribe(() => {
@@ -295,6 +299,36 @@ export const App: React.FC = () => {
       clockIntervalRef.current = null;
     }
   }, []);
+
+  // حفظ السباق المكتمل في الأرشيف الدائم (IndexedDB) — يعمل بدون إنترنت ولا تُفقد النتائج
+  const saveRaceToArchive = useCallback((opts: { runners: Runner[]; fullPhotoFinishUrl?: string }) => {
+    try {
+      const heat = heatsRef.current[currentHeatIndexRef.current];
+      athleticsArchive
+        .saveRace({
+          roomCode: roomCode,
+          heatId: heat?.id || 'heat',
+          heatName: heat?.name || settingsRef.current.heatName,
+          heatNumber: heat?.number ?? settingsRef.current.heatNumber,
+          distance: heat?.distance || settingsRef.current.distance,
+          windSpeed: heat?.windSpeed || settingsRef.current.windSpeed,
+          laneCount: settingsRef.current.laneCount,
+          completedAt: Date.now(),
+          runners: opts.runners.map((r) => ({
+            bib: r.bib,
+            name: r.name,
+            country: r.country,
+            lane: r.lane,
+            finishTime: r.finishTime,
+            rank: r.rank,
+            status: r.status,
+          })),
+          fullPhotoFinishUrl: opts.fullPhotoFinishUrl,
+        })
+        .then((id) => console.log('[Archive] ✅ تم حفظ السباق في الأرشيف الدائم:', id))
+        .catch(() => {});
+    } catch (e) {}
+  }, [roomCode]);
 
   // إعادة ضبط محلية فورية
   const handleLocalReset = useCallback(() => {
@@ -375,6 +409,11 @@ export const App: React.FC = () => {
             return updated;
           });
         }
+        // أرشفة السباق تلقائياً على هذا الهاتف أيضاً (نسخة محلية من النتيجة الرسمية)
+        saveRaceToArchive({
+          runners: msg.payload?.runners || runnersRef.current,
+          fullPhotoFinishUrl: msg.payload?.fullPhotoFinishUrl,
+        });
         setShowPodium(true);
         break;
 
@@ -568,7 +607,7 @@ export const App: React.FC = () => {
       default:
         break;
     }
-  }, [handleLocalReset, startLocalClock, stopLocalClock, role]);
+  }, [handleLocalReset, startLocalClock, stopLocalClock, role, saveRaceToArchive]);
 
   // بث التفعيل الشبكي 1*4 للهواتف الثلاثة الأخرى عند الدخول للغرفة
   useEffect(() => {
@@ -781,6 +820,12 @@ export const App: React.FC = () => {
         runners,
         fullPhotoFinishUrl: fullPanorama || undefined
       }
+    });
+
+    // أرشفة السباق المكتمل تلقائياً مع شريط الـ Photo Finish الرسمي
+    saveRaceToArchive({
+      runners: runnersRef.current.length > 0 ? runnersRef.current : runners,
+      fullPhotoFinishUrl: fullPanorama || undefined,
     });
 
     if (fullPanorama) {
@@ -1114,6 +1159,7 @@ export const App: React.FC = () => {
         onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
         onOpenTransferModal={() => setShowTransferModal(true)}
         sharedPoolLicense={sharedPoolLicense}
+        onOpenArchive={() => setShowArchiveModal(true)}
         onSharedResetRace={handleSharedResetRace}
         onStartBellSignal={handleStartBellSignal}
         onStopBellSignal={handleStopBellSignal}
@@ -1124,14 +1170,20 @@ export const App: React.FC = () => {
       {/* الشاشات الرئيسية حسب دور الهاتف المختار */}
       <main className="flex-1 flex flex-col">
         {!role && (
-          <RoleSelector
-            roomCode={roomCode}
-            onSetRoomCode={setRoomCode}
-            onSelectRole={(selectedRole) => setRole(selectedRole)}
-            onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
-            onOpenTransferModal={() => setShowTransferModal(true)}
-            sharedPoolLicense={sharedPoolLicense}
-          />
+          <>
+            <RoleSelector
+              roomCode={roomCode}
+              onSetRoomCode={setRoomCode}
+              onSelectRole={(selectedRole) => setRole(selectedRole)}
+              onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
+              onOpenTransferModal={() => setShowTransferModal(true)}
+              sharedPoolLicense={sharedPoolLicense}
+            />
+            {/* زر تثبيت التطبيق كـ PWA — يظهر فقط عند توفر إمكانية التثبيت */}
+            <div className="px-4 pb-6 max-w-xl mx-auto w-full">
+              <PwaInstallButton />
+            </div>
+          </>
         )}
 
         {role === 'start' && !showPodium && (
@@ -1315,6 +1367,11 @@ export const App: React.FC = () => {
         <LicenseTransferModal
           onClose={() => setShowTransferModal(false)}
         />
+      )}
+
+      {/* نافذة أرشيف السباقات الدائم */}
+      {showArchiveModal && (
+        <ArchiveModal onClose={() => setShowArchiveModal(false)} />
       )}
     </div>
   );

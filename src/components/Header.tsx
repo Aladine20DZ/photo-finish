@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Wifi, WifiOff, Settings, RotateCcw, BellRing, Globe, Home, ArrowRight, ListOrdered, Crown, ArrowLeftRight, ExternalLink } from 'lucide-react';
+import { Volume2, VolumeX, Wifi, WifiOff, Settings, RotateCcw, BellRing, Globe, Home, ArrowRight, ListOrdered, Crown, ArrowLeftRight, ExternalLink, Archive } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 
 interface HeaderProps {
@@ -18,6 +18,7 @@ interface HeaderProps {
   onOpenSchedulePanel?: () => void;
   onOpenSubscriptionModal?: () => void;
   onOpenTransferModal?: () => void;
+  onOpenArchive?: () => void;
   onSharedResetRace?: () => void;
   onStartBellSignal?: () => void;
   onStopBellSignal?: () => void;
@@ -41,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSchedulePanel,
   onOpenSubscriptionModal,
   onOpenTransferModal,
+  onOpenArchive,
   onSharedResetRace,
   onStartBellSignal,
   onStopBellSignal,
@@ -144,6 +146,19 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <ListOrdered className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">السباقات</span>
+              </button>
+            )}
+
+            {/* زر أرشيف السباقات الدائم */}
+            {role && onOpenArchive && (
+              <button
+                type="button"
+                onClick={onOpenArchive}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-850 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold transition-all cursor-pointer"
+                title="أرشيف السباقات المحفوظة دائماً على هذا الجهاز (يعمل بدون إنترنت)"
+              >
+                <Archive className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">الأرشيف</span>
               </button>
             )}
 

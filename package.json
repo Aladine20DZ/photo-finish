@@ -1,7 +1,8 @@
 {
-  "name": "react-vite-tailwind",
+  "name": "photo-finish-pro",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "نظام Photo Finish Pro الذكي للتوقيت الإلكتروني والتحكيم بالمسح الشريطي لألعاب القوى — Quad-Sync 4G",
   "type": "module",
   "scripts": {
     "dev": "vite",

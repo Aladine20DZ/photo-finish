@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 Thumbs.db
+
+# environment
+.env
+.env.local
+bun.lock
