@@ -106,7 +106,10 @@ export interface NetworkPeerMessage {
     | 'DELETE_HEAT'             // حذف قائمة/سلسلة
     | 'SLIT_SCAN_IMAGE'         // بث شريط المسح البانورامي المستمر الكامل
     | 'REQUEST_STATE_SYNC'      // طلب مزامنة الحالة الكاملة عند دخول هاتف جديد
-    | 'RESPONSE_STATE_SYNC';    // إرسال الحالة الكاملة للهاتف المنضم
+    | 'RESPONSE_STATE_SYNC'     // إرسال الحالة الكاملة للهاتف المنضم
+    | 'LICENSE_SHARE_POOL'      // تقاسم التفعيل الشبكي 1*4 بين الهواتف في نفس الجلسة
+    | 'LICENSE_REVOKE_AND_TRANSFER' // نقل الترخيص المتبقي إلى هاتف آخر وإبطاله في الهاتف الأول
+    | 'LICENSE_TRANSFER_ACK';   // تأكيد الهاتف الجديد استلام التفعيل ونقله بنجاح
   timestamp: number;            // ساعة الحائط Date.now() — للعرض
   senderTime: number;           // ساعة الحائط وقت الإرسال
   perfNow?: number;             // ساعة أحادية الاتجاه performance.now() — للتوقيت الدقيق
@@ -119,4 +122,35 @@ export interface LaneMotionState {
   isTriggered: boolean;
   hasFinished: boolean;
   finishTime?: number;
+}
+
+// ═══ منظومة التراخيص الشبكية 1*4 ونقل التفعيل المشفر ═══
+export type LicenseTierCode = 'CLB8' | 'ENTX';
+
+export interface LicensePoolInfo {
+  hostDeviceId: string;
+  hostRole: PhoneRole;
+  licenseCode: string;
+  tier: LicenseTierCode;
+  tierName: string;
+  expiryDate: string;
+  maxSharedSlots: number; // 4 هواتف (1*4)
+  activeMembers: { role: PhoneRole; deviceId: string }[];
+  isShared: boolean;
+  timestamp: number;
+}
+
+export interface LicenseTransferTicket {
+  ticketId: string;
+  sourceDeviceId: string;
+  targetDeviceId: string;
+  tier: LicenseTierCode;
+  tierName: string;
+  originalCode: string;
+  voucherCode: string;
+  expiryDate: string;
+  remainingDays: number;
+  signature: string;
+  revocationProof: string;
+  timestamp: number;
 }

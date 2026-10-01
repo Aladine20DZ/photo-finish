@@ -84,6 +84,10 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
 
   // إشعار نجاح البث
   const [broadcastNotification, setBroadcastNotification] = useState(false);
+  // تبويب الشاشة للهواتف المحمولة: نموذج الإدخال أو قائمة الأروقة
+  const [mobileTab, setMobileTab] = useState<'form' | 'table'>(() => 
+    (currentHeat?.runners && currentHeat.runners.length > 0) ? 'table' : 'form'
+  );
 
   const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EAB308'];
 
@@ -132,6 +136,7 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
     setClub('');
     setBirthDate('');
     setSelectedLane(findNextFreeLane());
+    setMobileTab('table');
   };
 
   // بدء تعديل عداء
@@ -143,6 +148,7 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
     setEditClub(runner.club || runner.country || '');
     setEditWilaya(runner.wilaya || '16 الجزائر');
     setEditLane(runner.lane);
+    setMobileTab('form');
   };
 
   // حفظ تعديل عداء
@@ -548,10 +554,40 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
         </div>
       )}
 
+      {/* شريط التبديل السريع للهواتف المحمولة (Mobile Tab Switcher) */}
+      <div className="lg:hidden grid grid-cols-2 gap-2 bg-slate-950/90 p-1.5 rounded-2xl border border-slate-800 shadow-md">
+        <button
+          type="button"
+          onClick={() => setMobileTab('form')}
+          className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            mobileTab === 'form'
+              ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>{editingRunnerId ? '✏️ تعديل العداء' : '➕ تسجيل عداء جديد'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('table')}
+          className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            mobileTab === 'table'
+              ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>📋 قائمة الأروقة ({currentHeat?.runners.length || 0})</span>
+        </button>
+      </div>
+
       {/* قسم نموذج تسجيل الرياضي وقرعة الأروقة */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* عمود النموذج: إدخال معلومات العداء */}
-        <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+        <div className={`lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4 ${
+          mobileTab === 'form' ? 'block' : 'hidden lg:block'
+        }`}>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
@@ -708,7 +744,9 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
         </div>
 
         {/* عمود جدول العدائين المسجلين في القائمة الحالية */}
-        <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-3 flex flex-col">
+        <div className={`lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-3 flex flex-col ${
+          mobileTab === 'table' ? 'flex' : 'hidden lg:flex'
+        }`}>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">

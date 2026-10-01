@@ -766,6 +766,10 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
 
           {/* جدول النتائج التفصيلي */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <div className="sm:hidden px-3 py-1.5 bg-slate-950/80 border-b border-slate-800 text-[10px] text-amber-400/90 flex items-center justify-between font-mono">
+              <span>← اسحب أفقياً لمشاهدة باقي الأعمدة والصور →</span>
+              <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-bold">{runners.length} أروقة</span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 border-b border-slate-800 font-bold">

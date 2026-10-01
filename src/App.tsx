@@ -10,7 +10,11 @@ import { RaceSettingsModal } from './components/RaceSettingsModal';
 import { InternetBridgeModal } from './components/InternetBridgeModal';
 import { ChambreDappelView } from './components/ChambreDappelView';
 import { RaceSchedulePanel } from './components/RaceSchedulePanel';
-import { Runner, PhoneRole, RaceStatus, RaceSettings, NetworkPeerMessage, Heat } from './types/race';
+import { SubscriptionModal } from './components/SubscriptionModal';
+import { LicenseTransferModal } from './components/LicenseTransferModal';
+import { Runner, PhoneRole, RaceStatus, RaceSettings, NetworkPeerMessage, Heat, LicensePoolInfo } from './types/race';
+import { licenseManager } from './services/licenseManager';
+import { pricingService } from './services/pricingService';
 import { athleticsAudio } from './services/audioService';
 import { athleticsNetwork } from './services/networkService';
 import { slitScanEngine } from './services/slitScanEngine';
@@ -224,11 +228,33 @@ export const App: React.FC = () => {
   const [isReceivingBellAlert, setIsReceivingBellAlert] = useState<boolean>(false);
   const bellHoldTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // النوافذ المشروطة (Modals)
+  // النوافذ المشروطة (Modals) وحالة التراخيص والاشتراك
   const [showPhotoFinishViewer, setShowPhotoFinishViewer] = useState<boolean>(false);
   const [showPodium, setShowPodium] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showInternetBridgeModal, setShowInternetBridgeModal] = useState<boolean>(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState<boolean>(false);
+  const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
+  const [activeLicense, setActiveLicense] = useState(() => licenseManager.activeLicense);
+  const [sharedPoolLicense, setSharedPoolLicense] = useState<LicensePoolInfo | null>(() => licenseManager.sharedPoolLicense);
+  const [isTrialExpired, setIsTrialExpired] = useState<boolean>(() => pricingService.isTrialExpired());
+
+  useEffect(() => {
+    const unsubLicense = licenseManager.subscribe(() => {
+      setActiveLicense(licenseManager.activeLicense);
+      setSharedPoolLicense(licenseManager.sharedPoolLicense);
+    });
+    const unsubPricing = pricingService.subscribe(() => {
+      setIsTrialExpired(pricingService.isTrialExpired());
+    });
+    return () => {
+      unsubLicense();
+      unsubPricing();
+    };
+  }, []);
+
+  // شرط قفل التطبيق الإجباري: انتهاء الـ 7 أيام التجريبية مع عدم وجود اشتراك نشط أو مشاركة شبكية 1*4
+  const isAppLocked = isTrialExpired && !activeLicense && !sharedPoolLicense;
 
   const clockIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const raceStartTimeRef = useRef<number>(0);
@@ -520,10 +546,44 @@ export const App: React.FC = () => {
         setIsPeerSirenRinging(true);
         break;
 
+      case 'LICENSE_SHARE_POOL':
+        if (msg.payload) {
+          licenseManager.setReceivedSharedPool(msg.payload);
+          setSharedPoolLicense(msg.payload);
+          if (msg.payload.tier === 'ENTX' && settingsRef.current.laneCount < 10) {
+            setSettings(prev => ({ ...prev, laneCount: 10 }));
+          } else if (msg.payload.tier === 'CLB8' && settingsRef.current.laneCount < 8) {
+            setSettings(prev => ({ ...prev, laneCount: Math.max(prev.laneCount, 8) }));
+          }
+        }
+        break;
+
+      case 'LICENSE_REVOKE_AND_TRANSFER':
+        if (msg.payload?.sourceDeviceId === licenseManager.deviceId) {
+          licenseManager.resetToTrial();
+          setSharedPoolLicense(null);
+        }
+        break;
+
       default:
         break;
     }
   }, [handleLocalReset, startLocalClock, stopLocalClock, role]);
+
+  // بث التفعيل الشبكي 1*4 للهواتف الثلاثة الأخرى عند الدخول للغرفة
+  useEffect(() => {
+    if (role) {
+      const pool = licenseManager.createPoolShareMessage(role);
+      if (pool) {
+        athleticsNetwork.sendMessage({
+          type: 'LICENSE_SHARE_POOL',
+          timestamp: Date.now(),
+          senderTime: Date.now(),
+          payload: pool
+        });
+      }
+    }
+  }, [role, roomCode]);
 
   // إرسال واستجابة جرس لفت الانتباه وفحص الإشارة
   const handleStopBellSignal = useCallback(() => {
@@ -1051,6 +1111,9 @@ export const App: React.FC = () => {
         onOpenSettings={() => setShowSettingsModal(true)}
         onOpenInternetBridge={() => setShowInternetBridgeModal(true)}
         onOpenSchedulePanel={() => setShowSchedulePanel(true)}
+        onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
+        onOpenTransferModal={() => setShowTransferModal(true)}
+        sharedPoolLicense={sharedPoolLicense}
         onSharedResetRace={handleSharedResetRace}
         onStartBellSignal={handleStartBellSignal}
         onStopBellSignal={handleStopBellSignal}
@@ -1065,6 +1128,9 @@ export const App: React.FC = () => {
             roomCode={roomCode}
             onSetRoomCode={setRoomCode}
             onSelectRole={(selectedRole) => setRole(selectedRole)}
+            onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
+            onOpenTransferModal={() => setShowTransferModal(true)}
+            sharedPoolLicense={sharedPoolLicense}
           />
         )}
 
@@ -1214,6 +1280,40 @@ export const App: React.FC = () => {
           latencyMs={latencyMs}
           onClose={() => setShowInternetBridgeModal(false)}
           onSendTestPing={() => athleticsNetwork.performTimeSync()}
+        />
+      )}
+
+      {/* نافذة خطط الاشتراكات والأسعار والتفعيل (عند النقر على زر الاشتراك) */}
+      {showSubscriptionModal && !isAppLocked && (
+        <SubscriptionModal
+          onClose={() => setShowSubscriptionModal(false)}
+          isPaywallLock={false}
+          currentRoomCode={roomCode}
+          onConnectToMeshRoom={(newRoom) => {
+            setRoomCode(newRoom);
+            setShowSubscriptionModal(false);
+          }}
+          sharedPoolLicense={sharedPoolLicense}
+        />
+      )}
+
+      {/* قفل التطبيق الإجباري (Paywall Gate) بعد انتهاء فترة الـ 7 أيام التجريبية: لا يفتح إلا بالاشتراك أو الاتصال بشبكة 1*4 */}
+      {isAppLocked && (
+        <SubscriptionModal
+          onClose={() => {}}
+          isPaywallLock={true}
+          currentRoomCode={roomCode}
+          onConnectToMeshRoom={(newRoom) => {
+            setRoomCode(newRoom);
+          }}
+          sharedPoolLicense={sharedPoolLicense}
+        />
+      )}
+
+      {/* نافذة تحويل ونقل الترخيص المشفر لمنع الازدواجية */}
+      {showTransferModal && (
+        <LicenseTransferModal
+          onClose={() => setShowTransferModal(false)}
         />
       )}
     </div>

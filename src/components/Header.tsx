@@ -1,6 +1,6 @@
 import React from 'react';
-import { Volume2, VolumeX, Wifi, WifiOff, Settings, RotateCcw, BellRing, Globe, Home, ArrowRight, ListOrdered } from 'lucide-react';
-import { PhoneRole } from '../types/race';
+import { Volume2, VolumeX, Wifi, WifiOff, Settings, RotateCcw, BellRing, Globe, Home, ArrowRight, ListOrdered, Crown, ArrowLeftRight, ExternalLink } from 'lucide-react';
+import { PhoneRole, LicensePoolInfo } from '../types/race';
 
 interface HeaderProps {
   role: PhoneRole;
@@ -10,11 +10,14 @@ interface HeaderProps {
   isMuted: boolean;
   heatNumber?: number;
   heatName?: string;
+  sharedPoolLicense?: LicensePoolInfo | null;
   onToggleMute: () => void;
   onChangeRole: () => void;
   onOpenSettings?: () => void;
   onOpenInternetBridge?: () => void;
   onOpenSchedulePanel?: () => void;
+  onOpenSubscriptionModal?: () => void;
+  onOpenTransferModal?: () => void;
   onSharedResetRace?: () => void;
   onStartBellSignal?: () => void;
   onStopBellSignal?: () => void;
@@ -30,11 +33,14 @@ export const Header: React.FC<HeaderProps> = ({
   isMuted,
   heatNumber,
   heatName,
+  sharedPoolLicense,
   onToggleMute,
   onChangeRole,
   onOpenSettings,
   onOpenInternetBridge,
   onOpenSchedulePanel,
+  onOpenSubscriptionModal,
+  onOpenTransferModal,
   onSharedResetRace,
   onStartBellSignal,
   onStopBellSignal,
@@ -76,6 +82,43 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* الجزء الأيسر: شارة الدور الحالية + زر العودة للرئيسية البارز جداً */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* شارة الاشتراك الشبكي المشترك 1*4 إذا كان فعالاً */}
+            {sharedPoolLicense && (
+              <span 
+                className="hidden md:flex items-center gap-1 text-[10px] bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 font-bold px-2.5 py-1 rounded-full border border-amber-500/40 animate-pulse shadow-sm"
+                title={`اشتراك 1*4 مشترك من ${sharedPoolLicense.hostRole === 'start' ? 'هاتف البداية' : sharedPoolLicense.hostRole === 'finish' ? 'هاتف النهاية' : 'الهاتف الرئيسي'} (${sharedPoolLicense.tierName})`}
+              >
+                <Crown className="w-3 h-3 text-amber-400" />
+                <span>1×4 مشترك ({sharedPoolLicense.tier === 'ENTX' ? '10 أروقة' : '8 أروقة'}) 🏆</span>
+              </span>
+            )}
+
+            {/* زر نافذة خطط الاشتراك والأسعار والتفعيل */}
+            {onOpenSubscriptionModal && (
+              <button
+                type="button"
+                onClick={onOpenSubscriptionModal}
+                className={`items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 font-bold text-[11px] sm:text-xs shadow-sm border border-amber-500/40 transition-all active:scale-95 cursor-pointer shrink-0 ${!role ? 'hidden sm:flex' : 'flex'}`}
+                title="عرض أنواع الاشتراكات، الأسعار، كيفية الاشتراك، وتفعيل كود الترخيص"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>الاشتراك والأسعار 👑</span>
+              </button>
+            )}
+
+            {/* زر نقل الترخيص المشفر */}
+            {onOpenTransferModal && (
+              <button
+                type="button"
+                onClick={onOpenTransferModal}
+                className={`items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-slate-850 hover:bg-purple-900/60 text-purple-300 border border-purple-500/40 text-[10px] sm:text-xs font-bold transition-all cursor-pointer shadow-sm ${!role ? 'hidden sm:flex' : 'flex'}`}
+                title="تحويل الترخيص المتبقي إلى هاتف آخر أو استقبال كود نقل"
+              >
+                <ArrowLeftRight className="w-3 h-3 text-purple-400" />
+                <span className="hidden sm:inline">نقل الترخيص</span>
+              </button>
+            )}
+
             {/* شارة الدور الحالي */}
             {role && (
               <span className={`text-[10px] sm:text-xs font-bold px-2 py-1 rounded-xl border shrink-0 ${
