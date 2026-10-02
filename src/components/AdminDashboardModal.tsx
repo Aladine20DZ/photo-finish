@@ -4,21 +4,15 @@ import {
   Crown, 
   Key, 
   Smartphone, 
-  QrCode, 
   Copy, 
   Check, 
-  Calendar, 
   ShieldCheck, 
-  Users, 
   Trash2, 
   Share2, 
   Sparkles, 
   Activity, 
-  RefreshCw,
   ExternalLink,
-  Laptop,
-  CheckCircle2,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { PhoneRole } from '../types/race';
 
@@ -127,8 +121,6 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [simRole, setSimRole] = useState<'start' | 'finish' | 'judge' | 'chambre_dappel'>('start');
   const [simLicenseActive, setSimLicenseActive] = useState<boolean>(false);
   const [simInputCode, setSimInputCode] = useState<string>('');
-
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   useEffect(() => {
     try {

@@ -3,10 +3,8 @@ import {
   Crown, 
   Key, 
   Smartphone, 
-  QrCode, 
   Copy, 
   Check, 
-  Calendar, 
   ShieldCheck, 
   Users, 
   Trash2, 
@@ -19,17 +17,11 @@ import {
   ArrowLeftRight,
   Radio,
   CheckCircle2,
-  AlertTriangle,
   Layers,
   Search,
-  Filter,
-  Download,
   Wifi,
   BarChart3,
-  Sliders,
-  Send,
   Settings,
-  DollarSign,
   Coins,
   Clock,
   Phone,
@@ -38,15 +30,13 @@ import {
   Flag,
   Camera,
   Plus,
-  Eye,
   Zap,
-  Info,
   CheckSquare
 } from 'lucide-react';
-import { licenseManager, StoredLicense } from '../services/licenseManager';
+import { licenseManager } from '../services/licenseManager';
 import { pricingService, SubscriptionSettings, CurrencyCode, CustomPackage } from '../services/pricingService';
 import { athleticsAudio } from '../services/audioService';
-import { LicenseTierCode, PhoneRole } from '../types/race';
+import { LicenseTierCode } from '../types/race';
 
 interface AdminLicenseRecord {
   id: string;
@@ -67,7 +57,7 @@ const STORAGE_LEDGER_KEY = 'pf_admin_portal_master_ledger_v2';
 
 export const AdminPortal: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'overview' | 'generator' | 'packages' | 'transfer' | 'ledger' | 'simulator' | 'settings'>('overview');
-  const [roomCode, setRoomCode] = useState<string>('RACE-2026');
+  const [roomCode] = useState<string>('RACE-2026');
 
   // إعدادات المنظومة والأسعار
   const [systemSettings, setSystemSettings] = useState<SubscriptionSettings>(() => pricingService.settings);
@@ -96,7 +86,7 @@ export const AdminPortal: React.FC = () => {
   const [newPkgName, setNewPkgName] = useState<string>('باقة المدارس الرياضية');
   const [newPkgDesc, setNewPkgDesc] = useState<string>('مخصصة للبطولات المدرسية والجامعية وأكاديميات الفئات الصغرى');
   const [newPkgLanes, setNewPkgLanes] = useState<number>(6);
-  const [newPkgTier, setNewPkgTier] = useState<LicenseTierCode>('CLB8');
+  const [newPkgTier] = useState<LicenseTierCode>('CLB8');
   const [newPkgDuration, setNewPkgDuration] = useState<number>(12);
   const [newPkgDurationLabel, setNewPkgDurationLabel] = useState<string>('سنة كاملة (موسم دراسي)');
   const [newPkgPriceDZD, setNewPkgPriceDZD] = useState<number>(15000);

@@ -23,6 +23,7 @@ import { burstCaptureService } from './services/burstCaptureService';
 import { athleticsArchive } from './services/archiveService';
 import { ArchiveModal } from './components/ArchiveModal';
 import { PwaInstallButton } from './components/PwaInstallButton';
+import { AdminGate } from './components/AdminGate';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -1377,4 +1378,13 @@ export const App: React.FC = () => {
   );
 };
 
-export default App;
+// ═══ الجذر: يوجه إلى ADMIN SUITE عند وجود ?admin في الرابط ═══
+// مثال: https://<domain>/?admin → بوابة رمز المدير → لوحة التراخيص
+const AppRoot: React.FC = () => {
+  const [adminMode] = useState<boolean>(() => {
+    try { return new URLSearchParams(window.location.search).has('admin'); } catch { return false; }
+  });
+  return adminMode ? <AdminGate /> : <App />;
+};
+
+export default AppRoot;

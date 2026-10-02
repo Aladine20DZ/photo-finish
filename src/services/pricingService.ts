@@ -282,7 +282,7 @@ class PricingService {
 
   public subscribe(fn: () => void) {
     this._listeners.add(fn);
-    return () => this._listeners.delete(fn);
+    return () => { this._listeners.delete(fn); };
   }
 
   private notify() {
