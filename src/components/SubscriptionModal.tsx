@@ -2,21 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Crown, 
-  ShieldCheck, 
   Sparkles, 
   Check, 
   Copy, 
-  Smartphone, 
-  Users, 
   Clock, 
   CreditCard, 
   MessageCircle, 
-  Phone, 
   HelpCircle, 
   CheckCircle2, 
-  Flame, 
-  Coins,
-  ArrowRight,
   Radio
 } from 'lucide-react';
 import { licenseManager, StoredLicense } from '../services/licenseManager';
@@ -49,6 +42,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [isActivating, setIsActivating] = useState<boolean>(false);
   const [activationError, setActivationError] = useState<string>('');
   const [activationSuccess, setActivationSuccess] = useState<string>('');
+  const [activatedLicense, setActivatedLicense] = useState<StoredLicense | null>(null);
   const [copiedDevId, setCopiedDevId] = useState<boolean>(false);
 
   // حقل الاتصال بغرفة شبكية 1*4
@@ -77,6 +71,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const handleActivate = async () => {
     setActivationError('');
     setActivationSuccess('');
+    setActivatedLicense(null);
     if (!activationInput.trim()) {
       setActivationError('يرجى إدخال أو لصق كود الاشتراك أولاً.');
       return;
@@ -87,6 +82,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       const res = await licenseManager.activateCode(activationInput);
       if (res.success) {
         setActivationSuccess(res.message);
+        setActivatedLicense(res.license || null);
+        if (res.license) setActiveLicense(res.license);
         setActivationInput('');
       } else {
         setActivationError(res.message);
@@ -106,6 +103,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
   const isExpired = pricingService.isTrialExpired() && !activeLicense && !sharedPoolLicense;
   const trialText = pricingService.getRemainingTrialText();
+
+  // نص مدة الاشتراك للرخصة المفعّلة حديثاً (تاريخ الانتهاء + الأيام المتبقية)
+  const activatedExpiryText = activatedLicense
+    ? `حتى ${new Date(activatedLicense.expiryDate).toLocaleDateString('ar', { year: 'numeric', month: 'long', day: 'numeric' })} — تبقى ${Math.max(0, Math.ceil((new Date(activatedLicense.expiryDate).getTime() - Date.now()) / 86400000))} يوم`
+    : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md" dir="rtl">
@@ -545,9 +547,31 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 )}
 
                 {activationSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{activationSuccess}</span>
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>{activationSuccess}</span>
+                    </div>
+                    {activatedLicense && (
+                      <div className="mt-3 grid gap-1.5 text-[11px] bg-slate-950/60 rounded-lg p-2.5 border border-slate-800">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-500 font-bold">🏆 نوع الباقة</span>
+                          <span className="font-bold text-amber-300">{activatedLicense.tierName}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-500 font-bold">📡 نمط التوزيع</span>
+                          <span className="font-bold text-cyan-300">
+                            {activatedLicense.isQuadPool
+                              ? `شبكي 1*4 — يتقاسمه ${activatedLicense.maxSharedSlots} هواتف في نفس السباق`
+                              : 'مقيد بجهاز واحد — هذا الهاتف فقط'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-500 font-bold">⏳ مدة الاشتراك</span>
+                          <span className="font-bold text-emerald-300">{activatedExpiryText}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
