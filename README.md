@@ -103,6 +103,11 @@ npm run dev -- --host
 - الأجهزة المرفوضة تتحول تلقائياً إلى MQTT مع بقاء المزامنة — لا توقف ميداني أبداً.
 
 ### ☁️ النشر على Vercel
-1. المستودع جاهز للنشر المباشر (إطار Vite يُكتشف تلقائياً، إخراج `dist`).
-2. أي `git push` إلى `main` = نشر تلقائي (بعد ربط GitHub مع Vercel).
+1. **النظام حي الآن** — مرتبط بمستودع GitHub بنشر تلقائي كامل (CI/CD):
+   - 🏠 [photo-finish-bouanani20-dz.vercel.app](https://photo-finish-bouanani20-dz.vercel.app)
+   - 🧪 [photo-finish-beta.vercel.app](https://photo-finish-beta.vercel.app)
+   - 🌐 [photo-finish-gamma.vercel.app](https://photo-finish-gamma.vercel.app)
+2. أي `git push` إلى `main` = نشر إنتاجي تلقائي (GitHub ⇄ Vercel مرتبطان دائماً).
 3. اختياري: أضف `VITE_RELAY_WS_URL` لتفعيل الترحيل السحابي.
+
+[![CI](https://github.com/Aladine20DZ/photo-finish/actions/workflows/ci.yml/badge.svg)](https://github.com/Aladine20DZ/photo-finish/actions/workflows/ci.yml)
