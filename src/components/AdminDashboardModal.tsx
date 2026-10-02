@@ -93,28 +93,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       const saved = localStorage.getItem('pf_admin_license_ledger');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      {
-        id: 'lic-1',
-        code: 'ALADINE-VIP-2026',
-        tier: 'ENTX',
-        tierName: 'رخصة المدير العام الدائمة (Enterprise)',
-        clientName: 'الإدارة العليا للاتحاد',
-        deviceId: 'GLOBAL',
-        expiryDate: '2035-01-01',
-        createdAt: '2026-09-30'
-      },
-      {
-        id: 'lic-2',
-        code: 'PRO-ATHLETICS-2026',
-        tier: 'CLB8',
-        tierName: 'باقة الأندية السنوية (Pro Club 8L)',
-        clientName: 'نادي الرائد الرياضي',
-        deviceId: 'GLOBAL',
-        expiryDate: '2027-09-30',
-        createdAt: '2026-09-30'
-      }
-    ];
+    return [];
   });
 
   // محاكي الهاتف
@@ -156,7 +135,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const copyCodeOnly = (codeToCopy: string) => {
     navigator.clipboard.writeText(codeToCopy);
     setCopiedCode(true);
-    setTimeout(() => setCopiedCode(null), 2500);
+    setTimeout(() => setCopiedCode(false), 2500);
   };
 
   const copyWhatsAppMessage = (lic: { code: string; client: string; exp: string; tierName: string }) => {
@@ -663,18 +642,6 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                           className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] px-2.5 py-1 rounded-lg"
                         >
                           تفعيل
-                        </button>
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSimInputCode('PRO-ATHLETICS-2026');
-                            setSimLicenseActive(true);
-                          }}
-                          className="text-[9px] text-cyan-400 hover:underline"
-                        >
-                          استخدم الكود الجاهز: PRO-ATHLETICS-2026
                         </button>
                       </div>
                     </div>

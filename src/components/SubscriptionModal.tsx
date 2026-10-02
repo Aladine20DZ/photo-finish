@@ -104,9 +104,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const isExpired = pricingService.isTrialExpired() && !activeLicense && !sharedPoolLicense;
   const trialText = pricingService.getRemainingTrialText();
 
+  // تنسيق تاريخ انتهاء الرخصة (YYYY-MM-DD) بصدق مع المنطقة الزمنية المحلية
+  const formatExpiryDate = (dateStr: string): string =>
+    new Date(`${dateStr}T23:59:59`).toLocaleDateString('ar', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  // الأيام المتبقية لرخصة ما
+  const daysLeftOf = (dateStr: string): number =>
+    Math.max(0, Math.ceil((new Date(`${dateStr}T23:59:59`).getTime() - Date.now()) / 86400000));
+
   // نص مدة الاشتراك للرخصة المفعّلة حديثاً (تاريخ الانتهاء + الأيام المتبقية)
   const activatedExpiryText = activatedLicense
-    ? `حتى ${new Date(activatedLicense.expiryDate).toLocaleDateString('ar', { year: 'numeric', month: 'long', day: 'numeric' })} — تبقى ${Math.max(0, Math.ceil((new Date(activatedLicense.expiryDate).getTime() - Date.now()) / 86400000))} يوم`
+    ? `حتى ${formatExpiryDate(activatedLicense.expiryDate)} — تبقى ${daysLeftOf(activatedLicense.expiryDate)} يوم`
     : '';
 
   return (
@@ -158,7 +166,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             {activeLicense ? (
               <>
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>الاشتراك نشط: {activeLicense.tierName} (صالح لغاية {activeLicense.expiryDate})</span>
+                <span>الاشتراك نشط: {activeLicense.tierName} (صالح لغاية {formatExpiryDate(activeLicense.expiryDate)})</span>
               </>
             ) : sharedPoolLicense ? (
               <>
@@ -547,28 +555,44 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 )}
 
                 {activationSuccess && (
-                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
-                    <div className="flex items-center gap-2">
+                  <div className="rounded-2xl overflow-hidden border border-emerald-500/40">
+                    {/* رسالة نجاح التفعيل */}
+                    <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/15 border-b border-emerald-500/25 text-emerald-300 text-xs font-black">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
                       <span>{activationSuccess}</span>
                     </div>
+
+                    {/* بطاقة معلومات الاشتراك المُفعّل */}
                     {activatedLicense && (
-                      <div className="mt-3 grid gap-1.5 text-[11px] bg-slate-950/60 rounded-lg p-2.5 border border-slate-800">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500 font-bold">🏆 نوع الباقة</span>
-                          <span className="font-bold text-amber-300">{activatedLicense.tierName}</span>
+                      <div className="p-3.5 bg-slate-950/80 space-y-2">
+                        <p className="text-[10px] font-black text-slate-400 tracking-wide">معلومات الإشتراك:</p>
+
+                        <div className="flex items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 shrink-0">
+                            <Crown className="w-4 h-4 text-amber-400" />
+                            <span>نوع الباقة</span>
+                          </div>
+                          <span className="text-xs font-black text-amber-300 text-left">{activatedLicense.tierName}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500 font-bold">📡 نمط التوزيع</span>
-                          <span className="font-bold text-cyan-300">
+
+                        <div className="flex items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 shrink-0">
+                            <Radio className="w-4 h-4 text-cyan-400" />
+                            <span>نمط التوزيع</span>
+                          </div>
+                          <span className="text-xs font-black text-cyan-300 text-left">
                             {activatedLicense.isQuadPool
                               ? `شبكي 1*4 — يتقاسمه ${activatedLicense.maxSharedSlots} هواتف في نفس السباق`
                               : 'مقيد بجهاز واحد — هذا الهاتف فقط'}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500 font-bold">⏳ مدة الاشتراك</span>
-                          <span className="font-bold text-emerald-300">{activatedExpiryText}</span>
+
+                        <div className="flex items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 shrink-0">
+                            <Clock className="w-4 h-4 text-emerald-400" />
+                            <span>مدة الاشتراك</span>
+                          </div>
+                          <span className="text-xs font-black text-emerald-300 text-left">{activatedExpiryText}</span>
                         </div>
                       </div>
                     )}
@@ -586,26 +610,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 </button>
               </div>
 
-              {/* أكواد تجريبية سريعة */}
-              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 text-xs">
-                <p className="font-bold text-slate-400">أكواد تجريبية وإدارية للاختبار السريع:</p>
-                <div className="flex flex-wrap gap-2 font-mono text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setActivationInput('PRO-ATHLETICS-2026')}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer"
-                  >
-                    PRO-ATHLETICS-2026
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActivationInput('ALADINE-VIP-2026')}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 cursor-pointer"
-                  >
-                    ALADINE-VIP-2026
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
