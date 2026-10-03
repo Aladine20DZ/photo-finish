@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, SwitchCamera, Flashlight, Sliders, Award, Crosshair, RotateCcw, Zap, BellRing, Film, Globe } from 'lucide-react';
+import { Camera, SwitchCamera, Flashlight, Sliders, Award, Crosshair, RotateCcw, Zap, BellRing, Film, Globe, LocateFixed, AlertTriangle, MapPin } from 'lucide-react';
 import { Runner, RaceStatus, RaceSettings } from '../types/race';
 import { opticalGateDetector, OpticalLaneResult } from '../services/motionDetector';
 import { slitScanEngine } from '../services/slitScanEngine';
 import { athleticsAudio } from '../services/audioService';
 import { burstCaptureService } from '../services/burstCaptureService';
+import { getPlacementOption, CAMERA_PLACEMENT_OPTIONS } from '../services/cameraPlacement';
 
 interface FinishPhoneViewProps {
   raceStatus: RaceStatus;
@@ -52,6 +53,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
   const [laneResults, setLaneResults] = useState<OpticalLaneResult[]>([]);
   const [cameraError, setCameraError] = useState<string>('');
   const [showCalibration, setShowCalibration] = useState<boolean>(false);
+  const [showPlacementGuide, setShowPlacementGuide] = useState<boolean>(false);
 
   // حالات التصوير المتتالي فائق السرعة (Burst Capture)
   const [isBurstActive, setIsBurstActive] = useState<boolean>(false);
@@ -89,13 +91,14 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
 
       let stream: MediaStream | null = null;
       
-      // 1. محاولة طلب الكاميرا الخلفية بدقة HD
+      // 1. محاولة طلب الكاميرا الخلفية بدقة HD ومعدل إطارات عالٍ (دقة التوقيت تعتمد على هذا)
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: facingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 },
+            frameRate: { ideal: 60, min: 30 },
           },
           audio: false
         });
@@ -139,6 +142,20 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
           console.warn('Auto video play failed, waiting for user gesture:', playErr);
         }
         streamRef.current = stream;
+
+        // قفل التعريض/التركيز/توازن الأبيض التلقائي حيث يدعمه الجهاز، لمنع أي تعديل تلقائي
+        // مفاجئ (سطوع/تركيز) من خداع كاشف الحركة ويُسجَّل كوصول زائف
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track.getCapabilities?.() as any;
+          const advanced: any[] = [];
+          if (caps?.focusMode?.includes?.('manual')) advanced.push({ focusMode: 'manual' });
+          if (caps?.exposureMode?.includes?.('manual')) advanced.push({ exposureMode: 'manual' });
+          if (caps?.whiteBalanceMode?.includes?.('manual')) advanced.push({ whiteBalanceMode: 'manual' });
+          if (advanced.length) await track.applyConstraints({ advanced } as any);
+        } catch (lockErr) {
+          console.warn('Manual exposure/focus lock not supported on this device:', lockErr);
+        }
       }
     } catch (e: any) {
       console.error('Camera access error:', e);
@@ -184,9 +201,14 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
     }
   };
 
-  // حلقة معالجة إطارات الكاميرا وحساس خط النهاية (60 FPS)
+  // حلقة معالجة إطارات الكاميرا وحساس خط النهاية
+  // تُستخدم requestVideoFrameCallback حيث تتوفر (Chrome/Edge/Safari الحديث) لأنها تستدعينا بالضبط
+  // عند عرض إطار كاميرا جديد فعلياً، بدل التخمين عبر معدل تحديث الشاشة كما في requestAnimationFrame
   useEffect(() => {
     let animId: number;
+    let vfcId: number;
+    const video0 = videoRef.current;
+    const supportsVFC = !!(video0 && 'requestVideoFrameCallback' in video0);
 
     const loop = () => {
       if (videoRef.current && videoRef.current.readyState >= 2) {
@@ -220,12 +242,13 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             }
           }
 
-          // 2. كشف الحساس الضوئي لكل رواق
+          // 2. كشف الحساس الضوئي لكل رواق (تمرير ساعة السباق نفسها، تُستخدم للاستيفاء الزمني الدقيق)
           const detected = opticalGateDetector.scan(
             video,
             currentSettings.laneCount,
             currentX,
-            currentSettings.motionThreshold
+            currentSettings.motionThreshold,
+            currentClock
           );
           setLaneResults(detected);
 
@@ -278,7 +301,9 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
               // تنبيه صوتي للحساس
               athleticsAudio.playSensorCutBeep(res.lane);
 
-              const formatted = `${(currentClock / 1000).toFixed(3)}s`;
+              // استخدم اللحظة المستوفاة رياضياً (أدق من لحظة اكتشاف العبور) إن توفرت
+              const preciseTimeMs = res.interpolatedCrossMs ?? currentClock;
+              const formatted = `${(preciseTimeMs / 1000).toFixed(3)}s`;
               const alreadyFinished = currentRunners.filter(r => r.finishTime > 0).length;
               const currentRank = alreadyFinished + 1;
 
@@ -291,7 +316,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
                 runner.bib,
                 currentRank
               );
-              onLaneFinishRef.current(res.lane, currentClock, snap || undefined);
+              onLaneFinishRef.current(res.lane, preciseTimeMs, snap || undefined);
             }
           });
 
@@ -308,11 +333,25 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
         }
       }
 
-      animId = requestAnimationFrame(loop);
+      if (supportsVFC) {
+        vfcId = (videoRef.current as any).requestVideoFrameCallback(loop);
+      } else {
+        animId = requestAnimationFrame(loop);
+      }
     };
 
-    animId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animId);
+    if (supportsVFC) {
+      vfcId = (videoRef.current as any).requestVideoFrameCallback(loop);
+    } else {
+      animId = requestAnimationFrame(loop);
+    }
+    return () => {
+      if (supportsVFC && videoRef.current && vfcId) {
+        (videoRef.current as any).cancelVideoFrameCallback(vfcId);
+      } else if (animId) {
+        cancelAnimationFrame(animId);
+      }
+    };
   }, [raceStatus]);
 
   useEffect(() => {
@@ -539,6 +578,15 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             >
               <Sliders className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => setShowPlacementGuide(!showPlacementGuide)}
+              className={`p-1.5 rounded-lg border backdrop-blur-md ${
+                showPlacementGuide ? 'bg-emerald-500 border-emerald-400 text-black' : 'bg-black/60 border-white/10 text-emerald-300'
+              }`}
+              title="دليل وضعية الكاميرا (دقة التوقيت)"
+            >
+              <LocateFixed className="w-4 h-4" />
+            </button>
             {onOpenSettings && (
               <button
                 onClick={onOpenSettings}
@@ -624,6 +672,121 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* ═══ دليل هندسة وضعية الكاميرا (Camera Placement Guide) — العامل الأهم في دقة التوقيت ═══ */}
+      {showPlacementGuide && (() => {
+        const activePlacement = getPlacementOption(settings.cameraPlacement);
+        return (
+          <div className="bg-slate-900 border border-emerald-800/60 rounded-2xl p-3 space-y-3 text-xs shadow-xl">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-black text-emerald-400 flex items-center gap-1.5">
+                <LocateFixed className="w-4 h-4" />
+                دليل وضعية الكاميرا (Placement Guide):
+              </span>
+              <span
+                className="text-[9px] font-black px-2 py-0.5 rounded-full border"
+                style={{ color: activePlacement.accent, borderColor: activePlacement.accent + '70', backgroundColor: activePlacement.accent + '15' }}
+              >
+                الوضعية الحالية: {activePlacement.title}
+              </span>
+            </div>
+
+            {/* مخططات الوضعيات الثلاث (عرض علوي للمضمار) */}
+            <div className="grid grid-cols-3 gap-2">
+              {CAMERA_PLACEMENT_OPTIONS.map((opt) => {
+                const isActive = opt.id === activePlacement.id;
+                return (
+                  <div
+                    key={opt.id}
+                    className={`rounded-xl p-1.5 border-2 text-center space-y-1 ${
+                      isActive ? 'bg-slate-950' : 'bg-slate-950/50 border-slate-800 opacity-60'
+                    }`}
+                    style={isActive ? { borderColor: opt.accent } : undefined}
+                  >
+                    <svg viewBox="0 0 100 64" className="w-full rounded-lg bg-slate-900">
+                      {/* الأروقة (خطوط المضمار) */}
+                      {[0, 1, 2, 3].map(i => (
+                        <line key={i} x1="18" y1={10 + i * 14} x2="88" y2={10 + i * 14} stroke="#334155" strokeWidth="1" />
+                      ))}
+                      {/* اتجاه العدائين */}
+                      <text x="53" y="62" fill="#64748b" fontSize="6" textAnchor="middle">اتجاه العدائين ←</text>
+                      {/* خط النهاية */}
+                      <line x1="34" y1="6" x2="34" y2="52" stroke="#EF4444" strokeWidth="2" />
+                      {/* الكاميرا حسب الوضعية */}
+                      {opt.id === 'tele_parallel' && (
+                        <>
+                          <circle cx="10" cy="30" r="5" fill={opt.accent} />
+                          <line x1="15" y1="30" x2="33" y2="30" stroke={opt.accent} strokeWidth="1.5" strokeDasharray="3 2" />
+                          <text x="10" y="8" fill={opt.accent} fontSize="6" textAnchor="middle">زاوية 0°</text>
+                        </>
+                      )}
+                      {opt.id === 'angled_behind' && (
+                        <>
+                          <circle cx="14" cy="14" r="5" fill={opt.accent} />
+                          <line x1="18" y1="17" x2="33" y2="26" stroke={opt.accent} strokeWidth="1.5" strokeDasharray="3 2" />
+                          <text x="24" y="10" fill={opt.accent} fontSize="6" textAnchor="middle">≤10°</text>
+                        </>
+                      )}
+                      {opt.id === 'side_classic' && (
+                        <>
+                          <circle cx="60" cy="30" r="5" fill={opt.accent} />
+                          <line x1="55" y1="30" x2="35" y2="30" stroke={opt.accent} strokeWidth="1.5" strokeDasharray="3 2" />
+                          <text x="72" y="32" fill={opt.accent} fontSize="6" textAnchor="middle">90°</text>
+                        </>
+                      )}
+                    </svg>
+                    <p className="text-[8.5px] font-black leading-tight" style={{ color: isActive ? opt.accent : '#94a3b8' }}>
+                      {opt.title}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* خطوات التثبيت للوضعية النشطة */}
+            <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 space-y-1.5">
+              <p className="font-black text-[10px]" style={{ color: activePlacement.accent }}>
+                خطوات التثبيت الصحيح للوضعية الحالية:
+              </p>
+              <ul className="space-y-1">
+                {activePlacement.steps.map((step, i) => (
+                  <li key={i} className="text-[10px] text-slate-300 flex items-start gap-1.5">
+                    <span className="w-4 h-4 rounded-full shrink-0 font-black text-[8px] flex items-center justify-center text-black" style={{ backgroundColor: activePlacement.accent }}>{i + 1}</span>
+                    <span className="leading-relaxed">{step}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* تحذير الوضعية إن وجد */}
+            {activePlacement.warning && (
+              <div className="flex items-start gap-1.5 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                <span className="leading-relaxed">{activePlacement.warning}</span>
+              </div>
+            )}
+
+            {/* تذكير بتغيير الوضعية من الإعدادات */}
+            {activePlacement.id !== 'tele_parallel' && (
+              <div className="flex items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2">
+                <span className="text-[10px] text-emerald-300 font-bold leading-relaxed">
+                  💡 للدقة الأولمبية المعتمدة: بدّل إلى «موازية أولمبية + تكبير» من إعدادات السباق
+                </span>
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] cursor-pointer transition-all active:scale-95 flex items-center gap-1"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    <span>فتح الإعدادات</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* شريط المسح الشريطي التراكمي المباشر (Live Photo Finish Ribbon) */}
       <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 space-y-1.5 shadow-inner">

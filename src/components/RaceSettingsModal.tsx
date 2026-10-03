@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Save, Sliders, Volume2, Play, Sparkles, Crosshair, Plus, Smartphone, Gauge, Upload, Music, RotateCcw, CheckCircle } from 'lucide-react';
+import { X, Save, Sliders, Volume2, Play, Sparkles, Crosshair, Plus, Smartphone, Gauge, Upload, Music, RotateCcw, CheckCircle, Video, AlertTriangle } from 'lucide-react';
 import { RaceSettings, Runner } from '../types/race';
+import { CAMERA_PLACEMENT_OPTIONS } from '../services/cameraPlacement';
 import { athleticsAudio } from '../services/audioService';
 
 interface RaceSettingsModalProps {
@@ -622,6 +623,76 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 onChange={(e) => setCurrentSettings(prev => ({ ...prev, motionThreshold: parseInt(e.target.value) }))}
                 className="w-full accent-emerald-400 cursor-pointer mt-1"
               />
+            </div>
+          </div>
+
+          {/* 4.5 هندسة وضعية كاميرا خط النهاية (Camera Placement) */}
+          <div className="space-y-3 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+            <div className="font-bold text-cyan-400 flex items-center gap-1.5">
+              <Video className="w-4 h-4" />
+              <span>هندسة وضعية كاميرا خط النهاية (Camera Placement):</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed -mt-1.5">
+              أهم عامل في دقة التوقيت على الإطلاق — الكاميرا يجب أن تنظر على طول خط النهاية نفسه لا بزاوية نحوه،
+              لأن أي ميلان يولّد خطأ منظور (Parallax) لا يمكن لأي خوارزمية تصحيحه لاحقاً.
+            </p>
+
+            <div className="grid gap-2">
+              {CAMERA_PLACEMENT_OPTIONS.map((opt) => {
+                const selected = (currentSettings.cameraPlacement || 'side_classic') === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setCurrentSettings(prev => ({ ...prev, cameraPlacement: opt.id }))}
+                    className={`text-right p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                      selected ? 'bg-slate-900' : 'bg-slate-950/70 border-slate-800 hover:border-slate-600'
+                    }`}
+                    style={selected ? { borderColor: opt.accent } : undefined}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-xs" style={{ color: opt.accent }}>{opt.title}</span>
+                        {opt.recommended && (
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-black px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                            ⭐ موصى بها رسمياً
+                          </span>
+                        )}
+                      </div>
+                      {selected && <CheckCircle className="w-4 h-4 shrink-0" style={{ color: opt.accent }} />}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">{opt.subtitle}</p>
+
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="text-[9px] text-slate-500 font-bold shrink-0">دقة التوقيت:</span>
+                      <div className="flex gap-0.5 shrink-0">
+                        {[1, 2, 3].map(lvl => (
+                          <span key={lvl} className="w-4 h-1.5 rounded-full" style={{ backgroundColor: lvl <= opt.accuracyLevel ? opt.accent : '#1e293b' }} />
+                        ))}
+                      </div>
+                      <span className="text-[9px] font-bold truncate" style={{ color: opt.accent }}>{opt.accuracy}</span>
+                    </div>
+
+                    {selected && (
+                      <ul className="mt-2 space-y-1 bg-slate-950/80 rounded-lg p-2 border border-slate-800">
+                        {opt.steps.map((step, i) => (
+                          <li key={i} className="text-[10px] text-slate-300 flex items-start gap-1.5">
+                            <span className="font-mono font-black shrink-0" style={{ color: opt.accent }}>{i + 1}.</span>
+                            <span className="leading-relaxed">{step}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {selected && opt.warning && (
+                      <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                        <span className="leading-relaxed">{opt.warning}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

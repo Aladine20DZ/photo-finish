@@ -2,6 +2,16 @@ export type GunSoundType = 'official_starter_gun'; // صوت طلقة مسدس �
 
 export type StarterMode = 'auto_random' | 'manual';
 
+/**
+ * هندسة وضعية كاميرا خط النهاية (Camera Placement Geometry)
+ * تلعب دوراً حاسماً في دقة التوقيت: أي ميلان عن امتداد خط النهاية يولّد خطأ منظور (Parallax)
+ * يجعل الأروقة تُسجّل في لحظات مختلفة رغم وصولها معاً على أرض الواقع — ولا يمكن لأي خوارزمية تصحيحه لاحقاً.
+ */
+export type CameraPlacementMode =
+  | 'tele_parallel'   // موازية لخط النهاية من الخلف + تكبير (الوضع الأولمبي المعتمد — الأدق)
+  | 'angled_behind'   // خلفية بزاوية خفيفة (حل وسط عند محدودية المساحة)
+  | 'side_classic';   // جانبية كلاسيكية من الجانب (الأسلوب التقليدي — خطأ منظور مرتفع)
+
 export interface Runner {
   id: number;
   bib: number;           // رقم الصدرية (Dossard)
@@ -79,6 +89,7 @@ export interface RaceSettings {
   slitScanWidth: number;         // عرض شريحة المسح الشريطي
   windSpeed: string;             // سرعة الرياح الرسمية (+1.2 m/s)
   autoStopAfterLastRunner: boolean;
+  cameraPlacement?: CameraPlacementMode; // هندسة وضعية كاميرا خط النهاية (اختياري للتوافق مع الإعدادات المحفوظة سابقاً)
 }
 
 export interface NetworkPeerMessage {

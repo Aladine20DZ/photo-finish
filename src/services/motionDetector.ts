@@ -8,6 +8,12 @@ export interface OpticalLaneResult {
   lane: number;
   motionScore: number;
   isTriggered: boolean;
+  /**
+   * اللحظة الحقيقية المستوفاة رياضياً للمس خط النهاية (بالمللي ثانية، على مقياس ساعة السباق نفسه)
+   * أدق من زمن "اكتشاف" العبور لأنها تُحسب رجعياً بين آخر عيّنة دون العتبة والعيّنة التي تجاوزتها.
+   * استخدم هذه القيمة بدل زمن استدعاء scan() نفسه عند تسجيل وصول العداء.
+   */
+  interpolatedCrossMs: number | null;
 }
 
 export interface MultiGateScanResult {
@@ -30,6 +36,11 @@ export class OpticalGateDetector {
   private postCtx: CanvasRenderingContext2D;
   private triggeredLanes: Set<number> = new Set();
 
+  // تاريخ آخر عيّنة (النسبة المئوية + زمن السباق) لكل رواق، لازم لتأكيد العبور واستيفاء لحظته الحقيقية
+  private laneScoreHistory: Map<number, { score: number; t: number }> = new Map();
+  // عداد التأكيد: نطلب تجاوز العتبة في عيّنتين متتاليتين قبل اعتباره عبوراً حقيقياً (يلغي ضوضاء اللحظة الواحدة)
+  private laneConfirmCount: Map<number, number> = new Map();
+
   constructor() {
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
@@ -44,6 +55,8 @@ export class OpticalGateDetector {
     this.prevPreGateData = null;
     this.prevPostGateData = null;
     this.triggeredLanes.clear();
+    this.laneScoreHistory.clear();
+    this.laneConfirmCount.clear();
   }
 
   /**
@@ -143,7 +156,8 @@ export class OpticalGateDetector {
     video: HTMLVideoElement,
     laneCount: number = 4,
     finishLineXPercent: number = 0.35,
-    threshold: number = 20
+    threshold: number = 20,
+    currentRaceTimeMs: number = 0
   ): OpticalLaneResult[] {
     const width = video.videoWidth;
     const height = video.videoHeight;
@@ -167,7 +181,7 @@ export class OpticalGateDetector {
     if (!this.prevFrameData || this.prevFrameData.length !== currData.length) {
       this.prevFrameData = new Uint8ClampedArray(currData);
       for (let l = 1; l <= laneCount; l++) {
-        results.push({ lane: l, motionScore: 0, isTriggered: false });
+        results.push({ lane: l, motionScore: 0, isTriggered: false, interpolatedCrossMs: null });
       }
       return results;
     }
@@ -197,17 +211,48 @@ export class OpticalGateDetector {
       }
 
       const scorePercent = totalSamples > 0 ? (changedPixels / totalSamples) * 100 : 0;
-      // انطلاق الحساس الفوري عند قطع خط النهاية
-      const isTriggered = scorePercent > 16;
+
+      // --- تأكيد العبور + استيفاء اللحظة الحقيقية ---
+      const prevSample = this.laneScoreHistory.get(laneNumber) || { score: 0, t: currentRaceTimeMs };
+      let isTriggered = false;
+      let interpolatedCrossMs: number | null = null;
+
+      if (scorePercent > 16) {
+        const confirmCount = (this.laneConfirmCount.get(laneNumber) || 0) + 1;
+        this.laneConfirmCount.set(laneNumber, confirmCount);
+        if (confirmCount >= 2) {
+          isTriggered = true;
+          // استيفاء خطي بين آخر عيّنة دون العتبة (prevSample) والعيّنة الحالية، لاسترجاع لحظة اللمس الحقيقية
+          const frac = scorePercent > prevSample.score
+            ? (16 - prevSample.score) / (scorePercent - prevSample.score)
+            : 0;
+          const clampedFrac = Math.max(0, Math.min(1, frac));
+          interpolatedCrossMs = prevSample.t + clampedFrac * (currentRaceTimeMs - prevSample.t);
+        }
+      } else {
+        this.laneConfirmCount.set(laneNumber, 0);
+      }
+
+      this.laneScoreHistory.set(laneNumber, { score: scorePercent, t: currentRaceTimeMs });
 
       results.push({
         lane: laneNumber,
         motionScore: Math.round(scorePercent),
-        isTriggered
+        isTriggered,
+        interpolatedCrossMs
       });
     }
 
     this.prevFrameData.set(currData);
+
+    // --- حماية من التحفيز الجماعي الزائف (اهتزاز الكاميرا / ومضة ضوئية / تغيّر إضاءة مفاجئ) ---
+    // إذا تجاوز أكثر من نصف الأروقة العتبة في نفس اللحظة تقريباً، هذا اضطراب عام للمشهد كله
+    // وليس وصولاً حقيقياً متزامناً، فنُلغي هذه الدفعة من التحفيزات لتفادي تسجيل أزمنة خاطئة.
+    const triggeredCount = results.filter(r => r.isTriggered).length;
+    if (triggeredCount > 0 && triggeredCount > Math.ceil(laneCount / 2)) {
+      results.forEach(r => { r.isTriggered = false; r.interpolatedCrossMs = null; });
+    }
+
     return results;
   }
 

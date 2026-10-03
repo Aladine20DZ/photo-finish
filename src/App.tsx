@@ -99,6 +99,7 @@ const DEFAULT_SETTINGS: RaceSettings = {
   slitScanWidth: 2,
   windSpeed: '+1.2 m/s',
   autoStopAfterLastRunner: true,
+  cameraPlacement: 'side_classic', // الوضعية التاريخية الافتراضية — يُنصح بالتحويل إلى tele_parallel من الإعدادات
 };
 
 const getInitialRoleAndRoom = (): { initialRole: PhoneRole; initialRoom: string; initialToken?: string } => {
