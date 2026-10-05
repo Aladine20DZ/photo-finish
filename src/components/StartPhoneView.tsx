@@ -147,7 +147,7 @@ export const StartPhoneView: React.FC<StartPhoneViewProps> = ({
   };
 
   return (
-    <div className="max-w-xl mx-auto p-2 sm:p-4 space-y-3" dir="rtl">
+    <div className="w-full max-w-xl mx-auto p-2 sm:p-4 space-y-3" dir="rtl">
       {/* قسم تحديد القائمة المعنية بالسباق وزر Au Départ البارز */}
       <div className="bg-gradient-to-br from-slate-900 via-amber-950/30 to-slate-900 border-2 border-amber-500/50 rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-3 relative overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -311,7 +311,7 @@ export const StartPhoneView: React.FC<StartPhoneViewProps> = ({
 
         {/* المؤقت الرقمي الرياضي الضخم (Cyan Stadium Display) */}
         <div className="my-3 py-2 bg-slate-950/80 rounded-2xl border border-cyan-900/40 shadow-inner">
-          <div className="text-5xl font-black font-mono tracking-wider text-cyan-400 drop-shadow-[0_0_25px_rgba(0,229,255,0.4)]">
+          <div className="font-black font-mono text-cyan-400 drop-shadow-[0_0_25px_rgba(0,229,255,0.4)] tracking-wider text-[clamp(1.85rem,9vw,3rem)] leading-tight">
             {formatTime(clockTimeMs)}
           </div>
           <div className="text-[10px] text-slate-500 font-mono mt-1">توقيت إلكتروني رسمي بدقة 1/1000 ثانية</div>

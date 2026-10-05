@@ -52,8 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white px-2.5 sm:px-4 py-2 sticky top-0 z-50 shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto flex flex-col gap-1.5">
-        {/* الصف العلوي: اللوجو + الدور + زر العودة للرئيسية المباشر */}
-        <div className="flex items-center justify-between gap-2">
+        {/* الصف العلوي: اللوجو + الدور + زر العودة للرئيسية المباشر (لفّي ليناسب كل الشاشات) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
           {/* اللوجو والعنوان */}
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 shrink-0 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-red-500 flex items-center justify-center font-black text-slate-950 text-xs shadow-md shadow-amber-500/25">
@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* الجزء الأيسر: شارة الدور الحالية + زر العودة للرئيسية البارز جداً */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 min-w-0">
             {/* شارة الاشتراك الشبكي المشترك 1*4 إذا كان فعالاً */}
             {sharedPoolLicense && (
               <span 
@@ -103,8 +103,9 @@ export const Header: React.FC<HeaderProps> = ({
                 className={`items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 font-bold text-[11px] sm:text-xs shadow-sm border border-amber-500/40 transition-all active:scale-95 cursor-pointer shrink-0 ${!role ? 'hidden sm:flex' : 'flex'}`}
                 title="عرض أنواع الاشتراكات، الأسعار، كيفية الاشتراك، وتفعيل كود الترخيص"
               >
-                <Crown className="w-3.5 h-3.5 text-amber-400" />
-                <span>الاشتراك والأسعار 👑</span>
+                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="sm:hidden">الاشتراك 👑</span>
+                <span className="hidden sm:inline">الاشتراك والأسعار 👑</span>
               </button>
             )}
 

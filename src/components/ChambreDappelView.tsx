@@ -244,7 +244,7 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-2 sm:p-4 space-y-4 text-slate-100" dir="rtl">
+    <div className="w-full max-w-5xl mx-auto p-2 sm:p-4 space-y-4 text-slate-100" dir="rtl">
       {/* إشعار تأكيد البث اللحظي */}
       {broadcastNotification && (
         <div className="p-3 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl text-white font-bold text-xs flex items-center justify-between shadow-xl animate-fade-in border border-emerald-400/40">

@@ -337,7 +337,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-2 sm:p-5 space-y-3 sm:space-y-4 text-slate-100" dir="rtl">
+    <div className="w-full max-w-4xl mx-auto p-2 sm:p-5 space-y-3 sm:space-y-4 text-slate-100" dir="rtl">
       {/* رأس شاشة الحكم العام: السلاسل / القوائم والمؤقت الرقمي */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-900/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6 shadow-2xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">

@@ -375,7 +375,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
   };
 
   return (
-    <div className="max-w-lg mx-auto p-2 sm:p-4 space-y-2.5 sm:space-y-3" dir="rtl">
+    <div className="w-full max-w-lg mx-auto p-2 sm:p-4 space-y-2.5 sm:space-y-3" dir="rtl">
       {/* نافذة الكاميرا وخطوط الأروقة وخط النهاية */}
       <div 
         onClick={() => {
