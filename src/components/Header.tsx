@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Wifi, WifiOff, Settings, RotateCcw, BellRing, Globe, Home, ArrowRight, ListOrdered, Crown, ArrowLeftRight, ExternalLink, Archive } from 'lucide-react';
+import { Volume2, VolumeX, Wifi, WifiOff, Settings, RotateCcw, BellRing, Globe, Home, ArrowRight, ListOrdered, Crown, ArrowLeftRight, Archive } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 
 interface HeaderProps {
