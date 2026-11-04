@@ -31,8 +31,8 @@ export interface Runner {
   notes?: string;        // ملاحظات الحكم العام
 }
 
-// الأدوار الأربعة للنظام: هاتف البداية، هاتف الكاميرا، هاتف التحكيم، وهاتف غرفة النداء (Chambre d'Appel)
-export type PhoneRole = 'start' | 'finish' | 'judge' | 'chambre_dappel' | null;
+// الأدوار الرسمية للنظام: هاتف البداية، هاتف الكاميرا، هاتف التحكيم، غرفة النداء، حكم نقطة المراقبة، وإدارة ألعاب القوى
+export type PhoneRole = 'start' | 'finish' | 'judge' | 'chambre_dappel' | 'checkpoint_judge' | 'athletics_manager' | null;
 
 export type RaceStatus = 
   | 'idle'
@@ -120,7 +120,12 @@ export interface NetworkPeerMessage {
     | 'RESPONSE_STATE_SYNC'     // إرسال الحالة الكاملة للهاتف المنضم
     | 'LICENSE_SHARE_POOL'      // تقاسم التفعيل الشبكي 1*4 بين الهواتف في نفس الجلسة
     | 'LICENSE_REVOKE_AND_TRANSFER' // نقل الترخيص المتبقي إلى هاتف آخر وإبطاله في الهاتف الأول
-    | 'LICENSE_TRANSFER_ACK';   // تأكيد الهاتف الجديد استلام التفعيل ونقله بنجاح
+    | 'LICENSE_TRANSFER_ACK'   // تأكيد الهاتف الجديد استلام التفعيل ونقله بنجاح
+    | 'ATHLETICS_PASSAGE_BATCH' // بث دفعات أحداث المرور من نقاط المراقبة
+    | 'ATHLETICS_CORRECTION'    // طلب أو اعتماد تصحيح مرور
+    | 'ATHLETICS_JUDGE_HEARTBEAT' // نبضات أجهزة الحكام ونقاط المراقبة
+    | 'ATHLETICS_COMPETITION_SYNC' // مزامنة إعدادات المنافسة ونقاط المراقبة
+    | 'ATHLETICS_VIOLATION';    // بلاغ عن مخالفة مسار
   timestamp: number;            // ساعة الحائط Date.now() — للعرض
   senderTime: number;           // ساعة الحائط وقت الإرسال
   perfNow?: number;             // ساعة أحادية الاتجاه performance.now() — للتوقيت الدقيق

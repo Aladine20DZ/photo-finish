@@ -23,7 +23,9 @@ import {
   ChevronLeft,
   Smartphone,
   Zap,
-  Activity
+  Activity,
+  MapPin,
+  Route
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
@@ -371,6 +373,84 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
                 </div>
 
                 <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-purple-300 group-hover:border-purple-400 transition-colors shrink-0 mt-2">
+                  <ChevronLeft className="w-5 h-5" />
+                </div>
+              </div>
+            </button>
+
+            {/* 5. حكم نقاط المراقبة الميداني (Checkpoint Judge) */}
+            <button
+              type="button"
+              onClick={() => onSelectRole('checkpoint_judge')}
+              className="group relative overflow-hidden text-right p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-950 border border-emerald-500/40 hover:border-emerald-400 transition-all shadow-lg active:scale-[0.99] cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                        محطة 5 (جديد)
+                      </span>
+                      <h4 className="font-black text-sm sm:text-base text-white group-hover:text-emerald-300 transition-colors">
+                        حكم نقطة مراقبة (Checkpoint Judge) 🚩
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      تسجيل عبور العدائين الميداني في نقاط المسار (CP01, CP02...)، لوحة أرقام سريعة للأفواج، ومسح متواصل لـ QR الصدريات مع حفظ دون إنترنت.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1 text-[10px] text-emerald-400 font-mono">
+                      <span>✓ لوحة أرقام سريعة</span>
+                      <span>•</span>
+                      <span>✓ مسح QR متتابع</span>
+                      <span>•</span>
+                      <span>✓ Offline-First</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-emerald-300 group-hover:border-emerald-400 transition-colors shrink-0 mt-2">
+                  <ChevronLeft className="w-5 h-5" />
+                </div>
+              </div>
+            </button>
+
+            {/* 6. لوحة إدارة ألعاب القوى والترتيب (Athletics Manager) */}
+            <button
+              type="button"
+              onClick={() => onSelectRole('athletics_manager')}
+              className="group relative overflow-hidden text-right p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-950 border border-indigo-500/40 hover:border-indigo-400 transition-all shadow-lg active:scale-[0.99] cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/50 text-indigo-400 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                    <Route className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                        محطة 6 (جديد)
+                      </span>
+                      <h4 className="font-black text-sm sm:text-base text-white group-hover:text-indigo-300 transition-colors">
+                        إدارة ألعاب القوى والترتيب المباشر 🏆
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      إعداد المسارات والحلقات، تكليف الحكام، ومتابعة مصفوفة نقاط المرور واعتماد النتائج الرسمية لسباقات العدو الريفي والطريق.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1 text-[10px] text-indigo-400 font-mono">
+                      <span>✓ مصفوفة المرور الحية</span>
+                      <span>•</span>
+                      <span>✓ رصد النقاط الناقصة</span>
+                      <span>•</span>
+                      <span>✓ سجل تدقيق غير قابل للحذف</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-indigo-300 group-hover:border-indigo-400 transition-colors shrink-0 mt-2">
                   <ChevronLeft className="w-5 h-5" />
                 </div>
               </div>

@@ -24,6 +24,13 @@ import { athleticsArchive } from './services/archiveService';
 import { ArchiveModal } from './components/ArchiveModal';
 import { PwaInstallButton } from './components/PwaInstallButton';
 import { AdminGate } from './components/AdminGate';
+import { CheckpointJudgeView } from './components/checkpoints/CheckpointJudgeView';
+import { CheckpointConfigModal } from './components/checkpoints/CheckpointConfigModal';
+import { JudgeManagementModal } from './components/checkpoints/JudgeManagementModal';
+import { PassageMonitoringDashboard } from './components/checkpoints/PassageMonitoringDashboard';
+import { AthleticsCompetition, Checkpoint } from './types/athletics';
+import { checkpointStorage } from './services/checkpointStorage';
+import { passageSyncEngine } from './services/passageSyncEngine';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -114,6 +121,10 @@ const getInitialRoleAndRoom = (): { initialRole: PhoneRole; initialRoom: string;
         validRole = r;
       } else if (r === 'chambre' || r === 'chambre_dappel' || r === 'chambre-dappel' || r === 'call_room') {
         validRole = 'chambre_dappel';
+      } else if (r === 'checkpoint' || r === 'checkpoint_judge' || r === 'cp') {
+        validRole = 'checkpoint_judge';
+      } else if (r === 'athletics_manager' || r === 'manager' || r === 'cross_country' || r === 'athletics') {
+        validRole = 'athletics_manager';
       }
       const validRoom = room ? room.trim().toUpperCase() : 'RACE-2026';
       if (token) {
@@ -244,6 +255,57 @@ export const App: React.FC = () => {
   const [sharedPoolLicense, setSharedPoolLicense] = useState<LicensePoolInfo | null>(() => licenseManager.sharedPoolLicense);
   const [isTrialExpired, setIsTrialExpired] = useState<boolean>(() => pricingService.isTrialExpired());
   const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
+
+  // ═══ منظومة ألعاب القوى ونقاط المراقبة الجديدة ═══
+  const [currentCompetition, setCurrentCompetition] = useState<AthleticsCompetition | null>(null);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+  const [showJudgesModal, setShowJudgesModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    checkpointStorage.listCompetitions().then((comps) => {
+      let activeComp: AthleticsCompetition;
+      if (comps.length > 0) {
+        activeComp = comps[0];
+      } else {
+        activeComp = {
+          id: 'comp_cc_default',
+          name: 'بطولة العدو الريفي الرسمية 8 كم',
+          type: 'cross_country',
+          venue: 'غابة بوشاوي',
+          date: new Date().toISOString().split('T')[0],
+          distanceKm: 8,
+          lapCount: 4,
+          category: 'SENIOR',
+          gender: 'M',
+          checkpoints: [
+            { id: 'cp_start', code: 'START', name: 'خط الانطلاق', distanceKm: 0, type: 'start', requiredLaps: [1], order: 0, assignedJudgeIds: [] },
+            { id: 'cp_01', code: 'CP01', name: 'نقطة جسر الوادي', distanceKm: 1.0, type: 'intermediate', requiredLaps: [1, 2, 3, 4], order: 1, assignedJudgeIds: [] },
+            { id: 'cp_02', code: 'CP02', name: 'منعرج الصنوبر', distanceKm: 2.0, type: 'intermediate', requiredLaps: [1, 2, 3, 4], order: 2, assignedJudgeIds: [] },
+            { id: 'cp_finish', code: 'FINISH', name: 'خط النهاية', distanceKm: 8.0, type: 'finish', requiredLaps: [4], order: 3, assignedJudgeIds: [] },
+          ],
+          scheduledStartTime: '10:00',
+          status: 'ready',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        checkpointStorage.saveCompetition(activeComp);
+      }
+      setCurrentCompetition(activeComp);
+
+      if (typeof window !== 'undefined') {
+        const p = new URLSearchParams(window.location.search);
+        const cpParam = p.get('cp');
+        if (cpParam) {
+          const found = activeComp.checkpoints.find(c => c.id === cpParam || c.code.toLowerCase() === cpParam.toLowerCase());
+          if (found) setSelectedCheckpoint(found);
+          else setSelectedCheckpoint(activeComp.checkpoints[0]);
+        } else {
+          setSelectedCheckpoint(activeComp.checkpoints[0]);
+        }
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const unsubLicense = licenseManager.subscribe(() => {
@@ -606,6 +668,14 @@ export const App: React.FC = () => {
         }
         break;
 
+      case 'ATHLETICS_PASSAGE_BATCH':
+      case 'ATHLETICS_CORRECTION':
+      case 'ATHLETICS_JUDGE_HEARTBEAT':
+      case 'ATHLETICS_COMPETITION_SYNC':
+      case 'ATHLETICS_VIOLATION':
+        passageSyncEngine.handleIncomingMessage(msg);
+        break;
+
       default:
         break;
     }
@@ -667,6 +737,7 @@ export const App: React.FC = () => {
   // إعداد شبكة الاتصال - لا يتم تدميرها إلا عند تغيير الدور أو كود الغرفة فعلياً
   useEffect(() => {
     if (role) {
+      passageSyncEngine.attachNetwork((msg) => athleticsNetwork.sendMessage(msg));
       athleticsNetwork.init(
         role,
         roomCode,
@@ -1142,32 +1213,34 @@ export const App: React.FC = () => {
       )}
 
       {/* الشريط العلوي مع زر سباق جديد وجرس التنبيه وتفاصيل القائمة */}
-      <Header
-        role={role}
-        roomCode={roomCode}
-        isConnected={isConnected}
-        latencyMs={latencyMs}
-        isMuted={isMuted}
-        heatNumber={settings.heatNumber}
-        heatName={settings.heatName}
-        onToggleMute={() => {
-          athleticsAudio.isMuted = !isMuted;
-          setIsMuted(!isMuted);
-        }}
-        onChangeRole={() => setRole(null)}
-        onOpenSettings={() => setShowSettingsModal(true)}
-        onOpenInternetBridge={() => setShowInternetBridgeModal(true)}
-        onOpenSchedulePanel={() => setShowSchedulePanel(true)}
-        onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
-        onOpenTransferModal={() => setShowTransferModal(true)}
-        sharedPoolLicense={sharedPoolLicense}
-        onOpenArchive={() => setShowArchiveModal(true)}
-        onSharedResetRace={handleSharedResetRace}
-        onStartBellSignal={handleStartBellSignal}
-        onStopBellSignal={handleStopBellSignal}
-        isHoldingBell={isHoldingBellButton}
-        isPeerSirenRinging={isPeerSirenRinging}
-      />
+      {role !== 'checkpoint_judge' && role !== 'athletics_manager' && (
+        <Header
+          role={role}
+          roomCode={roomCode}
+          isConnected={isConnected}
+          latencyMs={latencyMs}
+          isMuted={isMuted}
+          heatNumber={settings.heatNumber}
+          heatName={settings.heatName}
+          onToggleMute={() => {
+            athleticsAudio.isMuted = !isMuted;
+            setIsMuted(!isMuted);
+          }}
+          onChangeRole={() => setRole(null)}
+          onOpenSettings={() => setShowSettingsModal(true)}
+          onOpenInternetBridge={() => setShowInternetBridgeModal(true)}
+          onOpenSchedulePanel={() => setShowSchedulePanel(true)}
+          onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
+          onOpenTransferModal={() => setShowTransferModal(true)}
+          sharedPoolLicense={sharedPoolLicense}
+          onOpenArchive={() => setShowArchiveModal(true)}
+          onSharedResetRace={handleSharedResetRace}
+          onStartBellSignal={handleStartBellSignal}
+          onStopBellSignal={handleStopBellSignal}
+          isHoldingBell={isHoldingBellButton}
+          isPeerSirenRinging={isPeerSirenRinging}
+        />
+      )}
 
       {/* الشاشات الرئيسية حسب دور الهاتف المختار */}
       <main className="flex-1 flex flex-col">
@@ -1285,6 +1358,26 @@ export const App: React.FC = () => {
             onViewPhotoFinish={() => setShowPhotoFinishViewer(true)}
           />
         )}
+
+        {/* الدور الخامس: حكم نقطة المراقبة الميداني */}
+        {role === 'checkpoint_judge' && currentCompetition && (
+          <CheckpointJudgeView
+            competition={currentCompetition}
+            checkpoint={selectedCheckpoint || currentCompetition.checkpoints[0]}
+            onExit={() => setRole(null)}
+            onOpenMonitoring={() => setRole('athletics_manager')}
+          />
+        )}
+
+        {/* الدور السادس: لوحة إدارة ألعاب القوى والترتيب المباشر للحكم العام */}
+        {role === 'athletics_manager' && currentCompetition && (
+          <PassageMonitoringDashboard
+            competition={currentCompetition}
+            onExit={() => setRole(null)}
+            onOpenConfig={() => setShowConfigModal(true)}
+            onOpenJudges={() => setShowJudgesModal(true)}
+          />
+        )}
       </main>
 
       {/* لوحة جدول وحالة السباقات (Au Départ / القادمة / المنتهية) */}
@@ -1374,6 +1467,27 @@ export const App: React.FC = () => {
       {/* نافذة أرشيف السباقات الدائم */}
       {showArchiveModal && (
         <ArchiveModal onClose={() => setShowArchiveModal(false)} />
+      )}
+
+      {/* نافذة إعداد المنافسة والمسار ونقاط المراقبة */}
+      {showConfigModal && (
+        <CheckpointConfigModal
+          initialCompetition={currentCompetition || undefined}
+          onSave={(comp) => {
+            setCurrentCompetition(comp);
+            setShowConfigModal(false);
+          }}
+          onClose={() => setShowConfigModal(false)}
+        />
+      )}
+
+      {/* نافذة إدارة وتكليف الحكام وتوليد QR الأجهزة */}
+      {showJudgesModal && currentCompetition && (
+        <JudgeManagementModal
+          competition={currentCompetition}
+          roomCode={roomCode}
+          onClose={() => setShowJudgesModal(false)}
+        />
       )}
     </div>
   );
