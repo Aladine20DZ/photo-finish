@@ -3,9 +3,8 @@ import { Crown, Lock, ArrowRight, LogOut } from 'lucide-react';
 import { AdminPortal } from '../admin/AdminPortal';
 
 // ═══ بوابة الدخول إلى ADMIN SUITE (لوحة مدير المنظومة) ═══
-// الوصول: أضف ?admin إلى رابط التطبيق ثم أدخل رمز المدير.
-// يمكن تغيير الرمز من هذا السطر فقط:
-const PORTAL_PASSCODE = 'PFP-ADMIN-2026';
+// الوصول: أضف ?admin إلى رابط التطبيق ثم أدخل كلمة مرور المدير المعتمدة في البيئة (ADMIN_PORTAL_PASSWORD).
+// المصادقة تتم عبر الخادم مع فحص معدل المحاولات (Rate Limiting) وتوقيع Ed25519.
 
 const SESSION_KEY = 'pf_admin_portal_unlocked_v1';
 
@@ -16,21 +15,56 @@ export const AdminGate: React.FC = () => {
   const [input, setInput] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [shake, setShake] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() === PORTAL_PASSCODE) {
-      try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* تخزين غير متاح */ }
-      setUnlocked(true);
-    } else {
-      setError('رمز غير صحيح — حاول مجدداً');
+    if (!input.trim() || loading) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const resp = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: input.trim() })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (resp.status === 429) {
+        setError(data.error || 'تم تجاوز الحد الأقصى للمحاولات (5 محاولات). يرجى الانتظار 15 دقيقة.');
+        setShake(true);
+        setTimeout(() => setShake(false), 450);
+        return;
+      }
+
+      if (resp.ok && data.success && data.token) {
+        try { 
+          sessionStorage.setItem(SESSION_KEY, '1');
+          sessionStorage.setItem('pf_admin_token', data.token);
+        } catch { /* تخزين غير متاح */ }
+        setUnlocked(true);
+      } else {
+        setError(data.error || 'رمز الدخول غير صحيح — حاول مجدداً');
+        setShake(true);
+        setTimeout(() => setShake(false), 450);
+      }
+    } catch (err) {
+      setError('تعذر الاتصال بخادم المصادقة الآمن. تأكد من تشغيل الخادم.');
       setShake(true);
       setTimeout(() => setShake(false), 450);
+    } finally {
+      setLoading(false);
     }
   };
 
   const exitPortal = () => {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* تخزين غير متاح */ }
+    try { 
+      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem('pf_admin_token');
+    } catch { /* تخزين غير متاح */ }
     window.location.href = '/';
   };
 
@@ -84,9 +118,10 @@ export const AdminGate: React.FC = () => {
           )}
           <button
             type="submit"
-            className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+            disabled={loading}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-95"
           >
-            دخول لوحة الإدارة
+            {loading ? 'جاري التحقق الآمن...' : 'دخول لوحة الإدارة'}
           </button>
         </form>
 

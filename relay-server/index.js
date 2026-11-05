@@ -17,6 +17,7 @@
 const http = require('http');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
+const security = require('./security');
 
 const PORT = process.env.PORT || 8080;
 
@@ -64,10 +65,23 @@ function getWsActiveRoles(room) {
   return Array.from(roomClients.values()).map((c) => c.role);
 }
 
-// ═══ خادم HTTP (فحص الصحة + ترحيب) ═══
+// ═══ خادم HTTP (فحص الصحة + أمان وتراخيص Ed25519) ═══
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.url === '/' || req.url === '/health') {
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+
+  // 1. فحص الصحة (Health Check)
+  if (url.pathname === '/' || url.pathname === '/health') {
     const rooms = [];
     wsRooms.forEach((clients, room) => {
       rooms.push({ room, clients: clients.size, roles: getWsActiveRoles(room) });
@@ -76,7 +90,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: 'photo-finish-relay',
-      version: '1.0.0',
+      version: '2.0.0',
       uptimeSec: Math.floor(process.uptime()),
       rooms,
       sessionCount: roomSessions.size,
@@ -84,6 +98,75 @@ const server = http.createServer((req, res) => {
     }));
     return;
   }
+
+  // 2. جلب المفتاح العام Ed25519 للتحقق من التراخيص أوفلاين
+  if (url.pathname === '/api/public-key' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      publicKeyBase64: security.getPublicKeyBase64()
+    }));
+    return;
+  }
+
+  // 3. جلسة الغرفة ورمز الحماية (Session Token)
+  if (url.pathname === '/api/session' && req.method === 'GET') {
+    const room = (url.searchParams.get('room') || 'RACE-2026').toUpperCase();
+    const token = getOrCreateSession(room);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ room, sessionToken: token }));
+    return;
+  }
+
+  // 4. تسجيل دخول المدير الآمن (Rate-Limited Admin Login)
+  if (url.pathname === '/api/admin/login' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const result = security.verifyAdminLogin(parsed.password, clientIp);
+        res.writeHead(result.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+    });
+    return;
+  }
+
+  // 5. توليد كود ترخيص Ed25519 موقع رسمياً (Admin License Generator)
+  if (url.pathname === '/api/admin/generate-license' && req.method === 'POST') {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!security.verifyAdminToken(token)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid admin token' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { tier, expCode, devHash } = JSON.parse(body || '{}');
+        if (!tier || !expCode) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Missing tier or expCode' }));
+          return;
+        }
+        const licenseCode = security.generateEd25519License(tier, expCode, devHash || 'POOL');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, licenseCode }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ ok: false, error: 'Not found' }));
 });

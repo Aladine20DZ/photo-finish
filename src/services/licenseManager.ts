@@ -9,8 +9,7 @@
  */
 
 import { LicensePoolInfo, LicenseTierCode, LicenseTransferTicket, PhoneRole } from '../types/race';
-
-export const SECRET_SALT = 'AQUACORE_PHOTOFINISH_SECRET_SALT_2026_ATHLETICS_MASTER';
+import { verifyEd25519LicenseCode } from './securityService';
 
 export interface StoredLicense {
   code: string;
@@ -36,18 +35,13 @@ const PREF_DEVICE_ID = 'pf_device_id_v2';
 const PREF_ACTIVE_LICENSE = 'pf_active_license_v2';
 const PREF_REVOCATION_LEDGER = 'pf_revocation_ledger_v2';
 
-// ═══ أدوات التشفير الرياضي عبر Web Crypto API ═══
-async function computeHmacSha256(payload: string): Promise<string> {
+// ═══ أدوات التشفير والتحقق عبر Web Crypto API ═══
+async function computeSha256Digest(payload: string): Promise<string> {
+  const subtle = (typeof window !== 'undefined' ? window.crypto : globalThis.crypto)?.subtle;
+  if (!subtle) return '000000';
   const enc = new TextEncoder();
-  const key = await window.crypto.subtle.importKey(
-    'raw',
-    enc.encode(SECRET_SALT),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sigBuffer = await window.crypto.subtle.sign('HMAC', key, enc.encode(payload));
-  return Array.from(new Uint8Array(sigBuffer))
+  const buf = await subtle.digest('SHA-256', enc.encode(payload));
+  return Array.from(new Uint8Array(buf))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -64,18 +58,20 @@ class LicenseManagerService {
 
   public init() {
     // 1. استرجاع أو توليد معرّف الجهاز
-    let dev = localStorage.getItem(PREF_DEVICE_ID);
+    let dev = typeof localStorage !== 'undefined' ? localStorage.getItem(PREF_DEVICE_ID) : null;
     if (!dev) {
       const rand1 = Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase();
       const rand2 = Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase();
       dev = `PF-${rand1}-${rand2}`;
-      localStorage.setItem(PREF_DEVICE_ID, dev);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(PREF_DEVICE_ID, dev);
+      }
     }
     this._deviceId = dev;
 
     // 2. استرجاع الترخيص النشط وفحص الإبطال
     try {
-      const raw = localStorage.getItem(PREF_ACTIVE_LICENSE);
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(PREF_ACTIVE_LICENSE) : null;
       if (raw) {
         const parsed: StoredLicense = JSON.parse(raw);
         if (new Date(parsed.expiryDate) > new Date() && !this.isCodeRevoked(parsed.code)) {
@@ -134,7 +130,7 @@ class LicenseManagerService {
   // ═══ سجل الإبطال لمنع تفعيل نفس الكود في هاتفين ═══
   public getRevocationLedger(): RevocationRecord[] {
     try {
-      const saved = localStorage.getItem(PREF_REVOCATION_LEDGER);
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(PREF_REVOCATION_LEDGER) : null;
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -149,10 +145,12 @@ class LicenseManagerService {
   private markCodeAsRevoked(record: RevocationRecord) {
     const ledger = this.getRevocationLedger();
     ledger.unshift(record);
-    localStorage.setItem(PREF_REVOCATION_LEDGER, JSON.stringify(ledger));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PREF_REVOCATION_LEDGER, JSON.stringify(ledger));
+    }
   }
 
-  // ═══ توليد كود ترخيص مشفر (للمدير) ═══
+  // ═══ توليد كود ترخيص مشفر بـ Ed25519 (للمدير) ═══
   public async generateLicenseKey(
     tier: LicenseTierCode,
     expiryDate: Date,
@@ -164,7 +162,7 @@ class LicenseManagerService {
   ): Promise<string> {
     const yy = String(expiryDate.getFullYear() % 100).padStart(2, '0');
     const mm = String(expiryDate.getMonth() + 1).padStart(2, '0');
-    const expCode = `${yy}${mm}`;
+    const expiryCode = `${yy}${mm}`;
 
     let devHash = 'GLBL';
     if (options.isQuadPool) {
@@ -174,78 +172,68 @@ class LicenseManagerService {
       devHash = clean.length >= 6 ? clean.substring(2, 6) : clean.padEnd(4, 'X').substring(0, 4);
     }
 
-    const payload = `${tier}|${expCode}|${devHash}`;
-    const hex = await computeHmacSha256(payload);
-    const sig = hex.substring(0, 6).toUpperCase();
+    // استدعاء خادم التوقيع غير المتماثل (Ed25519)
+    const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pf_admin_token') : null;
+    try {
+      const resp = await fetch('/api/admin/generate-license', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ tier, expiryCode, devHash })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.code) return data.code;
+      }
+    } catch (err) {
+      console.warn('[LicenseManager] تعذر الاتصال بخادم التوقيع Ed25519 المباشر:', err);
+    }
 
-    return `PFP1-${tier}-${expCode}-${devHash}-${sig}`;
+    // تنسيق احتياطي بصيغة PFP2
+    return `PFP2-${tier}-${expiryCode}-${devHash}-SERVER_OFFLINE`;
   }
 
   // ═══ تفعيل كود ترخيص في الهاتف ═══
   public async activateCode(rawInput: string): Promise<{ success: boolean; message: string; license?: StoredLicense }> {
-    const code = rawInput.trim().toUpperCase().replace(/\s+/g, '');
+    const code = rawInput.trim().replace(/\s+/g, '');
+    const codeUpper = code.toUpperCase();
     if (!code) {
       return { success: false, message: 'يرجى إدخال كود الترخيص أولاً.' };
     }
 
     // 1. فحص هل الكود مبطل أو منقول سابقاً من هذا الجهاز
-    if (this.isCodeRevoked(code)) {
+    if (this.isCodeRevoked(codeUpper)) {
       return {
         success: false,
         message: 'تم إبطال هذا الترخيص ونقله إلى هاتف آخر سابقاً. لا يمكن استخدامه مرة أخرى لمنع الازدواجية.'
       };
     }
 
-    // 2. فحص الأكواد الماستر
-    if (code === 'ALADINE-VIP-2026' || code === 'AQUACORE-ADMIN-KEY') {
-      const lic: StoredLicense = {
-        code,
-        tier: 'ENTX',
-        tierName: 'رخصة الاتحادات الرسمية (Enterprise)',
-        clientName: 'المدير العام / رخصة المنظومة المفتوحة',
-        deviceId: this._deviceId,
-        expiryDate: '2035-12-31',
-        activatedAt: new Date().toISOString(),
-        isQuadPool: true,
-        maxSharedSlots: 4,
+    // 2. منع أي أكواد ثابتة قديمة (Zero Backdoors Policy)
+    if (['ALADINE-VIP-2026', 'AQUACORE-ADMIN-KEY', 'PRO-ATHLETICS-2026', 'COACH-CLUB-PRO'].includes(codeUpper)) {
+      return {
+        success: false,
+        message: 'تم إيقاف الأكواد الثابتة نهائياً لدواعي الأمان الميداني. يرجى الحصول على ترخيص مشفر رسمي من لوحة المدير.'
       };
-      this._saveActiveLicense(lic);
-      return { success: true, message: 'تم تفعيل رخصة الاتحادات الرسمية المفتوحة (10 أروقة + شبكة 1*4)!', license: lic };
-    }
-
-    if (code === 'PRO-ATHLETICS-2026' || code === 'COACH-CLUB-PRO') {
-      const lic: StoredLicense = {
-        code,
-        tier: 'CLB8',
-        tierName: 'باقة الأندية المعتمدة (Pro Club)',
-        clientName: 'نادي رياضي معتمد',
-        deviceId: this._deviceId,
-        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        activatedAt: new Date().toISOString(),
-        isQuadPool: true,
-        maxSharedSlots: 4,
-      };
-      this._saveActiveLicense(lic);
-      return { success: true, message: 'تم تفعيل باقة الأندية المعتمدة (8 أروقة + شبكة 1*4)!', license: lic };
     }
 
     // 3. فحص هل هو كود تحويل / تنازل (Transfer Voucher: TRF1-...)
-    if (code.startsWith('TRF1-')) {
-      return await this.activateTransferVoucher(code);
+    if (codeUpper.startsWith('TRF1-')) {
+      return await this.activateTransferVoucher(codeUpper);
     }
 
-    // 4. فحص الأكواد المشفرة العادية (PFP1-...)
-    if (code.startsWith('PFP1-')) {
-      const parts = code.split('-');
-      if (parts.length < 5) {
-        return { success: false, message: 'صيغة كود الترخيص غير صحيحة.' };
+    // 4. فحص تراخيص Ed25519 المعتمدة (PFP2-...)
+    if (codeUpper.startsWith('PFP2-')) {
+      const verified = await verifyEd25519LicenseCode(code);
+      if (!verified.valid) {
+        return { success: false, message: verified.error || 'كود الترخيص غير صالح.' };
       }
 
-      const [, tierCode, expCode, devHash, sig] = parts;
-      const tier = tierCode as LicenseTierCode;
-      if (tier !== 'CLB8' && tier !== 'ENTX') {
-        return { success: false, message: 'نوع الباقة في الكود غير معروف.' };
-      }
+      const tier = verified.tier!;
+      const expCode = verified.expCode!;
+      const devHash = verified.devHash!;
 
       // فحص ارتباط الجهاز: يقبل POOL (شبكي 1*4) أو GLBL (عام) أو تطابق معرف الجهاز الحالي
       const isPool = devHash === 'POOL';
@@ -269,15 +257,6 @@ class LicenseManagerService {
         return { success: false, message: 'كود الترخيص منتهي الصلاحية.' };
       }
 
-      // التحقق من التوقيع الرياضي
-      const payload = `${tierCode}|${expCode}|${devHash}`;
-      const hex = await computeHmacSha256(payload);
-      const expectedSig = hex.substring(0, 6).toUpperCase();
-
-      if (sig !== expectedSig) {
-        return { success: false, message: 'التوقيع الرقمي لكود الترخيص غير مطابق.' };
-      }
-
       const lic: StoredLicense = {
         code,
         tier,
@@ -295,6 +274,14 @@ class LicenseManagerService {
         success: true,
         message: `تم التفعيل بنجاح: ${lic.tierName} ${isPool ? '(تفعيل شبكي 1*4 متاح للهواتف الثلاثة الأخرى)' : ''}`,
         license: lic
+      };
+    }
+
+    // تنبيه واضح إذا كان الكود بصيغة قديمة غير مدعومة
+    if (code.startsWith('PFP1-')) {
+      return {
+        success: false,
+        message: 'صيغة الترخيص PFP1 قديمة وتعتمد تشفيراً متماثلاً غير آمن. يرجى الحصول على ترخيص PFP2 معتمد بـ Ed25519.'
       };
     }
 
@@ -332,9 +319,9 @@ class LicenseManagerService {
     const mm = String(expDate.getMonth() + 1).padStart(2, '0');
     const expCode = `${yy}${mm}`;
 
-    // توليد شهادة النقل المشفرة (HMAC-SHA256)
+    // توليد شهادة النقل المشفرة عبر SHA-256
     const transferPayload = `TRANSFER|${this._activeLicense.tier}|${expCode}|${sourceDevHash}|${targetDevHash}`;
-    const hex = await computeHmacSha256(transferPayload);
+    const hex = await computeSha256Digest(transferPayload);
     const sig = hex.substring(0, 6).toUpperCase();
     const voucherCode = `TRF1-${this._activeLicense.tier}-${expCode}-${targetDevHash}-${sig}`;
 
@@ -459,14 +446,18 @@ class LicenseManagerService {
 
   private _saveActiveLicense(lic: StoredLicense) {
     this._activeLicense = lic;
-    localStorage.setItem(PREF_ACTIVE_LICENSE, JSON.stringify(lic));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PREF_ACTIVE_LICENSE, JSON.stringify(lic));
+    }
     this.notify();
   }
 
   public resetToTrial() {
     this._activeLicense = null;
     this._sharedPoolLicense = null;
-    localStorage.removeItem(PREF_ACTIVE_LICENSE);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(PREF_ACTIVE_LICENSE);
+    }
     this.notify();
   }
 }

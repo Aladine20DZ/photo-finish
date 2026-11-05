@@ -4,8 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import { createRequire } from "module";
 import type { ServerResponse, IncomingMessage } from "http";
 import { WebSocketServer, type WebSocket as WsWebSocket } from "ws";
+import * as security from "./server/security.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -396,6 +398,63 @@ function raceRelayPlugin(): Plugin {
         const token = getOrCreateSession(room);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ room, sessionToken: token }));
+        return;
+      }
+
+      // 5. جلب المفتاح العام Ed25519 للتحقق من التراخيص
+      if (parsedUrl.pathname === '/api/public-key' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, publicKeyBase64: security.getPublicKeyBase64() }));
+        return;
+      }
+
+      // 6. تسجيل دخول المدير الآمن (Rate-Limited Admin Login)
+      if (parsedUrl.pathname === '/api/admin/login' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: any) => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const parsed = JSON.parse(body || '{}');
+            const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+            const result = security.verifyAdminLogin(parsed.password, clientIp);
+            res.writeHead(result.status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+          }
+        });
+        return;
+      }
+
+      // 7. توليد كود ترخيص موقع بـ Ed25519
+      if (parsedUrl.pathname === '/api/admin/generate-license' && req.method === 'POST') {
+        const authHeader = (req.headers['authorization'] || '').toString();
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+        if (!security.verifyAdminToken(token)) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid admin token' }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', (chunk: any) => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const { tier, expCode, devHash } = JSON.parse(body || '{}');
+            if (!tier || !expCode) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Missing tier or expCode' }));
+              return;
+            }
+            const licenseCode = security.generateEd25519License(tier, expCode, devHash || 'POOL');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, licenseCode }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+          }
+        });
         return;
       }
 

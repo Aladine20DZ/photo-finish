@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { PhoneRole } from '../types/race';
+import { licenseManager } from '../services/licenseManager';
 
 interface AdminDashboardModalProps {
   roomCode: string;
@@ -31,43 +32,6 @@ interface StoredLicense {
   deviceId: string;
   expiryDate: string;
   createdAt: string;
-}
-
-const SECRET_SALT = "AQUACORE_PHOTOFINISH_SECRET_SALT_2026_ATHLETICS_MASTER";
-
-// حساب التوقيع الرقمي HMAC-SHA256 المشفر المطابق 100% لكود فلاتر وبايثون
-async function generateCryptographicCode(
-  tierCode: 'CLB8' | 'ENTX',
-  expiryDateStr: string,
-  deviceId: string
-): Promise<string> {
-  const exp = new Date(expiryDateStr);
-  const yy = String(exp.getFullYear() % 100).padStart(2, '0');
-  const mm = String(exp.getMonth() + 1).padStart(2, '0');
-  const expiryCode = `${yy}${mm}`;
-
-  const cleanDev = deviceId.trim().toUpperCase().replace(/-/g, '');
-  let devHash = 'GLBL';
-  if (cleanDev && cleanDev !== 'GLOBAL') {
-    devHash = cleanDev.length >= 6 ? cleanDev.substring(2, 6) : cleanDev.padEnd(4, 'X').substring(0, 4);
-  }
-
-  const payload = `${tierCode}|${expiryCode}|${devHash}`;
-  const enc = new TextEncoder();
-  const key = await window.crypto.subtle.importKey(
-    'raw',
-    enc.encode(SECRET_SALT),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sigBuffer = await window.crypto.subtle.sign('HMAC', key, enc.encode(payload));
-  const hex = Array.from(new Uint8Array(sigBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  const sig = hex.substring(0, 6).toUpperCase();
-
-  return `PFP1-${tierCode}-${expiryCode}-${devHash}-${sig}`;
 }
 
 export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
@@ -113,7 +77,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     expDate.setMonth(expDate.getMonth() + durationMonths);
     const expDateStr = expDate.toISOString().split('T')[0];
 
-    const code = await generateCryptographicCode(tier, expDateStr, deviceIdInput);
+    const code = await licenseManager.generateLicenseKey(tier, expDate, {
+      targetDeviceId: deviceIdInput,
+      clientName
+    });
     setGeneratedCode(code);
     setIsGenerating(false);
 

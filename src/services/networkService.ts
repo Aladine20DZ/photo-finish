@@ -18,6 +18,7 @@
 import mqtt, { MqttClient } from 'mqtt';
 import Peer, { DataConnection } from 'peerjs';
 import { NetworkPeerMessage, PhoneRole } from '../types/race';
+import { isMessagePermitted, computeMessageHmac } from './securityService';
 
 export type ConnectionMode = 'local_ws' | 'cloud_mqtt' | 'webrtc_bridge' | 'local_hub' | 'local_broadcast' | 'dual_sync' | 'internet_bridge' | 'disconnected';
 
@@ -284,7 +285,8 @@ export class AthleticsNetworkService {
       this.mqttClient = null;
     }
 
-    const topic = `photofinish/v4/${this.roomCode}`;
+    const sessionScope = (this.sessionToken || 'GLOBAL').slice(0, 8);
+    const topic = `pfp/rooms/${this.roomCode}/${sessionScope}/events`;
     const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
 
     try {
@@ -568,10 +570,10 @@ export class AthleticsNetworkService {
   // ═══════════════════════════════════════════════════
 
   /**
-   * إرسال رسالة عبر جميع القنوات المتاحة بأفضل سرعة
+   * إرسال رسالة عبر جميع القنوات المتاحة بأفضل سرعة مع التوقيع الأمني
    * الأحداث الحرجة (START_GUN, LANE_FINISH) تُرسل عبر WS المحلي فقط لتجنب التأخير
    */
-  public sendMessage(msg: NetworkPeerMessage) {
+  public async sendMessage(msg: NetworkPeerMessage) {
     const enriched: any = {
       ...msg,
       _msgId: `${this.myAddress}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -580,6 +582,12 @@ export class AthleticsNetworkService {
       _room: this.roomCode,
       perfNow: performance.now() - this.perfOrigin,
     };
+
+    if (this.sessionToken) {
+      try {
+        enriched._sig = await computeMessageHmac(this.sessionToken, msg.type, enriched.timestamp || Date.now());
+      } catch {}
+    }
 
     const isCritical = ['START_GUN', 'RECALL_GUN', 'LANE_FINISH', 'RACE_COMPLETE', 'ON_MARKS', 'SET'].includes(msg.type);
 
@@ -605,7 +613,8 @@ export class AthleticsNetworkService {
     // 3. MQTT السحابي (للرسائل العامة أو كاحتياطي)
     if (this.mqttClient && this.mqttConnected) {
       try {
-        const topic = `photofinish/v4/${this.roomCode}`;
+        const sessionScope = (this.sessionToken || 'GLOBAL').slice(0, 8);
+        const topic = `pfp/rooms/${this.roomCode}/${sessionScope}/events`;
         this.mqttClient.publish(topic, JSON.stringify(enriched), { qos: 0 });
       } catch (e) {
         console.warn('[MQTT] Publish notice:', e);
@@ -635,6 +644,12 @@ export class AthleticsNetworkService {
 
   private handleIncomingMessage(msg: any, _source?: ConnectionMode) {
     if (!msg || !msg.type) return;
+
+    // فحص مصفوفة صلاحيات الأدوار الميدانية (Role Permission Matrix)
+    if (msg._senderRole && !isMessagePermitted(msg._senderRole as PhoneRole, msg.type)) {
+      console.warn(`[Security] تم حظر رسالة غير مصرح بها: ${msg.type} من دور: ${msg._senderRole}`);
+      return;
+    }
 
     // تصفية الرسائل المكررة عبر القنوات المختلفة
     if (msg._msgId) {

@@ -31,6 +31,7 @@ import { PassageMonitoringDashboard } from './components/checkpoints/PassageMoni
 import { AthleticsCompetition, Checkpoint } from './types/athletics';
 import { checkpointStorage } from './services/checkpointStorage';
 import { passageSyncEngine } from './services/passageSyncEngine';
+import { auditService } from './services/securityService';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -1111,14 +1112,33 @@ export const App: React.FC = () => {
 
   // تعديل حكم الهاتف الثالث لعداء محدد
   const handleJudgeUpdateRunner = (lane: number, updates: Partial<Runner>) => {
+    let prevRunner: Runner | undefined;
     setRunners(prev => {
+      prevRunner = prev.find(r => r.lane === lane);
       const updated = prev.map(r => r.lane === lane ? { ...r, ...updates } : r);
       if (updates.finishTime !== undefined) {
-        const sorted = [...updated].filter(r => r.finishTime > 0).sort((a, b) => a.finishTime - b.finishTime);
-        sorted.forEach((r, idx) => { r.rank = idx + 1; });
+        const sortedLanes = [...updated]
+          .filter(r => r.finishTime > 0)
+          .sort((a, b) => a.finishTime - b.finishTime);
+        const rankMap = new Map<number, number>();
+        sortedLanes.forEach((r, idx) => { rankMap.set(r.lane, idx + 1); });
+        return updated.map(r => rankMap.has(r.lane) ? { ...r, rank: rankMap.get(r.lane)! } : r);
       }
       return updated;
     });
+
+    // تسجيل التعديل في سجل التدقيق الأمني الميداني (Immutable Audit Log)
+    if (prevRunner) {
+      const runnerName = (prevRunner as Runner).name || `عداء حارة ${lane}`;
+      auditService.log({
+        actorRole: role || 'judge',
+        action: updates.finishTime !== undefined ? 'JUDGE_UPDATE_TIME' : 'JUDGE_UPDATE_RUNNER',
+        target: `حارة ${lane} (${runnerName})`,
+        oldValue: { finishTime: (prevRunner as Runner).finishTime, rank: (prevRunner as Runner).rank },
+        newValue: updates,
+        reason: 'تعديل توقيت/بيانات العداء من لوحة التحكيم'
+      }).catch(err => console.warn('[Audit] Failed to log entry:', err));
+    }
 
     athleticsNetwork.sendMessage({
       type: 'JUDGE_UPDATE_RUNNER',
