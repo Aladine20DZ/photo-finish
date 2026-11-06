@@ -167,3 +167,117 @@ export interface RunnerLiveRanking {
   anomalyReason?: string;
   passages: PassageEvent[];
 }
+
+// ═══════════════════════════════════════════════════
+// منظومة السجلات الرياضية والأرقام القياسية (PB / SB)
+// ═══════════════════════════════════════════════════
+
+export interface PersonalRecord {
+  eventCode: string;           // كود الاختصاص (100m, 800m, cross_country, long_jump...)
+  eventName: string;           // اسم الاختصاص (100 متر، 800 متر...)
+  recordValue: string;         // النتيجة النصية (مثلاً 10.12s أو 1:44.25 أو 8.25m)
+  numericValueMsOrCm: number;  // القيمة الرقمية للمقارنة والفرز
+  date: string;                // تاريخ تحقيق الرقم YYYY-MM-DD
+  venue?: string;              // مكان البطولة / الملعب
+  wind?: string;               // سرعة الرياح
+}
+
+// ═══════════════════════════════════════════════════
+// الملف الرياضي الموحد للعداء (Unified Athlete Profile)
+// ═══════════════════════════════════════════════════
+
+export interface Athlete {
+  id: string;                  // معرف فريد UUID
+  bibNumber?: number;          // رقم الصدرية الافتراضي (Dossard)
+  licenseNumber: string;       // رقم رخصة الاتحاد الوطني (e.g. DZ-2026-10492)
+  firstName: string;           // الاسم
+  lastName: string;            // اللقب
+  arabicName?: string;         // الاسم واللقب بالعربية
+  birthDate: string;           // تاريخ الميلاد YYYY-MM-DD
+  gender: 'M' | 'F';           // الجنس
+  nationality: string;         // الدولة / الجنسية
+  clubId?: string;             // معرف النادي المنتمي إليه
+  clubName?: string;           // اسم النادي
+  wilaya?: string;             // الولاية أو الرابطة الجهوية
+  primaryDiscipline: string;   // الاختصاص الأساسي (sprints, middle_distance, long_distance, jumps, throws)
+  eligibleEvents: string[];    // قائمة المسابقات المصرح له بالمشاركة فيها
+  personalBests: PersonalRecord[];  // الأرقام القياسية الشخصية (Personal Bests)
+  seasonBests: PersonalRecord[];    // أفضل أرقام الموسم الحالي (Season Bests)
+  medicalClearance: boolean;   // شهادة الكفاءة الطبية سارية
+  medicalClearanceExpiry?: string;  // تاريخ نهاية صلاحية الفحص الطبي
+  status: 'active' | 'suspended' | 'retired';
+  photoUrl?: string;           // صورة العداء
+  phone?: string;
+  email?: string;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ═══════════════════════════════════════════════════
+// بطاقة النادي الرياضي (Athletics Club)
+// ═══════════════════════════════════════════════════
+
+export interface Club {
+  id: string;                  // معرف فريد UUID
+  code: string;                // رمز النادي (MCA, GSP, CRB, ASSN...)
+  name: string;                // اسم النادي الرسمي (مثلاً: نادي مولودية الجزائر لألعاب القوى)
+  shortName?: string;          // الاسم المختصر
+  wilaya: string;              // الولاية / المنطقة
+  city?: string;
+  foundedYear?: number;        // سنة التأسيس
+  presidentName?: string;      // رئيس النادي
+  headCoachName?: string;      // المدرب الرئيسي
+  phone?: string;
+  email?: string;
+  logoUrl?: string;
+  colors: string[];            // ألوان النادي الرسمية (HEX codes)
+  activeAthletesCount?: number;
+  medalsTally: {
+    gold: number;
+    silver: number;
+    bronze: number;
+    total: number;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ═══════════════════════════════════════════════════
+// لقطة الفئات العمرية الثابتة (Category Snapshot)
+// تجميد القواعد وأعمار المتسابقين لضمان عدم تأثر السجلات التاريخية
+// ═══════════════════════════════════════════════════
+
+export interface CategoryRule {
+  category: AgeCategory;
+  nameAr: string;
+  minAge: number;
+  maxAge: number;
+  birthYearRange: { from: number; to: number };
+}
+
+export interface CategorySnapshot {
+  competitionId: string;
+  referenceYear: number;
+  frozenAt: number;
+  rules: CategoryRule[];
+  athleteSnapshots: {
+    athleteId: string;
+    birthDate: string;
+    calculatedCategory: AgeCategory;
+    ageAtCompetition: number;
+  }[];
+}
+
+// ═══════════════════════════════════════════════════
+// نموذج كشف تكرار تسجيل العدائين (Deduplication Match)
+// ═══════════════════════════════════════════════════
+
+export interface AthleteDuplicateMatch {
+  existingAthlete: Athlete;
+  matchType: 'exact_license' | 'name_and_birthyear' | 'fuzzy_name' | 'same_bib_in_club';
+  similarityScore: number;     // من 0.0 إلى 1.0 (1.0 = تطابق تام)
+  conflictDetails: string;     // تفاصيل الاشتباه
+  recommendedAction: 'block' | 'warn' | 'merge_suggestion';
+}
+

@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { Runner } from '../types/race';
+import { Athlete, Club, AthleteDuplicateMatch } from '../types/athletics';
+import { athleteClubStorage, INITIAL_CLUBS, INITIAL_ATHLETES } from '../services/athleteClubStorage';
+import { AthleteDeduplicationService } from '../services/athleteDeduplicationService';
 
 export const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -9,18 +12,46 @@ export const DEFAULT_RUNNERS: Runner[] = [
 ];
 
 export interface AthleteState {
+  // سباقات المضمار الحالية (Track Race Runners)
   runners: Runner[];
 
-  // Actions (Pure & Immutable)
+  // قاعدة بيانات العدائين والأندية الموحدة (Athletics Unified Database)
+  athletes: Athlete[];
+  clubs: Club[];
+  selectedAthlete: Athlete | null;
+  duplicateMatches: AthleteDuplicateMatch[];
+  searchFilter: string;
+  selectedClubFilter: string;
+  isLoading: boolean;
+
+  // إجراءات سباقات المضمار (Track Runners Actions)
   setRunners: (runners: Runner[] | ((prev: Runner[]) => Runner[])) => void;
   updateRunner: (lane: number, updates: Partial<Runner>) => void;
   setLaneFinish: (lane: number, finishTime: number, rank?: number, snapshotUrl?: string) => void;
   recalculateRanks: () => void;
   resetRunners: (count?: number) => void;
+
+  // إجراءات قاعدة البيانات والأندية (Athletics Database Actions)
+  loadAthletesAndClubs: () => Promise<void>;
+  setSearchFilter: (search: string) => void;
+  setSelectedClubFilter: (clubId: string) => void;
+  setSelectedAthlete: (athlete: Athlete | null) => void;
+  checkDeduplication: (candidate: Partial<Athlete>) => AthleteDuplicateMatch[];
+  saveAthlete: (athlete: Athlete, forceOverride?: boolean) => Promise<{ success: boolean; athlete?: Athlete; matches?: AthleteDuplicateMatch[]; error?: string }>;
+  deleteAthlete: (id: string) => Promise<void>;
+  saveClub: (club: Club) => Promise<Club>;
+  deleteClub: (id: string) => Promise<void>;
 }
 
-export const useAthleteStore = create<AthleteState>((set) => ({
+export const useAthleteStore = create<AthleteState>((set, get) => ({
   runners: DEFAULT_RUNNERS,
+  athletes: INITIAL_ATHLETES,
+  clubs: INITIAL_CLUBS,
+  selectedAthlete: null,
+  duplicateMatches: [],
+  searchFilter: '',
+  selectedClubFilter: '',
+  isLoading: false,
 
   setRunners: (val) => set((state) => ({
     runners: typeof val === 'function' ? val(state.runners) : val
@@ -127,5 +158,93 @@ export const useAthleteStore = create<AthleteState>((set) => ({
         };
       })
     };
-  })
+  }),
+
+  // ═══════════════════════════════════════════════════
+  // دوال قاعدة بيانات العدائين والأندية
+  // ═══════════════════════════════════════════════════
+
+  loadAthletesAndClubs: async () => {
+    set({ isLoading: true });
+    try {
+      const [athletesList, clubsList] = await Promise.all([
+        athleteClubStorage.listAthletes(),
+        athleteClubStorage.listClubs(),
+      ]);
+      set({
+        athletes: athletesList.length ? athletesList : INITIAL_ATHLETES,
+        clubs: clubsList.length ? clubsList : INITIAL_CLUBS,
+      });
+    } catch (e) {
+      console.warn('Failed loading athletes/clubs from storage:', e);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  setSearchFilter: (searchFilter) => set({ searchFilter }),
+  setSelectedClubFilter: (selectedClubFilter) => set({ selectedClubFilter }),
+  setSelectedAthlete: (selectedAthlete) => set({ selectedAthlete }),
+
+  checkDeduplication: (candidate) => {
+    const existing = get().athletes;
+    return AthleteDeduplicationService.findDuplicates(candidate, existing);
+  },
+
+  saveAthlete: async (athlete, forceOverride = false) => {
+    const existing = get().athletes;
+    const matches = AthleteDeduplicationService.findDuplicates(athlete, existing);
+
+    const hasBlockConflict = matches.some((m) => m.recommendedAction === 'block');
+    if (hasBlockConflict && !forceOverride) {
+      set({ duplicateMatches: matches });
+      return {
+        success: false,
+        matches,
+        error: matches[0]?.conflictDetails || 'تعارض في بيانات العداء مع ملف مسجل مسبقاً',
+      };
+    }
+
+    const saved = await athleteClubStorage.saveAthlete(athlete);
+    set((state) => {
+      const idx = state.athletes.findIndex((a) => a.id === saved.id);
+      const updated = idx >= 0
+        ? state.athletes.map((a) => (a.id === saved.id ? saved : a))
+        : [...state.athletes, saved];
+      return {
+        athletes: updated,
+        duplicateMatches: [],
+        selectedAthlete: saved,
+      };
+    });
+
+    return { success: true, athlete: saved, matches };
+  },
+
+  deleteAthlete: async (id) => {
+    await athleteClubStorage.deleteAthlete(id);
+    set((state) => ({
+      athletes: state.athletes.filter((a) => a.id !== id),
+      selectedAthlete: state.selectedAthlete?.id === id ? null : state.selectedAthlete,
+    }));
+  },
+
+  saveClub: async (club) => {
+    const saved = await athleteClubStorage.saveClub(club);
+    set((state) => {
+      const idx = state.clubs.findIndex((c) => c.id === saved.id);
+      const updated = idx >= 0
+        ? state.clubs.map((c) => (c.id === saved.id ? saved : c))
+        : [...state.clubs, saved];
+      return { clubs: updated };
+    });
+    return saved;
+  },
+
+  deleteClub: async (id) => {
+    await athleteClubStorage.deleteClub(id);
+    set((state) => ({
+      clubs: state.clubs.filter((c) => c.id !== id),
+    }));
+  },
 }));

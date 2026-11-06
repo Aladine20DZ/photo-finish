@@ -11,6 +11,7 @@ import {
   ShieldCheck, 
   SlidersHorizontal,
   Users,
+  Building2,
   Check,
   X
 } from 'lucide-react';
@@ -23,6 +24,8 @@ import {
 import { checkpointStorage } from '../../services/checkpointStorage';
 import { passageSyncEngine } from '../../services/passageSyncEngine';
 import { CrossCountryResultEngine } from '../../services/crossCountryResultEngine';
+import { AthletesDatabaseModal } from '../athletics/AthletesDatabaseModal';
+import { ClubsDatabaseModal } from '../athletics/ClubsDatabaseModal';
 
 interface PassageMonitoringDashboardProps {
   competition: AthleticsCompetition;
@@ -43,6 +46,8 @@ export const PassageMonitoringDashboard: React.FC<PassageMonitoringDashboardProp
   const [activeTab, setActiveTab] = useState<'standings' | 'matrix' | 'corrections'>('standings');
   const [filterLap, setFilterLap] = useState<number>(1);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isAthletesModalOpen, setIsAthletesModalOpen] = useState<boolean>(false);
+  const [isClubsModalOpen, setIsClubsModalOpen] = useState<boolean>(false);
 
   const loadAllData = async () => {
     setIsRefreshing(true);
@@ -180,6 +185,24 @@ export const PassageMonitoringDashboard: React.FC<PassageMonitoringDashboardProp
                 <span>إعطاء شارة الانطلاق</span>
               </button>
             )}
+
+            <button
+              onClick={() => setIsAthletesModalOpen(true)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700 transition"
+              title="سجل العدائين والتحقق من الفئات والتكرار"
+            >
+              <Users className="w-4 h-4 text-blue-400" />
+              <span>سجل العدائين</span>
+            </button>
+
+            <button
+              onClick={() => setIsClubsModalOpen(true)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700 transition"
+              title="دليل الأندية والميداليات"
+            >
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span>دليل الأندية</span>
+            </button>
 
             <button
               onClick={onOpenJudges}
@@ -473,6 +496,17 @@ export const PassageMonitoringDashboard: React.FC<PassageMonitoringDashboardProp
           </div>
         )}
       </div>
+
+      {/* نوافذ منظومة العدائين والأندية */}
+      <AthletesDatabaseModal
+        isOpen={isAthletesModalOpen}
+        onClose={() => setIsAthletesModalOpen(false)}
+      />
+
+      <ClubsDatabaseModal
+        isOpen={isClubsModalOpen}
+        onClose={() => setIsClubsModalOpen(false)}
+      />
     </div>
   );
 };

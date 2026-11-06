@@ -31,12 +31,15 @@ import {
   Camera,
   Plus,
   Zap,
-  CheckSquare
+  CheckSquare,
+  Building2
 } from 'lucide-react';
 import { licenseManager } from '../services/licenseManager';
 import { pricingService, SubscriptionSettings, CurrencyCode, CustomPackage } from '../services/pricingService';
 import { athleticsAudio } from '../services/audioService';
 import { LicenseTierCode } from '../types/race';
+import { AthletesDatabaseModal } from '../components/athletics/AthletesDatabaseModal';
+import { ClubsDatabaseModal } from '../components/athletics/ClubsDatabaseModal';
 
 interface AdminLicenseRecord {
   id: string;
@@ -58,6 +61,8 @@ const STORAGE_LEDGER_KEY = 'pf_admin_portal_master_ledger_v2';
 export const AdminPortal: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'overview' | 'generator' | 'packages' | 'transfer' | 'ledger' | 'simulator' | 'settings'>('overview');
   const [roomCode] = useState<string>('RACE-2026');
+  const [isAthletesModalOpen, setIsAthletesModalOpen] = useState<boolean>(false);
+  const [isClubsModalOpen, setIsClubsModalOpen] = useState<boolean>(false);
 
   // إعدادات المنظومة والأسعار
   const [systemSettings, setSystemSettings] = useState<SubscriptionSettings>(() => pricingService.settings);
@@ -598,6 +603,26 @@ export const AdminPortal: React.FC = () => {
             <Settings className="w-4 h-4" />
             <span>إعدادات الأسعار والمنظومة ⚙️</span>
           </button>
+
+          <div className="pt-2 mt-2 border-t border-slate-800">
+            <p className="text-[10px] font-bold text-slate-400 px-3 py-1">منظومة ألعاب القوى والعدائين:</p>
+            <button
+              type="button"
+              onClick={() => setIsAthletesModalOpen(true)}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-blue-300 hover:bg-slate-800/80 hover:text-white transition-all text-right cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-blue-400" />
+              <span>سجل العدائين الموحد 🏃</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsClubsModalOpen(true)}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-emerald-300 hover:bg-slate-800/80 hover:text-white transition-all text-right cursor-pointer"
+            >
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span>دليل الأندية والجمعيات 🏛️</span>
+            </button>
+          </div>
         </aside>
 
         {/* مساحة العمل الرئيسية (Content Area) */}
@@ -2445,6 +2470,17 @@ export const AdminPortal: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* نوافذ منظومة العدائين والأندية */}
+      <AthletesDatabaseModal
+        isOpen={isAthletesModalOpen}
+        onClose={() => setIsAthletesModalOpen(false)}
+      />
+
+      <ClubsDatabaseModal
+        isOpen={isClubsModalOpen}
+        onClose={() => setIsClubsModalOpen(false)}
+      />
     </div>
   );
 };

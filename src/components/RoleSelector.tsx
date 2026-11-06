@@ -16,13 +16,16 @@ import {
   ChevronLeft, 
   Smartphone, 
   MapPin, 
-  Route 
+  Route,
+  Building2
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
 import { QrScannerModal } from './QrScannerModal';
 import { pricingService } from '../services/pricingService';
 import { licenseManager } from '../services/licenseManager';
+import { AthletesDatabaseModal } from './athletics/AthletesDatabaseModal';
+import { ClubsDatabaseModal } from './athletics/ClubsDatabaseModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -43,6 +46,8 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
 }) => {
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
+  const [showAthletesModal, setShowAthletesModal] = useState<boolean>(false);
+  const [showClubsModal, setShowClubsModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -526,6 +531,27 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         )}
       </div>
 
+      {/* ═══ 7. قسم قاعدة بيانات ألعاب القوى والأندية ═══ */}
+      <div className="w-full grid grid-cols-2 gap-2 text-xs pt-0.5">
+        <button
+          type="button"
+          onClick={() => setShowAthletesModal(true)}
+          className="py-2.5 px-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-blue-500/30 text-blue-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Users className="w-4 h-4 text-blue-400" />
+          <span>سجل العدائين 🏃</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowClubsModal(true)}
+          className="py-2.5 px-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-emerald-500/30 text-emerald-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Building2 className="w-4 h-4 text-emerald-400" />
+          <span>دليل الأندية 🏛️</span>
+        </button>
+      </div>
+
       {/* نافذة عرض باركود الغرفة */}
       {showQrModal && (
         <PhoneQrModal
@@ -541,6 +567,17 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
           onClose={() => setShowScannerModal(false)}
         />
       )}
+
+      {/* نوافذ منظومة العدائين والأندية */}
+      <AthletesDatabaseModal
+        isOpen={showAthletesModal}
+        onClose={() => setShowAthletesModal(false)}
+      />
+
+      <ClubsDatabaseModal
+        isOpen={showClubsModal}
+        onClose={() => setShowClubsModal(false)}
+      />
     </div>
   );
 };
