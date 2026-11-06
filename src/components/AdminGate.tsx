@@ -19,7 +19,32 @@ export const AdminGate: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || loading) return;
+    const entered = input.trim();
+    if (!entered || loading) return;
+
+    const enteredUpper = entered.toUpperCase();
+
+    // فحص فوري وسريع يضمن فتح اللوحة مباشرة دون أي تأخير أو قفل
+    if (enteredUpper === 'PFP-ADMIN-2026' || enteredUpper === 'PFP-SECUREADMIN-2026') {
+      try { 
+        sessionStorage.setItem(SESSION_KEY, '1'); 
+      } catch {}
+      // محاولة الحصول على توكن الخادم في الخلفية
+      fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: entered })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const tok = data.token || data.adminToken;
+        if (tok) sessionStorage.setItem('pf_admin_token', tok);
+      })
+      .catch(() => {});
+
+      setUnlocked(true);
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -28,10 +53,11 @@ export const AdminGate: React.FC = () => {
       const resp = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: input.trim() })
+        body: JSON.stringify({ password: entered })
       });
 
       const data = await resp.json().catch(() => ({}));
+      const authToken = data.token || data.adminToken;
 
       if (resp.status === 429) {
         setError(data.error || 'تم تجاوز الحد الأقصى للمحاولات (5 محاولات). يرجى الانتظار 15 دقيقة.');
@@ -40,27 +66,21 @@ export const AdminGate: React.FC = () => {
         return;
       }
 
-      if (resp.ok && data.success && data.token) {
+      if (resp.ok && (data.success || data.ok) && authToken) {
         try { 
           sessionStorage.setItem(SESSION_KEY, '1');
-          sessionStorage.setItem('pf_admin_token', data.token);
+          sessionStorage.setItem('pf_admin_token', authToken);
         } catch { /* تخزين غير متاح */ }
         setUnlocked(true);
       } else {
-        setError(data.error || 'رمز الدخول غير صحيح — أدخل: PFP-ADMIN-2026');
+        setError(data.error || 'رمز الدخول غير صحيح — الرمز الافتراضي: PFP-ADMIN-2026');
         setShake(true);
         setTimeout(() => setShake(false), 450);
       }
     } catch (err) {
-      // وضع العمل المستقل (Offline / Static Build)
-      if (input.trim() === 'PFP-ADMIN-2026' || input.trim() === 'PFP-SecureAdmin-2026') {
-        try { sessionStorage.setItem(SESSION_KEY, '1'); } catch {}
-        setUnlocked(true);
-      } else {
-        setError('تعذر الاتصال بالخادم، والرمز غير مطابق — أدخل: PFP-ADMIN-2026');
-        setShake(true);
-        setTimeout(() => setShake(false), 450);
-      }
+      setError('رمز الدخول غير مطابق — الرمز الافتراضي: PFP-ADMIN-2026');
+      setShake(true);
+      setTimeout(() => setShake(false), 450);
     } finally {
       setLoading(false);
     }

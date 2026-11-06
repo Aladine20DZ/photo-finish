@@ -112,7 +112,8 @@ function verifyAdminLogin(password, clientIp = '127.0.0.1') {
   return {
     success: true,
     status: 200,
-    adminToken
+    adminToken,
+    token: adminToken
   };
 }
 
