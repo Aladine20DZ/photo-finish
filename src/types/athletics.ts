@@ -340,4 +340,71 @@ export interface RegistrationAuditEntry {
   details: string;
 }
 
+// ═══════════════════════════════════════════════════
+// المرحلة C3: المسابقات والاختصاصات والمسابقات الميدانية (Field Events)
+// ═══════════════════════════════════════════════════
+
+export type FieldEventType = 
+  | 'long_jump'       // الوثب الطويل
+  | 'triple_jump'     // الوثب الثلاثي
+  | 'high_jump'       // الوثب العالي
+  | 'pole_vault'      // القفز بالزانة
+  | 'shot_put'        // رمي الجلة
+  | 'discus_throw'    // رمي القرص
+  | 'javelin_throw'   // رمي الرمح
+  | 'hammer_throw';   // رمي المطرقة
+
+export type FieldAttemptResult = 'valid' | 'foul' | 'pass' | 'no_mark';
+
+export interface FieldAttempt {
+  attemptNumber: number;          // رقم المحاولة (1 إلى 6)
+  resultType: FieldAttemptResult; // صالح (valid)، خطأ (X - foul)، تنازل (P - pass)، بدون رقم (-)
+  measurementMeters: number;      // القياس بالأمتار (مثلاً 8.25 أو 18.42 أو 0 للخطأ)
+  wind?: number;                  // سرعة الرياح بالـ m/s (للوثب الطويل والثلاثي)
+  timestamp: number;              // توقيت المحاولة
+  judgeId?: string;               // معرف الحكم الراصد
+}
+
+export interface VerticalHeightTrial {
+  heightMeters: number;           // الارتفاع (مثلاً 2.15م أو 5.60م)
+  trials: ('O' | 'X' | '-' | 'r')[]; // O=نجاح، X=فشل، -=تنازل، r=انسحاب
+  cleared: boolean;               // هل تم اجتياز هذا الارتفاع
+  attemptsCount: number;          // عدد المحاولات المستهلكة في هذا الارتفاع
+}
+
+export interface FieldAthleteScore {
+  athleteId: string;
+  athleteName: string;
+  bibNumber: number;
+  clubName: string;
+  order: number;                  // ترتيب القفز أو الرمي في الفوج (Flight Order)
+  attempts: FieldAttempt[];       // مسابقات المسافة (الوثب الأفقي والرمي: حتى 6 محاولات)
+  verticalTrials?: VerticalHeightTrial[]; // مسابقات الارتفاع (الوثب العالي والزانة)
+  bestValidMeasurement: number;   // أفضل رقم معتمد
+  secondBestMeasurement: number;  // ثاني أفضل رقم (لكسر التعادل في الرمي والوثب الأفقي)
+  rank: number;                   // الترتيب الحالي
+  status: 'active' | 'qualified' | 'eliminated' | 'dns' | 'nm';
+}
+
+export interface FieldEventCompetition {
+  id: string;                     // UUID فريد
+  competitionId: string;          // المسابقة الأم
+  name: string;                   // اسم الاختصاص (مثلاً: نهائي الوثب الطويل - أكابر رجال)
+  discipline: FieldEventType;     // نوع المسابقة
+  gender: GenderCategory;
+  category: AgeCategory;
+  venue: string;                  // الملعب / القطاع الميداني
+  date: string;
+  scheduledTime?: string;
+  totalAttemptsAllowed: 3 | 6;    // 3 محاولات تصفيات أو 6 محاولات نهائي
+  athletes: FieldAthleteScore[];
+  status: 'scheduled' | 'in_progress' | 'completed' | 'official';
+  chiefJudgeId?: string;
+  chiefJudgeName?: string;
+  officialNotes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+
 
