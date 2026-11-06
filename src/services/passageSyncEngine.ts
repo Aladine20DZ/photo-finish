@@ -13,7 +13,6 @@
 import { 
   PassageEvent, 
   PassageCorrection, 
-  CourseViolation,
   PassageSource,
   AthleticsJudge,
   Checkpoint 
@@ -80,6 +79,18 @@ class PassageSyncEngine {
 
   public getCurrentJudge(): AthleticsJudge | null {
     return this.currentJudge;
+  }
+
+  public getIsOnline(): boolean {
+    return this.isOnline;
+  }
+
+  public destroy(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.stopHeartbeat();
   }
 
   // ═══════════════════════════════════════════════════

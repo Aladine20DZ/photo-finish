@@ -4,7 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
-import { createRequire } from "module";
 import type { ServerResponse, IncomingMessage } from "http";
 import { WebSocketServer, type WebSocket as WsWebSocket } from "ws";
 import * as security from "./server/security.js";

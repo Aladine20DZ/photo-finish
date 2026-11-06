@@ -1,3 +1,11 @@
+import type { 
+  PassageEvent, 
+  PassageCorrection, 
+  AthleticsJudge, 
+  AthleticsCompetition, 
+  CourseViolation 
+} from './athletics';
+
 export type GunSoundType = 'official_starter_gun'; // صوت طلقة مسدس الانطلاق الاحترافي الموحد (Web Audio API)
 
 export type StarterMode = 'auto_random' | 'manual';
@@ -92,45 +100,6 @@ export interface RaceSettings {
   cameraPlacement?: CameraPlacementMode; // هندسة وضعية كاميرا خط النهاية (اختياري للتوافق مع الإعدادات المحفوظة سابقاً)
 }
 
-export interface NetworkPeerMessage {
-  type: 
-    | 'SYNC_PING' 
-    | 'SYNC_PONG' 
-    | 'ON_MARKS' 
-    | 'SET' 
-    | 'START_GUN' 
-    | 'RECALL_GUN' 
-    | 'CLOCK_TICK' 
-    | 'LANE_FINISH' 
-    | 'RACE_COMPLETE' 
-    | 'SYNC_RESET_ALL'          // زر مشترك لإعادة ضبط السباق في الهواتف معاً
-    | 'SETTINGS_SYNC'
-    | 'BELL_SIGNAL_START'       // بدء جرس/إشارة لفت الانتباه
-    | 'BELL_SIGNAL_STOP'        // إيقاف جرس التنبيه
-    | 'BELL_SIGNAL_ACK'         // تأكيد استلام إشارة الرنين
-    | 'JUDGE_UPDATE_RUNNER'     // تعديل النتيجة أو الترتيب من هاتف الحكم
-    | 'HEAT_CHANGE'             // تبديل القائمة النشطة (قائمة 1، قائمة 2...)
-    | 'HEAT_DISPATCH'           // أمر "إلى خط الانطلاق (Au Départ)" من هاتف البداية
-    | 'HEAT_CANCEL_DISPATCH'    // إلغاء أمر خط الانطلاق وسحب القائمة
-    | 'HEATS_SYNC'              // مزامنة جميع القوائم والعدائين
-    | 'HEATS_REORDER'           // إعادة ترتيب القوائم يدوياً أو تلقائياً
-    | 'DELETE_HEAT'             // حذف قائمة/سلسلة
-    | 'SLIT_SCAN_IMAGE'         // بث شريط المسح البانورامي المستمر الكامل
-    | 'REQUEST_STATE_SYNC'      // طلب مزامنة الحالة الكاملة عند دخول هاتف جديد
-    | 'RESPONSE_STATE_SYNC'     // إرسال الحالة الكاملة للهاتف المنضم
-    | 'LICENSE_SHARE_POOL'      // تقاسم التفعيل الشبكي 1*4 بين الهواتف في نفس الجلسة
-    | 'LICENSE_REVOKE_AND_TRANSFER' // نقل الترخيص المتبقي إلى هاتف آخر وإبطاله في الهاتف الأول
-    | 'LICENSE_TRANSFER_ACK'   // تأكيد الهاتف الجديد استلام التفعيل ونقله بنجاح
-    | 'ATHLETICS_PASSAGE_BATCH' // بث دفعات أحداث المرور من نقاط المراقبة
-    | 'ATHLETICS_CORRECTION'    // طلب أو اعتماد تصحيح مرور
-    | 'ATHLETICS_JUDGE_HEARTBEAT' // نبضات أجهزة الحكام ونقاط المراقبة
-    | 'ATHLETICS_COMPETITION_SYNC' // مزامنة إعدادات المنافسة ونقاط المراقبة
-    | 'ATHLETICS_VIOLATION';    // بلاغ عن مخالفة مسار
-  timestamp: number;            // ساعة الحائط Date.now() — للعرض
-  senderTime: number;           // ساعة الحائط وقت الإرسال
-  perfNow?: number;             // ساعة أحادية الاتجاه performance.now() — للتوقيت الدقيق
-  payload?: any;
-}
 
 export interface LaneMotionState {
   lane: number;
@@ -170,3 +139,204 @@ export interface LicenseTransferTicket {
   revocationProof: string;
   timestamp: number;
 }
+
+// ═══════════════════════════════════════════════════
+// حمولات الرسائل الشبكية الصارمة (Strict Network Message Payloads)
+// ═══════════════════════════════════════════════════
+
+export interface StartGunPayload {
+  startTime?: number;
+  soundVolume?: number;
+  soundPitch?: number;
+  heatId?: string;
+  gunType?: string;
+  perfNow?: number;
+  soundType?: string;
+  [key: string]: any;
+}
+
+export interface RecallGunPayload {
+  reason?: string;
+  heatId?: string;
+  [key: string]: any;
+}
+
+export interface ClockTickPayload {
+  clockTimeMs: number;
+  isRunning: boolean;
+  [key: string]: any;
+}
+
+export interface LaneFinishPayload {
+  lane: number;
+  timeMs: number;
+  rank?: number;
+  bib?: number;
+  snapshotUrl?: string;
+  [key: string]: any;
+}
+
+export interface RaceCompletePayload {
+  runners?: Runner[];
+  fullPhotoFinishUrl?: string;
+  heatId?: string;
+  completedAt?: number;
+  [key: string]: any;
+}
+
+export interface SettingsSyncPayload {
+  settings?: RaceSettings;
+  runners?: Runner[];
+  heats?: Heat[];
+  heatIndex?: number;
+  [key: string]: any;
+}
+
+export interface JudgeUpdateRunnerPayload {
+  lane: number;
+  updates: Partial<Runner>;
+  [key: string]: any;
+}
+
+export interface HeatChangePayload {
+  heatIndex: number;
+  heat?: Heat;
+  [key: string]: any;
+}
+
+export interface HeatDispatchPayload {
+  heatId: string;
+  heatIndex?: number;
+  heat?: Heat;
+  [key: string]: any;
+}
+
+export interface HeatCancelDispatchPayload {
+  heatId?: string;
+  [key: string]: any;
+}
+
+export interface HeatsSyncPayload {
+  heats: Heat[];
+  [key: string]: any;
+}
+
+export interface HeatsReorderPayload {
+  heats: Heat[];
+  [key: string]: any;
+}
+
+export interface DeleteHeatPayload {
+  heatId: string;
+  [key: string]: any;
+}
+
+export interface SlitScanImagePayload {
+  fullPhotoFinishUrl: string;
+  [key: string]: any;
+}
+
+export interface RequestStateSyncPayload {
+  fromRole?: PhoneRole;
+  peerId?: string;
+  [key: string]: any;
+}
+
+export interface ResponseStateSyncPayload {
+  settings?: RaceSettings;
+  runners?: Runner[];
+  raceStatus?: RaceStatus;
+  clockTimeMs?: number;
+  heats?: Heat[];
+  currentHeatIndex?: number;
+  fromRole?: PhoneRole;
+  [key: string]: any;
+}
+
+export interface LicenseTransferAckPayload {
+  ticketId: string;
+  status: 'accepted' | 'rejected';
+  [key: string]: any;
+}
+
+export interface AthleticsPassageBatchPayload {
+  events: PassageEvent[];
+  senderDeviceId?: string;
+  judge?: AthleticsJudge | null;
+  [key: string]: any;
+}
+
+export interface AthleticsCorrectionPayload {
+  correction: PassageCorrection;
+  [key: string]: any;
+}
+
+export interface AthleticsJudgeHeartbeatPayload {
+  judge: AthleticsJudge;
+  deviceId?: string;
+  time?: number;
+  timestamp?: number;
+  [key: string]: any;
+}
+
+export interface AthleticsCompetitionSyncPayload {
+  competition: AthleticsCompetition;
+  [key: string]: any;
+}
+
+export interface AthleticsViolationPayload {
+  violation: CourseViolation;
+  [key: string]: any;
+}
+
+export interface NetworkMessagePayloadMap {
+  SYNC_PING: { pingId?: string; clientTime?: number; [key: string]: any } | undefined;
+  SYNC_PONG: { originalSenderTime?: any; clientTime?: number; serverTime?: number; [key: string]: any } | undefined;
+  ON_MARKS: { heatId?: string; [key: string]: any } | undefined;
+  SET: { heatId?: string; [key: string]: any } | undefined;
+  START_GUN: StartGunPayload | undefined;
+  RECALL_GUN: RecallGunPayload | undefined;
+  CLOCK_TICK: ClockTickPayload | undefined;
+  LANE_FINISH: LaneFinishPayload;
+  RACE_COMPLETE: RaceCompletePayload | undefined;
+  SYNC_RESET_ALL: { heatId?: string; [key: string]: any } | undefined;
+  SETTINGS_SYNC: SettingsSyncPayload;
+  BELL_SIGNAL_START: { sender?: string; [key: string]: any } | undefined;
+  BELL_SIGNAL_STOP: { sender?: string; [key: string]: any } | undefined;
+  BELL_SIGNAL_ACK: { sender?: string; [key: string]: any } | undefined;
+  JUDGE_UPDATE_RUNNER: JudgeUpdateRunnerPayload;
+  HEAT_CHANGE: HeatChangePayload;
+  HEAT_DISPATCH: HeatDispatchPayload;
+  HEAT_CANCEL_DISPATCH: HeatCancelDispatchPayload | undefined;
+  HEATS_SYNC: HeatsSyncPayload;
+  HEATS_REORDER: HeatsReorderPayload;
+  DELETE_HEAT: DeleteHeatPayload;
+  SLIT_SCAN_IMAGE: SlitScanImagePayload;
+  REQUEST_STATE_SYNC: RequestStateSyncPayload | undefined;
+  RESPONSE_STATE_SYNC: ResponseStateSyncPayload;
+  LICENSE_SHARE_POOL: LicensePoolInfo;
+  LICENSE_REVOKE_AND_TRANSFER: LicenseTransferTicket;
+  LICENSE_TRANSFER_ACK: LicenseTransferAckPayload;
+  ATHLETICS_PASSAGE_BATCH: AthleticsPassageBatchPayload;
+  ATHLETICS_CORRECTION: AthleticsCorrectionPayload;
+  ATHLETICS_JUDGE_HEARTBEAT: AthleticsJudgeHeartbeatPayload;
+  ATHLETICS_COMPETITION_SYNC: AthleticsCompetitionSyncPayload;
+  ATHLETICS_VIOLATION: AthleticsViolationPayload;
+}
+
+export type NetworkMessageType = keyof NetworkMessagePayloadMap;
+
+export type TypedNetworkPeerMessage<K extends NetworkMessageType = NetworkMessageType> = K extends any ? {
+  type: K;
+  timestamp: number;
+  senderTime: number;
+  perfNow?: number;
+  payload?: NetworkMessagePayloadMap[K];
+} : never;
+
+/**
+ * رسالة الشبكة المشتركة (Strict Discriminated Union)
+ * تضمن تعيين وتدقيق نوع الحمولة (Payload) حسب نوع الرسالة (Type)
+ */
+export type NetworkPeerMessage = TypedNetworkPeerMessage;
+

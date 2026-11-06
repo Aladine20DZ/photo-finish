@@ -12,9 +12,7 @@ import {
   AthleticsCompetition, 
   PassageEvent, 
   PassageCorrection, 
-  CourseViolation,
-  AthleticsJudge,
-  Checkpoint 
+  AthleticsJudge 
 } from '../types/athletics';
 
 const DB_NAME = 'athletics_competition_db_v1';

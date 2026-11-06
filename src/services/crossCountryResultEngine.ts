@@ -12,8 +12,7 @@
 import { 
   AthleticsCompetition, 
   PassageEvent, 
-  RunnerLiveRanking,
-  Checkpoint 
+  RunnerLiveRanking
 } from '../types/athletics';
 
 export class CrossCountryResultEngine {
@@ -52,7 +51,6 @@ export class CrossCountryResultEngine {
       const club = meta?.club || runnerEvents[0].club || '—';
 
       // فحص الحلقات ونقاط المراقبة
-      let lapsCompleted = 0;
       let lastCheckpointCode = 'START';
       let lastDistanceKm = 0;
       let lastPassageTime = competition.actualStartTime || runnerEvents[0].timestamp;

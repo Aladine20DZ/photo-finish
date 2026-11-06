@@ -2,18 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   UserPlus, 
-  Trash2, 
   Shield, 
   QrCode, 
   Copy, 
   Check, 
-  ExternalLink, 
-  Wifi, 
-  WifiOff, 
-  Activity,
-  Smartphone
+  ExternalLink 
 } from 'lucide-react';
-import { AthleticsJudge, Checkpoint, AthleticsCompetition, JudgeRole } from '../../types/athletics';
+import { AthleticsJudge, AthleticsCompetition, JudgeRole } from '../../types/athletics';
 import { checkpointStorage } from '../../services/checkpointStorage';
 import { passageSyncEngine } from '../../services/passageSyncEngine';
 
@@ -30,7 +25,7 @@ export const JudgeManagementModal: React.FC<JudgeManagementModalProps> = ({
 }) => {
   const [judges, setJudges] = useState<AthleticsJudge[]>([]);
   const [newJudgeName, setNewJudgeName] = useState<string>('');
-  const [newJudgeRole, setNewJudgeRole] = useState<JudgeRole>('checkpoint_judge');
+  const [newJudgeRole] = useState<JudgeRole>('checkpoint_judge');
   const [selectedCpId, setSelectedCpId] = useState<string>(competition.checkpoints[0]?.id || '');
   const [copiedJudgeId, setCopiedJudgeId] = useState<string | null>(null);
   const [selectedJudgeForQr, setSelectedJudgeForQr] = useState<AthleticsJudge | null>(null);

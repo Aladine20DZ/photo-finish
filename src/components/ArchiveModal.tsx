@@ -185,7 +185,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({ onClose }) => {
                           {race.runners
                             .slice()
                             .sort((a, b) => (a.finishTime || 9e9) - (b.finishTime || 9e9))
-                            .map((r, idx) => {
+                            .map((r) => {
                               const badge = STATUS_BADGE[r.status] || STATUS_BADGE.OK;
                               return (
                                 <tr key={`${race.id}-${r.lane}`} className="border-t border-slate-800/70 text-slate-200">

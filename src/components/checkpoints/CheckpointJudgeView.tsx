@@ -4,21 +4,15 @@ import {
   AlertTriangle, 
   Wifi, 
   WifiOff, 
-  QrCode, 
-  Hash, 
   RotateCcw, 
   Camera, 
-  Volume2, 
   Send, 
   Users, 
-  Flag,
-  ChevronRight,
-  RefreshCw,
-  Clock,
-  Zap
+  ChevronRight, 
+  Clock 
 } from 'lucide-react';
 import jsQR from 'jsqr';
-import { Checkpoint, AthleticsCompetition, PassageEvent, PassageCorrection } from '../../types/athletics';
+import { Checkpoint, AthleticsCompetition, PassageEvent } from '../../types/athletics';
 import { passageSyncEngine, SyncState } from '../../services/passageSyncEngine';
 import { checkpointStorage } from '../../services/checkpointStorage';
 

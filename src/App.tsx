@@ -449,12 +449,14 @@ export const App: React.FC = () => {
 
       case 'LANE_FINISH': {
         const { lane, timeMs, rank, snapshotUrl } = msg.payload || {};
-        setRunners(prev => prev.map(r => r.lane === lane ? { 
-          ...r, 
-          finishTime: timeMs, 
-          rank: rank || r.rank,
-          crossingSnapshot: snapshotUrl || r.crossingSnapshot
-        } : r));
+        if (typeof lane === 'number') {
+          setRunners(prev => prev.map(r => r.lane === lane ? { 
+            ...r, 
+            finishTime: typeof timeMs === 'number' ? timeMs : r.finishTime, 
+            rank: rank || r.rank,
+            crossingSnapshot: snapshotUrl || r.crossingSnapshot
+          } : r));
+        }
         break;
       }
 
@@ -465,11 +467,12 @@ export const App: React.FC = () => {
         if (msg.payload?.runners) {
           setRunners(msg.payload.runners);
         }
-        if (msg.payload?.fullPhotoFinishUrl) {
+        if (msg.payload && 'fullPhotoFinishUrl' in msg.payload && msg.payload.fullPhotoFinishUrl) {
+          const photoUrl = msg.payload.fullPhotoFinishUrl;
           setHeats(prev => {
             const updated = [...prev];
             if (updated[currentHeatIndexRef.current]) {
-              updated[currentHeatIndexRef.current].fullPhotoFinishUrl = msg.payload.fullPhotoFinishUrl;
+              updated[currentHeatIndexRef.current].fullPhotoFinishUrl = photoUrl;
             }
             return updated;
           });
@@ -477,17 +480,18 @@ export const App: React.FC = () => {
         // أرشفة السباق تلقائياً على هذا الهاتف أيضاً (نسخة محلية من النتيجة الرسمية)
         saveRaceToArchive({
           runners: msg.payload?.runners || runnersRef.current,
-          fullPhotoFinishUrl: msg.payload?.fullPhotoFinishUrl,
+          fullPhotoFinishUrl: msg.payload && 'fullPhotoFinishUrl' in msg.payload ? msg.payload.fullPhotoFinishUrl : undefined,
         });
         setShowPodium(true);
         break;
 
       case 'SLIT_SCAN_IMAGE':
-        if (msg.payload?.fullPhotoFinishUrl) {
+        if (msg.payload && 'fullPhotoFinishUrl' in msg.payload && msg.payload.fullPhotoFinishUrl) {
+          const photoUrl = msg.payload.fullPhotoFinishUrl;
           setHeats(prev => {
             const updated = [...prev];
             if (updated[currentHeatIndexRef.current]) {
-              updated[currentHeatIndexRef.current].fullPhotoFinishUrl = msg.payload.fullPhotoFinishUrl;
+              updated[currentHeatIndexRef.current].fullPhotoFinishUrl = photoUrl;
             }
             return updated;
           });
@@ -504,12 +508,13 @@ export const App: React.FC = () => {
           settingsRef.current = msg.payload.settings;
         }
         if (msg.payload?.runners) {
-          setRunners(msg.payload.runners);
+          const newRunners = msg.payload.runners;
+          setRunners(newRunners);
           setHeats(prev => {
             const updated = [...prev];
             const idx = typeof msg.payload?.heatIndex === 'number' ? msg.payload.heatIndex : currentHeatIndexRef.current;
             if (updated[idx]) {
-              updated[idx] = { ...updated[idx], runners: msg.payload.runners };
+              updated[idx] = { ...updated[idx], runners: newRunners };
             }
             return updated;
           });
@@ -521,14 +526,16 @@ export const App: React.FC = () => {
 
       case 'JUDGE_UPDATE_RUNNER': {
         const { lane, updates } = msg.payload || {};
-        setRunners(prev => {
-          const updated = prev.map(r => r.lane === lane ? { ...r, ...updates } : r);
-          if (updates.finishTime !== undefined) {
-            const sorted = [...updated].filter(r => r.finishTime > 0).sort((a, b) => a.finishTime - b.finishTime);
-            sorted.forEach((r, idx) => { r.rank = idx + 1; });
-          }
-          return updated;
-        });
+        if (typeof lane === 'number' && updates) {
+          setRunners(prev => {
+            const updated = prev.map(r => r.lane === lane ? { ...r, ...updates } : r);
+            if (updates.finishTime !== undefined) {
+              const sorted = [...updated].filter(r => r.finishTime > 0).sort((a, b) => a.finishTime - b.finishTime);
+              sorted.forEach((r, idx) => { r.rank = idx + 1; });
+            }
+            return updated;
+          });
+        }
         break;
       }
 

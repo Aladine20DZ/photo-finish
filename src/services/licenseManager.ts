@@ -371,7 +371,7 @@ class LicenseManagerService {
       return { success: false, message: 'كود النقل غير صحيح.' };
     }
 
-    const [, tierCode, expCode, targetDevHash, sig] = parts;
+    const [, tierCode, expCode, targetDevHash, _sig] = parts;
     const myHash = this.cleanDeviceHash;
 
     if (targetDevHash !== myHash) {

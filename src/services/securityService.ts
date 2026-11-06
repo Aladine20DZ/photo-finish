@@ -13,7 +13,7 @@
  *    - توثيق أي تعديل على أزمان أو مراكز المتسابقين.
  */
 
-import { PhoneRole, NetworkPeerMessage } from '../types/race';
+import { PhoneRole } from '../types/race';
 
 // المفتاح العام Ed25519 (الافتراضي أو من متغير البيئة)
 export const ED25519_PUBLIC_KEY_BASE64 = 
@@ -193,7 +193,7 @@ export async function verifyEd25519LicenseCode(code: string): Promise<{
     return { valid: false, error: 'صيغة كود الترخيص غير مطابقة للإصدار V2' };
   }
 
-  const [rawPrefix, rawTier, expCode, rawDevHash, ...sigParts] = parts;
+  const [_rawPrefix, rawTier, expCode, rawDevHash, ...sigParts] = parts;
   const tier = rawTier.toUpperCase();
   const devHash = rawDevHash.toUpperCase();
   const sigBase64Url = sigParts.join('-');

@@ -2,30 +2,21 @@ import React, { useState } from 'react';
 import { 
   Flag, 
   Camera, 
-  Sparkles, 
   Shuffle, 
   Award, 
-  Copy, 
-  Check, 
-  Link2, 
   QrCode, 
   Users, 
   ScanLine, 
   Crown, 
   ArrowLeftRight, 
   CreditCard, 
-  Clock, 
-  CheckCircle2,
-  Lock,
-  Wifi,
-  Radio,
-  ShieldCheck,
-  ChevronLeft,
-  Smartphone,
-  Zap,
-  Activity,
-  MapPin,
-  Route
+  Lock, 
+  Wifi, 
+  Radio, 
+  ChevronLeft, 
+  Smartphone, 
+  MapPin, 
+  Route 
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
@@ -50,10 +41,8 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   onOpenTransferModal,
   sharedPoolLicense,
 }) => {
-  const [copiedRole, setCopiedRole] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -64,13 +53,6 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const generateNewRoom = () => {
     const num = Math.floor(100 + Math.random() * 900);
     onSetRoomCode(`RACE-${num}`);
-  };
-
-  const copyRoleLink = (targetRole: 'start' | 'finish' | 'judge' | 'chambre_dappel') => {
-    const url = `${origin}/?role=${targetRole}&room=${roomCode}`;
-    navigator.clipboard.writeText(url);
-    setCopiedRole(targetRole);
-    setTimeout(() => setCopiedRole(null), 2500);
   };
 
   const handleScanSuccess = (data: { roomCode: string; role?: PhoneRole }) => {

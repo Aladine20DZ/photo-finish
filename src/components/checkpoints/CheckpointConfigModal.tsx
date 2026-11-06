@@ -4,13 +4,8 @@ import {
   Plus, 
   Trash2, 
   MapPin, 
-  Flag, 
-  Layers, 
   Save, 
-  AlertCircle, 
-  Route, 
-  Clock, 
-  Compass 
+  Route 
 } from 'lucide-react';
 import { 
   AthleticsCompetition, 
@@ -211,6 +206,16 @@ export const CheckpointConfigModal: React.FC<CheckpointConfigModalProps> = ({
                 <option value="MIXED">مختلط</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-300 block mb-1">وقت الانطلاق المجدول:</label>
+            <input 
+              type="time" 
+              value={scheduledStartTime} 
+              onChange={e => setScheduledStartTime(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-amber-400 font-mono font-bold"
+            />
           </div>
         </div>
 

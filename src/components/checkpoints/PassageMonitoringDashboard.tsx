@@ -3,13 +3,11 @@ import {
   Trophy, 
   AlertTriangle, 
   CheckCircle2, 
-  RotateCcw, 
   Download, 
   Play, 
   RefreshCw, 
   Layers, 
   ChevronRight, 
-  Clock, 
   ShieldCheck, 
   SlidersHorizontal,
   Users,
@@ -39,7 +37,7 @@ export const PassageMonitoringDashboard: React.FC<PassageMonitoringDashboardProp
   onOpenConfig,
   onOpenJudges,
 }) => {
-  const [passages, setPassages] = useState<PassageEvent[]>([]);
+  const [_passages, setPassages] = useState<PassageEvent[]>([]);
   const [standings, setStandings] = useState<RunnerLiveRanking[]>([]);
   const [corrections, setCorrections] = useState<PassageCorrection[]>([]);
   const [activeTab, setActiveTab] = useState<'standings' | 'matrix' | 'corrections'>('standings');

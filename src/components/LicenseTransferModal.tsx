@@ -3,13 +3,9 @@ import {
   X, 
   ArrowLeftRight, 
   Smartphone, 
-  ShieldCheck, 
   AlertTriangle, 
   Copy, 
   Check, 
-  QrCode, 
-  Share2, 
-  Sparkles,
   Download,
   Flame,
   CheckCircle2
@@ -44,9 +40,12 @@ export const LicenseTransferModal: React.FC<LicenseTransferModalProps> = ({
   const [receiveErrorMsg, setReceiveErrorMsg] = useState<string>('');
 
   useEffect(() => {
-    return licenseManager.subscribe(() => {
+    const unsub = licenseManager.subscribe(() => {
       setActiveLicense(licenseManager.activeLicense);
     });
+    return () => {
+      unsub();
+    };
   }, []);
 
   const handleStartTransfer = async () => {
@@ -99,7 +98,7 @@ export const LicenseTransferModal: React.FC<LicenseTransferModalProps> = ({
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedVoucher(true);
-    setTimeout(() => setCopiedVoucher(null), 2500);
+    setTimeout(() => setCopiedVoucher(false), 2500);
   };
 
   const qrCodeUrl = transferTicket
