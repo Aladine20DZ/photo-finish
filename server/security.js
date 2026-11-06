@@ -147,10 +147,7 @@ export function verifyAdminToken(token) {
 
 /**
  * توليد كود ترخيص موقع رسمياً بـ Ed25519
- * @param {object} params
- * @param {'CLB8' | 'ENTX'} params.tier فئة الترخيص
- * @param {string} params.expiryCode رمز انتهاء الصلاحية (مثلاً 2612)
- * @param {string} [params.devHash] كود الجهاز (أو POOL / GLBL)
+ * @param {{ tier: 'CLB8' | 'ENTX', expiryCode: string, devHash?: string }} params
  */
 export function generateEd25519License({ tier, expiryCode, devHash = 'POOL' }) {
   const payload = `PFP2|${tier}|${expiryCode}|${devHash}`;
