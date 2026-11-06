@@ -20,7 +20,8 @@ import {
   Building2,
   ShieldCheck,
   ShieldAlert,
-  Trophy
+  Trophy,
+  Sparkles
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
@@ -36,6 +37,7 @@ import { CourseDesignerModal } from './athletics/CourseDesignerModal';
 import { MultiJudgeMergeModal } from './athletics/MultiJudgeMergeModal';
 import { ChiefJudgeDashboardModal } from './athletics/ChiefJudgeDashboardModal';
 import { ClubStandingsModal } from './athletics/ClubStandingsModal';
+import { AiRaceAssistantModal } from './athletics/AiRaceAssistantModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -65,6 +67,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const [showMultiJudgeModal, setShowMultiJudgeModal] = useState<boolean>(false);
   const [showChiefJudgeModal, setShowChiefJudgeModal] = useState<boolean>(false);
   const [showClubStandingsModal, setShowClubStandingsModal] = useState<boolean>(false);
+  const [showAiModal, setShowAiModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -630,6 +633,15 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
           <Trophy className="w-4 h-4 text-amber-400" />
           <span>ترتيب الأندية وحصاد الميداليات والتصدير 🏆</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowAiModal(true)}
+          className="col-span-2 py-2.5 px-3 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900/90 to-purple-950/70 hover:from-indigo-900/70 hover:to-purple-900/70 border border-indigo-500/40 text-indigo-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Sparkles className="w-4 h-4 text-indigo-400" />
+          <span>المساعد الذكي والتحليل التكتيكي 🤖 AI</span>
+        </button>
       </div>
 
       {/* نافذة عرض باركود الغرفة */}
@@ -648,7 +660,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         />
       )}
 
-      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ وغرفة الحكم العام وترتيب الأندية */}
+      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ وغرفة الحكم العام وترتيب الأندية والذكاء الاصطناعي */}
       <AthletesDatabaseModal
         isOpen={showAthletesModal}
         onClose={() => setShowAthletesModal(false)}
@@ -693,6 +705,11 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <ClubStandingsModal
         isOpen={showClubStandingsModal}
         onClose={() => setShowClubStandingsModal(false)}
+      />
+
+      <AiRaceAssistantModal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
       />
     </div>
   );

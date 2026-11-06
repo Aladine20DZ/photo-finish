@@ -651,6 +651,50 @@ export interface ClubMedalTally {
 
 export type ExportFormat = 'pdf' | 'csv' | 'json';
 
+// ══════════════════════════════════════════════════════════════
+// نماذج المساعد الذكي للسباقات والتحليل التكتيكي (Stage C8)
+// ══════════════════════════════════════════════════════════════
 
+export interface PacingProfile {
+  bibNumber: number;
+  athleteName: string;
+  pacingStyle: 'negative_split' | 'positive_split' | 'even_pace' | 'irregular';
+  averagePaceMinKm: string;
+  fastestSplitKm: number;
+  slowestSplitKm: number;
+  paceVariationPercent: number;
+  tacticalAdvice: string;
+}
 
+export interface LeadChange {
+  checkpointCode: string;
+  kilometerMark: number;
+  newLeaderBib: number;
+  newLeaderName: string;
+  previousLeaderBib?: number;
+  previousLeaderName?: string;
+  gapSeconds: number;
+}
+
+export interface AiAnomalyCluster {
+  clusterType: 'suspected_course_measurement_error' | 'isolated_runner_irregularity' | 'judge_timing_drift';
+  affectedCheckpoints: string[];
+  affectedBibs: number[];
+  confidence: number;
+  diagnosis: string;
+  recommendation: string;
+}
+
+export interface AiRaceReport {
+  title: string;
+  summary: string;
+  winnerHeadline: string;
+  teamChampionHeadline?: string;
+  pacingInsights: PacingProfile[];
+  leadChanges: LeadChange[];
+  anomalyClusters: AiAnomalyCluster[];
+  triageRecommendations: string[];
+  fullNarrativeArabic: string;
+  generatedAt: number;
+}
 

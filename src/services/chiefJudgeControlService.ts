@@ -111,7 +111,9 @@ export class ChiefJudgeControlService {
     gunStartTime: number
   ): RaceResultEntry[] {
     const requiredLaps = competition.lapCount || 1;
-    const finishCheckpoint = competition.checkpoints.find(c => c.type === 'finish');
+    const finishCheckpoint = competition.checkpoints.find(c => c.type === 'finish')
+      || competition.checkpoints.find(c => c.code.toLowerCase().includes('fin') || c.name.includes('نهاية') || c.name.toLowerCase().includes('finish'))
+      || competition.checkpoints[competition.checkpoints.length - 1];
     const finishCpId = finishCheckpoint ? finishCheckpoint.id : '';
 
     // تجميع المرورات حسب رقم الصدر
@@ -166,7 +168,9 @@ export class ChiefJudgeControlService {
       const completedLaps = finishPassages.length;
 
       // العثور على مرور خط البداية لحساب الـ Net Time
-      const startCp = competition.checkpoints.find(c => c.type === 'start');
+      const startCp = competition.checkpoints.find(c => c.type === 'start')
+        || competition.checkpoints.find(c => c.code.toLowerCase().includes('start') || c.name.includes('انطلاق') || c.name.toLowerCase().includes('start'))
+        || competition.checkpoints[0];
       const startPassage = runnerPassages.find(p => p.checkpointId === (startCp ? startCp.id : ''));
       const netStartTime = startPassage ? startPassage.officialTimestamp : gunStartTime;
 
