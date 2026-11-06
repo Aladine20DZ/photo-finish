@@ -19,7 +19,11 @@ import {
   CheckCircle2,
   Search,
   X,
-  ArrowRight
+  ArrowRight,
+  Sun,
+  Moon,
+  Sunset,
+  ScanLine
 } from 'lucide-react';
 import { useTranslation } from '../../services/i18nService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
@@ -65,6 +69,28 @@ export const NavShell: React.FC<NavShellProps> = ({
     OFFICIAL_LEAGUES.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName)) || OFFICIAL_LEAGUES[0]
   );
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [theme, setTheme] = useState<'dark' | 'sunlight' | 'light'>(() => {
+    try {
+      return (localStorage.getItem('photo_finish_theme') as any) || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const root = document.documentElement;
+      root.classList.remove('sunlight', 'light', 'dark');
+      if (theme === 'sunlight') root.classList.add('sunlight');
+      else if (theme === 'light') root.classList.add('light');
+      else root.classList.add('dark');
+      localStorage.setItem('photo_finish_theme', theme);
+    } catch {}
+  }, [theme]);
+
+  const cycleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'sunlight' : prev === 'sunlight' ? 'light' : 'dark');
+  };
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -241,6 +267,27 @@ export const NavShell: React.FC<NavShellProps> = ({
                 </>
               )}
             </div>
+
+            
+            {/* زر تبديل الثيم: ليلي / شمسي عالي التباين للميدان / نهاري */}
+            <button
+              onClick={cycleTheme}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-300 hover:text-emerald-400 hover:border-emerald-800 transition-all cursor-pointer"
+              title="تبديل النمط: ليلي / وضع الشمس عالي التباين للميدان / نهاري"
+            >
+              {theme === 'sunlight' ? <Sun className="w-3 h-3 text-amber-400" /> : theme === 'light' ? <Sunset className="w-3 h-3 text-orange-400" /> : <Moon className="w-3 h-3 text-slate-300" />}
+              <span className="hidden sm:inline">{theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}</span>
+            </button>
+
+            {/* زر الدخول المباشر بكود المهمة */}
+            <button
+              onClick={() => onTabChange('competition')}
+              className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-[10px] font-black text-emerald-300 hover:bg-emerald-900 transition-all cursor-pointer shadow-sm"
+              title="دخول الحكام بكود التكليف الرسمي (مثال: LIG31-7K4M-Q9TX)"
+            >
+              <ScanLine className="w-3 h-3 text-emerald-400" />
+              <span>كود المهمة 🔑</span>
+            </button>
 
             {/* محدد اللغات السريع */}
             <div className="flex items-center rounded-lg bg-slate-900 border border-slate-800 p-0.5 text-[10px] font-extrabold">

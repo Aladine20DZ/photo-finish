@@ -37,6 +37,7 @@ import { NavShell, NavTab } from './components/navigation/NavShell';
 import { PublicPortal } from './components/public/PublicPortal';
 import { LeagueExecutiveSuite } from './components/league/LeagueExecutiveSuite';
 import { CoachRegistrationWizard } from './components/coach/CoachRegistrationWizard';
+import { DutyCodeCheckIn } from './components/public/DutyCodeCheckIn';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -1058,7 +1059,11 @@ export const App: React.FC = () => {
       {/* الشاشات الرئيسية حسب دور الهاتف المختار أو التبويب النشط */}
       <main className="flex-1 flex flex-col">
         {!role && currentTab === 'public' && (
-          <PublicPortal onEnterFieldMode={() => setCurrentTab('competition')} />
+          <PublicPortal 
+            onEnterFieldMode={() => setCurrentTab('competition')} 
+            onOpenCoachWizard={() => setCurrentTab('coach')}
+            onOpenLeagueSuite={() => setCurrentTab('league')}
+          />
         )}
 
         {!role && currentTab === 'league' && (
@@ -1074,7 +1079,25 @@ export const App: React.FC = () => {
         )}
 
         {!role && (currentTab === 'competition' || currentTab === 'analytics') && (
-          <>
+          <div className="max-w-4xl mx-auto w-full px-4 py-8 space-y-8">
+            {/* مدخل كود المهمة الرسمي للحكام ومساعدي المسابقات */}
+            <DutyCodeCheckIn
+              onUnlockTask={(task) => {
+                setRole(task.role);
+              }}
+              onEnterGeneralField={() => {
+                // Focus into field role selector
+              }}
+            />
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-slate-800"></div>
+              <span className="flex-shrink mx-4 text-xs font-black text-slate-500 uppercase tracking-widest bg-slate-950 px-3 py-1 rounded-full border border-slate-800">
+                أو اختر دور الهاتف مباشرة في المنظومة
+              </span>
+              <div className="flex-grow border-t border-slate-800"></div>
+            </div>
+
             <RoleSelector
               roomCode={roomCode}
               onSetRoomCode={setRoomCode}
@@ -1087,7 +1110,7 @@ export const App: React.FC = () => {
             <div className="px-4 pb-6 max-w-xl mx-auto w-full">
               <PwaInstallButton />
             </div>
-          </>
+          </div>
         )}
 
         {role === 'start' && !showPodium && (
