@@ -35,8 +35,12 @@ const privateKeyObject = crypto.createPrivateKey({
   type: 'pkcs8'
 });
 
-// كلمة مرور المدير (من البيئة أو قيمة آمنة)
-const ADMIN_PASSWORD = process.env.ADMIN_PORTAL_PASSWORD || 'PFP-SecureAdmin-2026';
+// كلمات مرور المدير المقبولة (تقبل الرمز المعتاد PFP-ADMIN-2026 أو الرمز الآمن الجديد أو من البيئة)
+const VALID_PASSWORDS = Array.from(new Set([
+  process.env.ADMIN_PORTAL_PASSWORD,
+  'PFP-ADMIN-2026',
+  'PFP-SecureAdmin-2026'
+].filter(Boolean)));
 
 // ═══ حماية محاولات تسجيل الدخول (Rate Limiting) ═══
 const loginAttempts = new Map(); // ip -> { count: number, resetAt: number }
@@ -72,10 +76,18 @@ export function verifyAdminLogin(password, clientIp = '127.0.0.1') {
     };
   }
 
-  // مقارنة آمنة ضد هجمات التوقيت
-  const inputBuffer = Buffer.from(String(password || ''));
-  const targetBuffer = Buffer.from(ADMIN_PASSWORD);
-  const isMatch = inputBuffer.length === targetBuffer.length && crypto.timingSafeEqual(inputBuffer, targetBuffer);
+  // مقارنة آمنة ضد هجمات التوقيت مع جميع كلمات المرور المعتمدة
+  const cleanInput = String(password || '').trim();
+  const inputBuffer = Buffer.from(cleanInput);
+  let isMatch = false;
+
+  for (const validPass of VALID_PASSWORDS) {
+    const targetBuffer = Buffer.from(validPass);
+    if (inputBuffer.length === targetBuffer.length && crypto.timingSafeEqual(inputBuffer, targetBuffer)) {
+      isMatch = true;
+      break;
+    }
+  }
 
   if (!isMatch) {
     record.count++;
