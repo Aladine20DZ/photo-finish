@@ -30,6 +30,7 @@ import { ClubsDatabaseModal } from './athletics/ClubsDatabaseModal';
 import { CoachPortalModal } from './athletics/CoachPortalModal';
 import { RegistrationApprovalModal } from './athletics/RegistrationApprovalModal';
 import { FieldEventScorepadModal } from './athletics/FieldEventScorepadModal';
+import { CourseDesignerModal } from './athletics/CourseDesignerModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -55,6 +56,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const [showCoachModal, setShowCoachModal] = useState<boolean>(false);
   const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false);
   const [showFieldEventModal, setShowFieldEventModal] = useState<boolean>(false);
+  const [showCourseDesignerModal, setShowCourseDesignerModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -579,10 +581,19 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         <button
           type="button"
           onClick={() => setShowFieldEventModal(true)}
-          className="col-span-2 py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900/80 to-amber-950/60 hover:from-amber-900/60 hover:to-amber-900/60 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+          className="py-2.5 px-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
         >
           <Award className="w-4 h-4 text-amber-400" />
-          <span>تحكيم المسابقات الميدانية (وثب ورمي) 🏆</span>
+          <span>المسابقات الميدانية 🏆</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowCourseDesignerModal(true)}
+          className="py-2.5 px-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-cyan-500/40 text-cyan-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Route className="w-4 h-4 text-cyan-400" />
+          <span>مصمم المسارات والخرائط 🗺️</span>
         </button>
       </div>
 
@@ -602,7 +613,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         />
       )}
 
-      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية */}
+      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات */}
       <AthletesDatabaseModal
         isOpen={showAthletesModal}
         onClose={() => setShowAthletesModal(false)}
@@ -626,6 +637,11 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <FieldEventScorepadModal
         isOpen={showFieldEventModal}
         onClose={() => setShowFieldEventModal(false)}
+      />
+
+      <CourseDesignerModal
+        isOpen={showCourseDesignerModal}
+        onClose={() => setShowCourseDesignerModal(false)}
       />
     </div>
   );

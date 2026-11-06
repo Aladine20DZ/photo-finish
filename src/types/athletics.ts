@@ -406,5 +406,82 @@ export interface FieldEventCompetition {
   updatedAt: number;
 }
 
+// ══════════════════════════════════════════════════════════════
+// نماذج مصمم المسارات والخرائط المحلية وحزم الباركود المؤمنة (Stage C4)
+// ══════════════════════════════════════════════════════════════
+
+export type CourseWaypointType = 
+  | 'start'          // خط الانطلاق
+  | 'finish'         // خط النهاية
+  | 'checkpoint'     // نقطة مراقبة وتوقيت
+  | 'turn'           // منعطف حاد
+  | 'aid_station'    // نقطة إمداد وإسعاف
+  | 'hazard'         // منطقة وعرة / خطر
+  | 'track_point';   // نقطة مسار عامة
+
+export interface CourseWaypoint {
+  id: string;
+  index: number;
+  lat: number;
+  lng: number;
+  elevation?: number;
+  name?: string;
+  type: CourseWaypointType;
+  distanceFromStartMeters: number;
+  checkpointId?: string;
+}
+
+export interface ElevationPoint {
+  distanceMeters: number;
+  elevationMeters: number;
+}
+
+export interface Course {
+  id: string;
+  competitionId: string;
+  name: string;
+  discipline: AthleticsCompetitionType;
+  totalDistanceMeters: number;
+  elevationGainMeters: number;
+  elevationLossMeters: number;
+  lapCount: number;
+  waypoints: CourseWaypoint[];
+  elevationProfile: ElevationPoint[];
+  checkpoints: Checkpoint[];
+  geoJsonData?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface OfflineMapPack {
+  id: string;
+  courseId: string;
+  name: string;
+  bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+  zoomLevels: number[];
+  tileCount: number;
+  dataSize: number;
+  status: 'ready' | 'downloading' | 'failed';
+  createdAt: number;
+}
+
+export interface SecuredQrPack {
+  id: string;
+  competitionId: string;
+  checkpointId: string;
+  checkpointCode: string;
+  checkpointName: string;
+  token: string;
+  encryptedPayload: string;
+  issuedAt: number;
+  expiresAt: number;
+  signature: string;
+}
+
 
 
