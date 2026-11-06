@@ -32,6 +32,7 @@ import { AthleticsCompetition, Checkpoint } from './types/athletics';
 import { checkpointStorage } from './services/checkpointStorage';
 import { passageSyncEngine } from './services/passageSyncEngine';
 import { auditService } from './services/securityService';
+import { dispatchNetworkMessage } from './services/messageHandlers/messageDispatcher';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -408,285 +409,37 @@ export const App: React.FC = () => {
     setShowPhotoFinishViewer(false);
   }, [stopLocalClock]);
 
-  // استقبال ومعالجة رسائل شبكة P2P بين الهواتف الثلاثة
+  // استقبال ومعالجة رسائل شبكة P2P بين الهواتف
   const handleIncomingMessage = useCallback((msg: NetworkPeerMessage) => {
-    const current = settingsRef.current;
-    switch (msg.type) {
-      case 'ON_MARKS':
-        setRaceStatus('on_marks');
-        athleticsAudio.playBeep(440, 0.2);
-        athleticsAudio.speakArabic('خذ مكانك');
-        break;
+    dispatchNetworkMessage(msg, {
+      role,
+      clockOffsetMs: athleticsNetwork.clockOffsetMs || 0,
+      getSettings: () => settingsRef.current,
+      getRunners: () => runnersRef.current,
+      getHeats: () => heatsRef.current,
+      getCurrentHeatIndex: () => currentHeatIndexRef.current,
+      getRaceStatus: () => raceStatusRef.current,
+      getClockTimeMs: () => clockTimeMsRef.current,
 
-      case 'SET':
-        setRaceStatus('set');
-        athleticsAudio.playBeep(660, 0.25);
-        athleticsAudio.speakArabic('استعد');
-        break;
+      setRaceStatus,
+      startLocalClock,
+      stopLocalClock,
+      handleLocalReset,
 
-      case 'START_GUN': {
-        setRaceStatus('racing');
-        const soundVol = msg.payload?.soundVolume ?? current.soundVolume;
-        const soundPitch = msg.payload?.soundPitch ?? current.soundPitch;
-        athleticsAudio.playStarterSound(soundVol, soundPitch);
+      setRunners,
+      setSettings,
+      setHeats,
+      setCurrentHeatIndex,
+      setDispatchedHeatId,
+      setShowPodium,
+      setSharedPoolLicense,
 
-        // توقيت البداية الدقيق مع تطبيق تصحيح فارق التوقيت NTP
-        const rawStartTime = msg.payload?.startTime || msg.timestamp || Date.now();
-        const offset = athleticsNetwork.clockOffsetMs || 0;
-        const synchronizedStartTime = rawStartTime + offset;
-        startLocalClock(synchronizedStartTime);
-        break;
-      }
+      setIsHoldingBellButton,
+      setIsPeerSirenRinging,
+      setIsReceivingBellAlert,
 
-      case 'RECALL_GUN':
-        setRaceStatus('false_start');
-        athleticsAudio.playRecallGun(
-          current.soundVolume,
-          current.soundPitch
-        );
-        stopLocalClock();
-        break;
-
-      case 'LANE_FINISH': {
-        const { lane, timeMs, rank, snapshotUrl } = msg.payload || {};
-        if (typeof lane === 'number') {
-          setRunners(prev => prev.map(r => r.lane === lane ? { 
-            ...r, 
-            finishTime: typeof timeMs === 'number' ? timeMs : r.finishTime, 
-            rank: rank || r.rank,
-            crossingSnapshot: snapshotUrl || r.crossingSnapshot
-          } : r));
-        }
-        break;
-      }
-
-      case 'RACE_COMPLETE':
-        setRaceStatus('finished');
-        stopLocalClock();
-        athleticsAudio.playWhistle(0.5, 2, current.soundVolume, current.soundPitch);
-        if (msg.payload?.runners) {
-          setRunners(msg.payload.runners);
-        }
-        if (msg.payload && 'fullPhotoFinishUrl' in msg.payload && msg.payload.fullPhotoFinishUrl) {
-          const photoUrl = msg.payload.fullPhotoFinishUrl;
-          setHeats(prev => {
-            const updated = [...prev];
-            if (updated[currentHeatIndexRef.current]) {
-              updated[currentHeatIndexRef.current].fullPhotoFinishUrl = photoUrl;
-            }
-            return updated;
-          });
-        }
-        // أرشفة السباق تلقائياً على هذا الهاتف أيضاً (نسخة محلية من النتيجة الرسمية)
-        saveRaceToArchive({
-          runners: msg.payload?.runners || runnersRef.current,
-          fullPhotoFinishUrl: msg.payload && 'fullPhotoFinishUrl' in msg.payload ? msg.payload.fullPhotoFinishUrl : undefined,
-        });
-        setShowPodium(true);
-        break;
-
-      case 'SLIT_SCAN_IMAGE':
-        if (msg.payload && 'fullPhotoFinishUrl' in msg.payload && msg.payload.fullPhotoFinishUrl) {
-          const photoUrl = msg.payload.fullPhotoFinishUrl;
-          setHeats(prev => {
-            const updated = [...prev];
-            if (updated[currentHeatIndexRef.current]) {
-              updated[currentHeatIndexRef.current].fullPhotoFinishUrl = photoUrl;
-            }
-            return updated;
-          });
-        }
-        break;
-
-      case 'SYNC_RESET_ALL':
-        handleLocalReset();
-        break;
-
-      case 'SETTINGS_SYNC':
-        if (msg.payload?.settings) {
-          setSettings(msg.payload.settings);
-          settingsRef.current = msg.payload.settings;
-        }
-        if (msg.payload?.runners) {
-          const newRunners = msg.payload.runners;
-          setRunners(newRunners);
-          setHeats(prev => {
-            const updated = [...prev];
-            const idx = typeof msg.payload?.heatIndex === 'number' ? msg.payload.heatIndex : currentHeatIndexRef.current;
-            if (updated[idx]) {
-              updated[idx] = { ...updated[idx], runners: newRunners };
-            }
-            return updated;
-          });
-        }
-        if (msg.payload?.heats) {
-          setHeats(msg.payload.heats);
-        }
-        break;
-
-      case 'JUDGE_UPDATE_RUNNER': {
-        const { lane, updates } = msg.payload || {};
-        if (typeof lane === 'number' && updates) {
-          setRunners(prev => {
-            const updated = prev.map(r => r.lane === lane ? { ...r, ...updates } : r);
-            if (updates.finishTime !== undefined) {
-              const sorted = [...updated].filter(r => r.finishTime > 0).sort((a, b) => a.finishTime - b.finishTime);
-              sorted.forEach((r, idx) => { r.rank = idx + 1; });
-            }
-            return updated;
-          });
-        }
-        break;
-      }
-
-      case 'HEAT_CHANGE': {
-        const { heatIndex, heat } = msg.payload || {};
-        if (typeof heatIndex === 'number') {
-          setCurrentHeatIndex(heatIndex);
-          if (heat?.runners) setRunners(heat.runners);
-          if (heat) {
-            setSettings(prev => ({
-              ...prev,
-              distance: heat.distance || prev.distance,
-              heatNumber: heat.number,
-              heatName: heat.name
-            }));
-          }
-          handleLocalReset();
-        }
-        break;
-      }
-
-      case 'HEATS_SYNC':
-        if (msg.payload?.heats) {
-          setHeats(msg.payload.heats);
-        }
-        break;
-
-      case 'HEAT_DISPATCH': {
-        const { heatId, heatIndex } = msg.payload || {};
-        setDispatchedHeatId(heatId || null);
-        setHeats(prev => prev.map((h, idx) => ({
-          ...h,
-          isDispatched: h.id === heatId || idx === heatIndex,
-          dispatchedAt: (h.id === heatId || idx === heatIndex) ? Date.now() : h.dispatchedAt
-        })));
-        if (typeof heatIndex === 'number') {
-          setCurrentHeatIndex(heatIndex);
-        }
-        athleticsAudio.playWhistle(0.3, 1, 1.2, 1.2);
-        break;
-      }
-
-      case 'HEAT_CANCEL_DISPATCH': {
-        setDispatchedHeatId(null);
-        setHeats(prev => prev.map(h => ({
-          ...h,
-          isDispatched: false,
-          dispatchedAt: undefined
-        })));
-        setRaceStatus('waiting');
-        athleticsAudio.playBeep(300, 0.3);
-        break;
-      }
-
-      case 'HEATS_REORDER': {
-        if (msg.payload?.heats) {
-          setHeats(msg.payload.heats);
-        }
-        break;
-      }
-
-      case 'DELETE_HEAT': {
-        const { heatId } = msg.payload || {};
-        if (heatId) {
-          setHeats(prev => prev.filter(h => h.id !== heatId));
-        }
-        break;
-      }
-
-      case 'REQUEST_STATE_SYNC':
-        athleticsNetwork.sendMessage({
-          type: 'RESPONSE_STATE_SYNC',
-          timestamp: Date.now(),
-          senderTime: Date.now(),
-          payload: {
-            settings: settingsRef.current,
-            runners: runnersRef.current,
-            raceStatus: raceStatusRef.current,
-            clockTimeMs: clockTimeMsRef.current,
-            heats: heatsRef.current,
-            currentHeatIndex: currentHeatIndexRef.current,
-            fromRole: role
-          }
-        });
-        break;
-
-      case 'RESPONSE_STATE_SYNC':
-        if (msg.payload) {
-          if (msg.payload.settings) {
-            setSettings(msg.payload.settings);
-            settingsRef.current = msg.payload.settings;
-          }
-          if (msg.payload.runners) setRunners(msg.payload.runners);
-          if (msg.payload.raceStatus) setRaceStatus(msg.payload.raceStatus);
-          if (msg.payload.clockTimeMs) setClockTimeMs(msg.payload.clockTimeMs);
-          if (msg.payload.heats) setHeats(msg.payload.heats);
-          if (typeof msg.payload.currentHeatIndex === 'number') {
-            setCurrentHeatIndex(msg.payload.currentHeatIndex);
-          }
-        }
-        break;
-
-      case 'BELL_SIGNAL_START':
-        setIsReceivingBellAlert(true);
-        athleticsAudio.startPoliceSiren(current.soundVolume);
-        athleticsNetwork.sendMessage({
-          type: 'BELL_SIGNAL_ACK',
-          timestamp: Date.now(),
-          senderTime: Date.now()
-        });
-        break;
-
-      case 'BELL_SIGNAL_STOP':
-        setIsReceivingBellAlert(false);
-        athleticsAudio.stopPoliceSiren();
-        break;
-
-      case 'BELL_SIGNAL_ACK':
-        setIsPeerSirenRinging(true);
-        break;
-
-      case 'LICENSE_SHARE_POOL':
-        if (msg.payload) {
-          licenseManager.setReceivedSharedPool(msg.payload);
-          setSharedPoolLicense(msg.payload);
-          if (msg.payload.tier === 'ENTX' && settingsRef.current.laneCount < 10) {
-            setSettings(prev => ({ ...prev, laneCount: 10 }));
-          } else if (msg.payload.tier === 'CLB8' && settingsRef.current.laneCount < 8) {
-            setSettings(prev => ({ ...prev, laneCount: Math.max(prev.laneCount, 8) }));
-          }
-        }
-        break;
-
-      case 'LICENSE_REVOKE_AND_TRANSFER':
-        if (msg.payload?.sourceDeviceId === licenseManager.deviceId) {
-          licenseManager.resetToTrial();
-          setSharedPoolLicense(null);
-        }
-        break;
-
-      case 'ATHLETICS_PASSAGE_BATCH':
-      case 'ATHLETICS_CORRECTION':
-      case 'ATHLETICS_JUDGE_HEARTBEAT':
-      case 'ATHLETICS_COMPETITION_SYNC':
-      case 'ATHLETICS_VIOLATION':
-        passageSyncEngine.handleIncomingMessage(msg);
-        break;
-
-      default:
-        break;
-    }
+      saveRaceToArchive,
+    });
   }, [handleLocalReset, startLocalClock, stopLocalClock, role, saveRaceToArchive]);
 
   // بث التفعيل الشبكي 1*4 للهواتف الثلاثة الأخرى عند الدخول للغرفة
