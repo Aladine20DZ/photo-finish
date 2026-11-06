@@ -4,7 +4,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { generateEd25519License } from '../../server/security.js';
+import { generateEd25519LicenseCode } from './securityService';
 import type { Database, LicenseTier } from '../types/supabase';
 
 export type League = Database['public']['Tables']['leagues']['Row'];
@@ -103,17 +103,17 @@ export class LeagueExecutiveService {
   /**
    * Issue an official Ed25519 Cryptographic License
    */
-  public issueLeagueLicense(params: {
+  public async issueLeagueLicense(params: {
     leagueId: string;
     tier: LicenseTier;
     expiryMonths: number;
     devHash: string;
     issuerUserId?: string;
-  }): {
+  }): Promise<{
     success: boolean;
     licenseCode: string;
     expiresAt: string;
-  } {
+  }> {
     const { tier, expiryMonths, devHash } = params;
     
     // Calculate expiry code YYMM
@@ -122,10 +122,10 @@ export class LeagueExecutiveService {
     const yr = (expiry.getFullYear() % 100).toString().padStart(2, '0');
     const mo = (expiry.getMonth() + 1).toString().padStart(2, '0');
     const expCode = `${yr}${mo}`;
+    const mappedTier: 'CLB8' | 'ENTX' = tier === 'ENTX' ? 'ENTX' : 'CLB8';
 
-    // Cryptographic Ed25519 License Generation
-    const licenseCode = (generateEd25519License as any)({
-      tier: tier === 'ENTX' ? 'ENTX' : 'CLB8',
+    const licenseCode = await generateEd25519LicenseCode({
+      tier: mappedTier,
       expiryCode: expCode,
       devHash: devHash.toUpperCase()
     });

@@ -20,7 +20,7 @@ describe('Stage 4: League Executive Suite & Governance', () => {
 
   it('generates cryptographic Ed25519 PFP2 licenses and activates them on devices', async () => {
     // Generate a 12-month CLUB license for a pooled 1*4 device mesh
-    const issueResult = leagueExecutiveService.issueLeagueLicense({
+    const issueResult = await leagueExecutiveService.issueLeagueLicense({
       leagueId: 'lg_algiers',
       tier: 'CLUB',
       expiryMonths: 12,

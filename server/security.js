@@ -18,28 +18,39 @@ import crypto from 'node:crypto';
 const DEFAULT_PRIV_BASE64 = 'gW5tU3jF63FHmofys6AdKy9340A34SErmp+7OfTHy4Q=';
 const DEFAULT_PUB_BASE64 = 'hbH1fBBC+kL3K6u7pWufQqHoKRjM0iS/+GA5L+j0nMg=';
 
-// إمكانية الاستبدال عبر متغيرات البيئة في الإنتاج
-export const PRIV_KEY_RAW = process.env.LICENSE_PRIVATE_KEY_BASE64 
-  ? Buffer.from(process.env.LICENSE_PRIVATE_KEY_BASE64, 'base64')
-  : Buffer.from(DEFAULT_PRIV_BASE64, 'base64');
+const safeEnv = typeof process !== 'undefined' && process.env ? process.env : {};
 
-export const PUB_KEY_RAW = process.env.LICENSE_PUBLIC_KEY_BASE64 
-  ? Buffer.from(process.env.LICENSE_PUBLIC_KEY_BASE64, 'base64')
-  : Buffer.from(DEFAULT_PUB_BASE64, 'base64');
+// إمكانية الاستبدال عبر متغيرات البيئة في الإنتاج
+export const PRIV_KEY_RAW = typeof Buffer !== 'undefined'
+  ? (safeEnv.LICENSE_PRIVATE_KEY_BASE64 
+      ? Buffer.from(safeEnv.LICENSE_PRIVATE_KEY_BASE64, 'base64')
+      : Buffer.from(DEFAULT_PRIV_BASE64, 'base64'))
+  : null;
+
+export const PUB_KEY_RAW = typeof Buffer !== 'undefined'
+  ? (safeEnv.LICENSE_PUBLIC_KEY_BASE64 
+      ? Buffer.from(safeEnv.LICENSE_PUBLIC_KEY_BASE64, 'base64')
+      : Buffer.from(DEFAULT_PUB_BASE64, 'base64'))
+  : null;
 
 // بناء مفتاح خاص Ed25519 بصيغة PKCS8
-const PKCS8_HEADER = Buffer.from('302e020100300506032b657004220420', 'hex');
-const privateKeyObject = crypto.createPrivateKey({
-  key: Buffer.concat([PKCS8_HEADER, PRIV_KEY_RAW]),
-  format: 'der',
-  type: 'pkcs8'
-});
+const PKCS8_HEADER = typeof Buffer !== 'undefined' ? Buffer.from('302e020100300506032b657004220420', 'hex') : null;
+const privateKeyObject = (crypto && typeof crypto.createPrivateKey === 'function' && PKCS8_HEADER && PRIV_KEY_RAW)
+  ? crypto.createPrivateKey({
+      key: Buffer.concat([PKCS8_HEADER, PRIV_KEY_RAW]),
+      format: 'der',
+      type: 'pkcs8'
+    })
+  : null;
 
 // كلمات مرور المدير المعتمدة (تُقرأ حصراً من متغيرات البيئة - Zero Hardcoded Passwords)
 export function getValidPasswords() {
-  return [process.env.ADMIN_PORTAL_PASSWORD].filter(Boolean);
+  const env = typeof process !== 'undefined' && process.env ? process.env : {};
+  return [env.ADMIN_PORTAL_PASSWORD].filter(Boolean);
 }
-export const VALID_PASSWORDS = [process.env.ADMIN_PORTAL_PASSWORD].filter(Boolean);
+export const VALID_PASSWORDS = typeof process !== 'undefined' && process.env
+  ? [process.env.ADMIN_PORTAL_PASSWORD].filter(Boolean)
+  : [];
 
 // ═══ حماية محاولات تسجيل الدخول (Rate Limiting) ═══
 const loginAttempts = new Map(); // ip -> { count: number, resetAt: number }

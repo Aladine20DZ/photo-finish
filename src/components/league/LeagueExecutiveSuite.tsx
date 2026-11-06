@@ -72,8 +72,8 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
     setPendingComps(prev => prev.map(c => c.id === id ? { ...c, status: approve ? 'sanctioned' : 'rejected' } : c));
   };
 
-  const handleGenerateLicense = () => {
-    const res = leagueExecutiveService.issueLeagueLicense({
+  const handleGenerateLicense = async () => {
+    const res = await leagueExecutiveService.issueLeagueLicense({
       leagueId,
       tier,
       expiryMonths,

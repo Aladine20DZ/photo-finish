@@ -20,6 +20,10 @@ export const ED25519_PUBLIC_KEY_BASE64 =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || 
   'hbH1fBBC+kL3K6u7pWufQqHoKRjM0iS/+GA5L+j0nMg=';
 
+export const ED25519_PRIVATE_KEY_BASE64 = 
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || 
+  'gW5tU3jF63FHmofys6AdKy9340A34SErmp+7OfTHy4Q=';
+
 // ═══ 1. مصفوفة صلاحيات الأدوار الميدانية (Role Permission Matrix) ═══
 // يحدد لكل دور ما هي أنواع الرسائل المسموح له قانونياً بإرسالها
 export const ROLE_PERMITTED_MESSAGES: Record<string, Set<string>> = {
@@ -239,6 +243,46 @@ export async function verifyEd25519LicenseCode(code: string): Promise<{
   } catch (err: any) {
     return { valid: false, error: `فشل التحقق: ${err.message}` };
   }
+}
+
+/**
+ * توليد كود ترخيص موقع رسمياً بـ Ed25519 عبر Web Crypto API المتوافق مع المتصفحات
+ */
+export async function generateEd25519LicenseCode(params: {
+  tier: 'CLB8' | 'ENTX';
+  expiryCode: string;
+  devHash?: string;
+}): Promise<string> {
+  const { tier, expiryCode, devHash = 'POOL' } = params;
+  const subtle = getSubtleCrypto();
+  if (!subtle) {
+    throw new Error('Web Crypto API غير متاح للتحقق والتوقيع');
+  }
+
+  // PKCS#8 header for Ed25519 (RFC 8410: OID 1.3.101.112)
+  const pkcs8Header = new Uint8Array([
+    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20
+  ]);
+  const privKeyRaw = Uint8Array.from(atob(ED25519_PRIVATE_KEY_BASE64), c => c.charCodeAt(0));
+  const pkcs8 = new Uint8Array(pkcs8Header.length + privKeyRaw.length);
+  pkcs8.set(pkcs8Header, 0);
+  pkcs8.set(privKeyRaw, pkcs8Header.length);
+
+  const key = await subtle.importKey('pkcs8', pkcs8, { name: 'Ed25519' }, false, ['sign']);
+  const payload = `PFP2|${tier}|${expiryCode}|${devHash}`;
+  const sigBuffer = await subtle.sign({ name: 'Ed25519' }, key, new TextEncoder().encode(payload));
+
+  const sigBytes = new Uint8Array(sigBuffer);
+  let binary = '';
+  for (let i = 0; i < sigBytes.byteLength; i++) {
+    binary += String.fromCharCode(sigBytes[i]);
+  }
+  const sigBase64Url = btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  return `PFP2-${tier}-${expiryCode}-${devHash}-${sigBase64Url}`;
 }
 
 // ═══ 3. توقيع الرسائل الحساسة بـ HMAC الجلسة ═══
