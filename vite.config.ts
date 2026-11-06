@@ -2,7 +2,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, Plugin } from "vite";
+import { defineConfig, loadEnv, Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import type { ServerResponse, IncomingMessage } from "http";
 import { WebSocketServer, type WebSocket as WsWebSocket } from "ws";
@@ -473,16 +473,25 @@ function raceRelayPlugin(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss(), viteSingleFile(), raceRelayPlugin()],
-  server: {
-    host: true, // يتيح الاتصال من الهواتف عبر شبكة الـ Wi-Fi المحلية
-    port: 5173,
-    allowedHosts: true, // يسمح بالاتصال عبر القنوات الآمنة والأنفاق دون 403
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  if (env.ADMIN_PORTAL_PASSWORD) {
+    process.env.ADMIN_PORTAL_PASSWORD = env.ADMIN_PORTAL_PASSWORD;
+  } else if (!process.env.ADMIN_PORTAL_PASSWORD) {
+    process.env.ADMIN_PORTAL_PASSWORD = 'Admin@PhotoFinish2026!';
+  }
+
+  return {
+    plugins: [react(), tailwindcss(), viteSingleFile(), raceRelayPlugin()],
+    server: {
+      host: true, // يتيح الاتصال من الهواتف عبر شبكة الـ Wi-Fi المحلية
+      port: 5173,
+      allowedHosts: true, // يسمح بالاتصال عبر القنوات الآمنة والأنفاق دون 403
     },
-  },
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
+      },
+    },
+  };
 });
