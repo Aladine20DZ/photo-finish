@@ -22,30 +22,6 @@ export const AdminGate: React.FC = () => {
     const entered = input.trim();
     if (!entered || loading) return;
 
-    const enteredUpper = entered.toUpperCase();
-
-    // فحص فوري وسريع يضمن فتح اللوحة مباشرة دون أي تأخير أو قفل
-    if (enteredUpper === 'PFP-ADMIN-2026' || enteredUpper === 'PFP-SECUREADMIN-2026') {
-      try { 
-        sessionStorage.setItem(SESSION_KEY, '1'); 
-      } catch {}
-      // محاولة الحصول على توكن الخادم في الخلفية
-      fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: entered })
-      })
-      .then(res => res.json())
-      .then(data => {
-        const tok = data.token || data.adminToken;
-        if (tok) sessionStorage.setItem('pf_admin_token', tok);
-      })
-      .catch(() => {});
-
-      setUnlocked(true);
-      return;
-    }
-
     setLoading(true);
     setError('');
 
@@ -73,12 +49,12 @@ export const AdminGate: React.FC = () => {
         } catch { /* تخزين غير متاح */ }
         setUnlocked(true);
       } else {
-        setError(data.error || 'رمز الدخول غير صحيح — الرمز الافتراضي: PFP-ADMIN-2026');
+        setError(data.error || 'بيانات الدخول غير صحيحة.');
         setShake(true);
         setTimeout(() => setShake(false), 450);
       }
-    } catch (err) {
-      setError('رمز الدخول غير مطابق — الرمز الافتراضي: PFP-ADMIN-2026');
+    } catch {
+      setError('تعذر التحقق من بيانات الدخول، يرجى المحاولة لاحقاً.');
       setShake(true);
       setTimeout(() => setShake(false), 450);
     } finally {

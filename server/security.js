@@ -35,12 +35,11 @@ const privateKeyObject = crypto.createPrivateKey({
   type: 'pkcs8'
 });
 
-// كلمات مرور المدير المقبولة (تقبل الرمز المعتاد PFP-ADMIN-2026 أو الرمز الآمن الجديد أو من البيئة)
-const VALID_PASSWORDS = Array.from(new Set([
-  process.env.ADMIN_PORTAL_PASSWORD,
-  'PFP-ADMIN-2026',
-  'PFP-SecureAdmin-2026'
-].filter(Boolean)));
+// كلمات مرور المدير المعتمدة (تُقرأ حصراً من متغيرات البيئة - Zero Hardcoded Passwords)
+export function getValidPasswords() {
+  return [process.env.ADMIN_PORTAL_PASSWORD].filter(Boolean);
+}
+export const VALID_PASSWORDS = [process.env.ADMIN_PORTAL_PASSWORD].filter(Boolean);
 
 // ═══ حماية محاولات تسجيل الدخول (Rate Limiting) ═══
 const loginAttempts = new Map(); // ip -> { count: number, resetAt: number }
@@ -76,12 +75,21 @@ export function verifyAdminLogin(password, clientIp = '127.0.0.1') {
     };
   }
 
-  // مقارنة آمنة ضد هجمات التوقيت مع جميع كلمات المرور المعتمدة
+  const activePasswords = getValidPasswords();
+  if (activePasswords.length === 0) {
+    return {
+      success: false,
+      status: 403,
+      error: 'لم يتم تعيين كلمة مرور المدير في متغيرات البيئة (ADMIN_PORTAL_PASSWORD).'
+    };
+  }
+
+  // مقارنة آمنة ضد هجمات التوقيت مع كلمة المرور المعينة في البيئة
   const cleanInput = String(password || '').trim();
   const inputBuffer = Buffer.from(cleanInput);
   let isMatch = false;
 
-  for (const validPass of VALID_PASSWORDS) {
+  for (const validPass of activePasswords) {
     const targetBuffer = Buffer.from(validPass);
     if (inputBuffer.length === targetBuffer.length && crypto.timingSafeEqual(inputBuffer, targetBuffer)) {
       isMatch = true;

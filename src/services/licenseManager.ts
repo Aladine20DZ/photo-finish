@@ -211,11 +211,11 @@ class LicenseManagerService {
       };
     }
 
-    // 2. منع أي أكواد ثابتة قديمة (Zero Backdoors Policy)
-    if (['ALADINE-VIP-2026', 'AQUACORE-ADMIN-KEY', 'PRO-ATHLETICS-2026', 'COACH-CLUB-PRO'].includes(codeUpper)) {
+    // 2. منع أي أكواد ثابتة أو غير مشفرة نهائياً (Zero Backdoors Policy)
+    if (!codeUpper.startsWith('PFP2-') && !codeUpper.startsWith('TRF1-')) {
       return {
         success: false,
-        message: 'تم إيقاف الأكواد الثابتة نهائياً لدواعي الأمان الميداني. يرجى الحصول على ترخيص مشفر رسمي من لوحة المدير.'
+        message: 'تم إيقاف الأكواد الثابتة نهائياً لدواعي الأمان الميداني. يرجى الحصول على ترخيص مشفر رسمي من لوحة المدير (صيغة PFP2 معتمدة بـ Ed25519).'
       };
     }
 

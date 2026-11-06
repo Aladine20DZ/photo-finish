@@ -28,3 +28,8 @@ Thumbs.db
 .env
 .env.local
 bun.lock
+
+# archives
+*.rar
+*.zip
+

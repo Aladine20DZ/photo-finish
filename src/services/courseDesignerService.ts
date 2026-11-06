@@ -21,7 +21,6 @@ import {
 
 const COURSES_STORAGE_KEY = 'pf_athletics_courses_v1';
 const QR_PACKS_STORAGE_KEY = 'pf_athletics_qr_packs_v1';
-const HMAC_SECRET_SALT = 'PFP_ATHLETICS_OFFLINE_SECRET_2026_SECURE';
 
 export class CourseDesignerService {
   private inMemoryCourses: Map<string, Course> = new Map();
@@ -370,6 +369,14 @@ export class CourseDesignerService {
   }
 
   /**
+   * توليد ملح تشفيري ديناميكي للمنافسة لضمان عدم وجود أسرار ثابتة في الكود (Zero Hardcoded Secrets)
+   */
+  private getCompetitionSalt(competitionId: string): string {
+    const envSecret = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_OFFLINE_SECRET) || '';
+    return `pfp_comp_${competitionId}_${envSecret}`;
+  }
+
+  /**
    * توليد حزمة باركود QR مؤمنة ومشفرة لنقطة مراقبة ميدانية
    * تمكّن الحكام والعدائين من مسح الكود دون اتصال، مع حماية ضد التلاعب والتزييف
    */
@@ -380,7 +387,7 @@ export class CourseDesignerService {
   ): Promise<SecuredQrPack> {
     const issuedAt = Date.now();
     const expiresAt = issuedAt + validDurationMs;
-    const salt = `${competitionId}:${checkpoint.id}:${checkpoint.code}:${checkpoint.distanceKm}:${issuedAt}:${expiresAt}:${HMAC_SECRET_SALT}`;
+    const salt = `${competitionId}:${checkpoint.id}:${checkpoint.code}:${checkpoint.distanceKm}:${issuedAt}:${expiresAt}:${this.getCompetitionSalt(competitionId)}`;
     
     const signature = await this.computeHash(salt);
     const shortSig = signature.substring(0, 16).toUpperCase();
@@ -492,7 +499,7 @@ export class CourseDesignerService {
         return { valid: false, error: 'انتهت صلاحية رمز النقطة الزمني.' };
       }
 
-      const expectedSalt = `${payload.cid}:${payload.cpid}:${payload.code}:${payload.km}:${payload.iat}:${payload.exp}:${HMAC_SECRET_SALT}`;
+      const expectedSalt = `${payload.cid}:${payload.cpid}:${payload.code}:${payload.km}:${payload.iat}:${payload.exp}:${this.getCompetitionSalt(payload.cid)}`;
       const calculatedSig = (await this.computeHash(expectedSalt)).substring(0, 16).toUpperCase();
 
       if (calculatedSig !== payload.sig) {
