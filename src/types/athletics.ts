@@ -614,6 +614,43 @@ export interface ChiefJudgeLockAudit {
   reason: string;
 }
 
+// ══════════════════════════════════════════════════════════════
+// نماذج ترتيب الأندية وحساب نقاط الفرق والتصدير (Stage C7)
+// ══════════════════════════════════════════════════════════════
+
+export interface TeamScoringRunner {
+  bibNumber: number;
+  athleteName: string;
+  individualRank: number;
+  timeMs: number;
+  formattedTime: string;
+  isScorer: boolean; // هل يدخل ضمن أفضل N عدائين مسجلين للنقاط
+}
+
+export interface ClubTeamScore {
+  rank: number;
+  clubId?: string;
+  clubName: string;
+  clubCode?: string;
+  totalPoints: number;        // مجموع رتب أفضل N عدائين (الأقل نقاطاً يفوز - WA Rule 19)
+  scoringCount: number;       // عدد العدائين المحتسبين (مثلاً 3 أو 4)
+  runners: TeamScoringRunner[];
+  lastScorerRank: number;     // رتبة العداء الأخير المحتسب لكسر التعادل
+  status: 'qualified' | 'incomplete';
+}
+
+export interface ClubMedalTally {
+  rank: number;
+  clubName: string;
+  gold: number;
+  silver: number;
+  bronze: number;
+  totalMedals: number;
+  trophyPoints: number;       // نقاط درع البطولة العام
+}
+
+export type ExportFormat = 'pdf' | 'csv' | 'json';
+
 
 
 

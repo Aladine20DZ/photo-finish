@@ -19,7 +19,8 @@ import {
   Route,
   Building2,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Trophy
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
@@ -34,6 +35,7 @@ import { FieldEventScorepadModal } from './athletics/FieldEventScorepadModal';
 import { CourseDesignerModal } from './athletics/CourseDesignerModal';
 import { MultiJudgeMergeModal } from './athletics/MultiJudgeMergeModal';
 import { ChiefJudgeDashboardModal } from './athletics/ChiefJudgeDashboardModal';
+import { ClubStandingsModal } from './athletics/ClubStandingsModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -62,6 +64,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const [showCourseDesignerModal, setShowCourseDesignerModal] = useState<boolean>(false);
   const [showMultiJudgeModal, setShowMultiJudgeModal] = useState<boolean>(false);
   const [showChiefJudgeModal, setShowChiefJudgeModal] = useState<boolean>(false);
+  const [showClubStandingsModal, setShowClubStandingsModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -618,6 +621,15 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
           <Award className="w-4 h-4 text-purple-400" />
           <span>غرفة الحكم العام والنتائج الرسمية 📜</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowClubStandingsModal(true)}
+          className="col-span-2 py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-950/70 via-slate-900/90 to-amber-950/70 hover:from-amber-900/70 hover:to-amber-900/70 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Trophy className="w-4 h-4 text-amber-400" />
+          <span>ترتيب الأندية وحصاد الميداليات والتصدير 🏆</span>
+        </button>
       </div>
 
       {/* نافذة عرض باركود الغرفة */}
@@ -636,7 +648,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         />
       )}
 
-      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ وغرفة الحكم العام */}
+      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ وغرفة الحكم العام وترتيب الأندية */}
       <AthletesDatabaseModal
         isOpen={showAthletesModal}
         onClose={() => setShowAthletesModal(false)}
@@ -675,6 +687,12 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <ChiefJudgeDashboardModal
         isOpen={showChiefJudgeModal}
         onClose={() => setShowChiefJudgeModal(false)}
+        onOpenStandingsModal={() => setShowClubStandingsModal(true)}
+      />
+
+      <ClubStandingsModal
+        isOpen={showClubStandingsModal}
+        onClose={() => setShowClubStandingsModal(false)}
       />
     </div>
   );
