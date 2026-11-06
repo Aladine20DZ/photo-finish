@@ -159,6 +159,7 @@ export const App: React.FC = () => {
     } catch {}
     return 'public';
   });
+  const [activeLeague, setActiveLeague] = useState<string>('الاتحاد الجزائري لألعاب القوى (FAA)');
 
   // مزامنة عنوان URL مع الدور والغرفة ورمز الجلسة الحالية دون إعادة تحميل الصفحة
   useEffect(() => {
@@ -1011,6 +1012,8 @@ export const App: React.FC = () => {
       {!role && (
         <NavShell
           currentTab={currentTab}
+          activeLeagueName={activeLeague}
+          onSelectLeague={(league) => setActiveLeague(league.name)}
           onTabChange={(tab) => {
             setCurrentTab(tab);
             try {
