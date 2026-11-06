@@ -68,6 +68,16 @@ class AthleticsAudioEngine {
   }
 
   private initContext(): AudioContext {
+    if (typeof window === 'undefined') {
+      return {
+        currentTime: 0,
+        state: 'suspended',
+        resume: async () => {},
+        createGain: () => ({ gain: { value: 1, setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} }, connect: () => {} }),
+        createBufferSource: () => ({ buffer: null, playbackRate: { value: 1 }, connect: () => {}, start: () => {}, stop: () => {} }),
+        destination: {}
+      } as any;
+    }
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.ctx = new AudioCtx();
@@ -356,7 +366,7 @@ class AthleticsAudioEngine {
    * - متزامن فورياً مع ساعة الانطلاق والاهتزاز اللمسي.
    */
   public playStarterSound(volInput?: number, pitchInput?: number): void {
-    if (this.isMuted) return;
+    if (typeof window === 'undefined' || this.isMuted) return;
 
     const ctx = this.initContext();
     const now = ctx.currentTime;
