@@ -33,6 +33,7 @@ import { RegistrationApprovalModal } from './athletics/RegistrationApprovalModal
 import { FieldEventScorepadModal } from './athletics/FieldEventScorepadModal';
 import { CourseDesignerModal } from './athletics/CourseDesignerModal';
 import { MultiJudgeMergeModal } from './athletics/MultiJudgeMergeModal';
+import { ChiefJudgeDashboardModal } from './athletics/ChiefJudgeDashboardModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -60,6 +61,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const [showFieldEventModal, setShowFieldEventModal] = useState<boolean>(false);
   const [showCourseDesignerModal, setShowCourseDesignerModal] = useState<boolean>(false);
   const [showMultiJudgeModal, setShowMultiJudgeModal] = useState<boolean>(false);
+  const [showChiefJudgeModal, setShowChiefJudgeModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -607,6 +609,15 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
           <ShieldAlert className="w-4 h-4 text-amber-400" />
           <span>مركز دمج تحكيم الهواتف وكشف الشذوذ ⚖️</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowChiefJudgeModal(true)}
+          className="col-span-2 py-2.5 px-3 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-900/90 to-purple-950/70 hover:from-purple-900/70 hover:to-purple-900/70 border border-purple-500/40 text-purple-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Award className="w-4 h-4 text-purple-400" />
+          <span>غرفة الحكم العام والنتائج الرسمية 📜</span>
+        </button>
       </div>
 
       {/* نافذة عرض باركود الغرفة */}
@@ -625,7 +636,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         />
       )}
 
-      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ */}
+      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ وغرفة الحكم العام */}
       <AthletesDatabaseModal
         isOpen={showAthletesModal}
         onClose={() => setShowAthletesModal(false)}
@@ -659,6 +670,11 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <MultiJudgeMergeModal
         isOpen={showMultiJudgeModal}
         onClose={() => setShowMultiJudgeModal(false)}
+      />
+
+      <ChiefJudgeDashboardModal
+        isOpen={showChiefJudgeModal}
+        onClose={() => setShowChiefJudgeModal(false)}
       />
     </div>
   );

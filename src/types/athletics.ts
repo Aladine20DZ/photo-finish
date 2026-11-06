@@ -62,6 +62,10 @@ export interface AthleticsCompetition {
   scheduledStartTime?: string; // وقت الانطلاق المجدول (مثلاً "09:30")
   actualStartTime?: number;    // توقيت البداية الفعلي بالمللي ثانية (Date.now())
   status: 'draft' | 'ready' | 'in_progress' | 'completed' | 'official';
+  runners?: { id: string; bibNumber: number; name: string; club?: string; startTime?: number }[];
+  chiefJudgeId?: string;
+  chiefJudgeName?: string;
+  isOfficial?: boolean;
   notes?: string;
   createdAt: number;
   updatedAt: number;
@@ -541,6 +545,75 @@ export interface MergeEngineConfig {
   debounceTapWindowMs: number; // نافذة إهمال النقرات المزدوجة العرضية (افتراضياً 1500ms)
   minTimeBetweenLapsMs: number;// أقل وقت ممكن لاجتياز حلقة كاملة (افتراضياً 90000ms)
 }
+
+// ══════════════════════════════════════════════════════════════
+// نماذج محرك النتائج الرسمية وغرفة الحكم الرئيسي والطعون (Stage C6)
+// ══════════════════════════════════════════════════════════════
+
+export type CompetitionResultStatus = 
+  | 'provisional'    // مؤقت (قيد المراجعة الميدانية)
+  | 'under_review'   // معلق لوجود طعن أو شبهة
+  | 'official'       // معتمد ورسمي (مغلق)
+  | 'certified';     // مصدق نهائياً وموقع من الحكم العام
+
+export interface RaceResultEntry {
+  rank: number;
+  bibNumber: number;
+  athleteName: string;
+  clubName: string;
+  category: AgeCategory;
+  gender: GenderCategory;
+  gunTimeMs: number;           // زمن طلقة البداية (Gun Time)
+  netTimeMs: number;           // زمن العبور الفعلي (Net / Chip Time)
+  formattedGunTime: string;    // HH:MM:SS.mmm
+  formattedNetTime: string;
+  gapMs: number;               // الفارق الزمني عن المتصدر
+  formattedGap: string;        // +00:14.2
+  completedLaps: number;
+  status: 'finished' | 'dnf' | 'dns' | 'dq';
+  disqualificationReason?: string;
+  isLocked: boolean;
+}
+
+export interface JudgeTelemetry {
+  judgeId: string;
+  judgeName: string;
+  role: string;
+  checkpointId: string;
+  checkpointCode: string;
+  deviceId: string;
+  batteryPercent?: number;
+  isOnline: boolean;
+  lastHeartbeat: number;
+  latencyMs: number;
+  passagesRecordedCount: number;
+}
+
+export interface ProtestAppeal {
+  id: string;
+  competitionId: string;
+  bibNumber: number;
+  clubName: string;
+  filedByName: string;
+  filedAt: number;
+  feeDeposited: boolean;       // دفع رسوم الطعن الرسمية (World Athletics Rule 8)
+  reason: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  decisionNote?: string;
+  decidedByChiefJudgeId?: string;
+  decidedAt?: number;
+}
+
+export interface ChiefJudgeLockAudit {
+  id: string;
+  competitionId: string;
+  action: 'lock' | 'unlock' | 'override' | 'certify';
+  chiefJudgeId: string;
+  chiefJudgeName: string;
+  timestamp: number;
+  reason: string;
+}
+
 
 
 
