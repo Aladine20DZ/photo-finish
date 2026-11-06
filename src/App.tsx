@@ -33,6 +33,10 @@ import { checkpointStorage } from './services/checkpointStorage';
 import { passageSyncEngine } from './services/passageSyncEngine';
 import { auditService } from './services/securityService';
 import { dispatchNetworkMessage } from './services/messageHandlers/messageDispatcher';
+import { NavShell, NavTab } from './components/navigation/NavShell';
+import { PublicPortal } from './components/public/PublicPortal';
+import { LeagueExecutiveSuite } from './components/league/LeagueExecutiveSuite';
+import { CoachRegistrationWizard } from './components/coach/CoachRegistrationWizard';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -144,6 +148,17 @@ export const App: React.FC = () => {
   const [raceStatus, setRaceStatus] = useState<RaceStatus>('waiting');
   const [showSchedulePanel, setShowSchedulePanel] = useState<boolean>(false);
   const [dispatchedHeatId, setDispatchedHeatId] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState<NavTab>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const tab = new URLSearchParams(window.location.search).get('tab');
+        if (tab === 'league' || tab === 'coach' || tab === 'competition' || tab === 'analytics' || tab === 'admin') {
+          return tab;
+        }
+      }
+    } catch {}
+    return 'public';
+  });
 
   // مزامنة عنوان URL مع الدور والغرفة ورمز الجلسة الحالية دون إعادة تحميل الصفحة
   useEffect(() => {
@@ -992,8 +1007,23 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* الشريط العلوي مع زر سباق جديد وجرس التنبيه وتفاصيل القائمة */}
-      {role !== 'checkpoint_judge' && role !== 'athletics_manager' && (
+      {/* شريط التنقل المتعدد للرابطات والمنظومة العامة — يظهر عند عدم تخصيص دور هاتف ميداني */}
+      {!role && (
+        <NavShell
+          currentTab={currentTab}
+          onTabChange={(tab) => {
+            setCurrentTab(tab);
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.set('tab', tab);
+              window.history.replaceState({}, '', url.toString());
+            } catch {}
+          }}
+        />
+      )}
+
+      {/* الشريط العلوي الميداني مع جرس التنبيه وتفاصيل القائمة — يظهر أثناء التحكيم أو وضع المنافسة */}
+      {(role || currentTab === 'competition') && role !== 'checkpoint_judge' && role !== 'athletics_manager' && (
         <Header
           role={role}
           roomCode={roomCode}
@@ -1022,9 +1052,25 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* الشاشات الرئيسية حسب دور الهاتف المختار */}
+      {/* الشاشات الرئيسية حسب دور الهاتف المختار أو التبويب النشط */}
       <main className="flex-1 flex flex-col">
-        {!role && (
+        {!role && currentTab === 'public' && (
+          <PublicPortal onEnterFieldMode={() => setCurrentTab('competition')} />
+        )}
+
+        {!role && currentTab === 'league' && (
+          <LeagueExecutiveSuite onOpenFieldMode={() => setCurrentTab('competition')} />
+        )}
+
+        {!role && currentTab === 'coach' && (
+          <CoachRegistrationWizard onFinished={() => setCurrentTab('public')} />
+        )}
+
+        {!role && currentTab === 'admin' && (
+          <AdminGate />
+        )}
+
+        {!role && (currentTab === 'competition' || currentTab === 'analytics') && (
           <>
             <RoleSelector
               roomCode={roomCode}
