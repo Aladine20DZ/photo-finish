@@ -106,15 +106,18 @@ export interface PassageEvent {
   timestamp: number;        // توقيت التسجيل الحقيقي (Date.now())
   perfNow?: number;         // توقيت دقيق أحادي الاتجاه (performance.now())
   elapsedTimeMs?: number;   // الزمن المنقضي منذ انطلاق السباق
-  splitTimeMs?: number;     // الزمن بين هذه النقطة والسابقة
   recordedByJudgeId: string;// معرف الحكم الذي سجل الحدث
+  judgeId?: string;         // معرّف الحكم المساعد
+  runnerId?: string;        // معرّف العداء
   judgeName?: string;
+  clubName?: string;        // اسم النادي
   deviceId: string;         // معرف الجهاز
   source: PassageSource;
   syncStatus: 'pending' | 'synced' | 'conflict';
   syncedAt?: number;
   isFlagged?: boolean;      // هل هناك تنبيه أو اشتباه (مثلاً تخطي نقطة سابقة)
   flagReason?: string;
+  isDeleted?: boolean;      // هل تم إهمال أو حذف السجل
 }
 
 export interface PassageCorrection {
@@ -481,6 +484,62 @@ export interface SecuredQrPack {
   issuedAt: number;
   expiresAt: number;
   signature: string;
+}
+
+// ══════════════════════════════════════════════════════════════
+// نماذج دمج تحكيم متعدد الهواتف وكشف شذوذ السباق (Stage C5)
+// ══════════════════════════════════════════════════════════════
+
+export type RaceAnomalyType = 
+  | 'skipped_checkpoint'   // تخطي نقطة مراقبة إجبارية
+  | 'speed_anomaly'        // سرعة قياسية غير بشرية (اشتباه قطع مسار أو وسيلة نقل)
+  | 'reverse_traversal'    // سير عكس اتجاه المسار
+  | 'rapid_duplicate'      // نقر مكرر سريع بالخطأ
+  | 'unregistered_bib';    // رقم صدر غير مسجل
+
+export type RaceAnomalySeverity = 'warning' | 'error' | 'critical';
+
+export interface MergedPassage {
+  id: string;
+  competitionId: string;
+  bibNumber: number;
+  athleteName?: string;
+  clubName?: string;
+  checkpointId: string;
+  checkpointCode: string;
+  lapNumber: number;
+  officialTimestamp: number;
+  originalTimestamps: { judgeId: string; timestamp: number }[];
+  corroboratingJudges: string[];
+  confidenceScore: number; // نسبة موثوقية من 0.0 إلى 1.0
+  status: 'valid' | 'suspicious' | 'disqualified' | 'overridden';
+  anomalyReason?: string;
+  manualOverrideNote?: string;
+}
+
+export interface RaceAnomaly {
+  id: string;
+  competitionId: string;
+  type: RaceAnomalyType;
+  bibNumber: number;
+  checkpointId: string;
+  checkpointCode: string;
+  lapNumber: number;
+  timestamp: number;
+  severity: RaceAnomalySeverity;
+  details: string;
+  calculatedSpeedKmh?: number;
+  expectedCheckpointCode?: string;
+  resolved: boolean;
+  resolutionNote?: string;
+  createdAt: number;
+}
+
+export interface MergeEngineConfig {
+  mergeWindowMs: number;       // نافذة دمج تسجيلات الحكام للنفس المرور (افتراضياً 3000ms)
+  maxHumanSpeedKmh: number;    // أقصى سرعة بشرية مقبولة بالسباق (افتراضياً 28 كم/سا)
+  debounceTapWindowMs: number; // نافذة إهمال النقرات المزدوجة العرضية (افتراضياً 1500ms)
+  minTimeBetweenLapsMs: number;// أقل وقت ممكن لاجتياز حلقة كاملة (افتراضياً 90000ms)
 }
 
 

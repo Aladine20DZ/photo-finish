@@ -18,7 +18,8 @@ import {
   MapPin, 
   Route,
   Building2,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
@@ -31,6 +32,7 @@ import { CoachPortalModal } from './athletics/CoachPortalModal';
 import { RegistrationApprovalModal } from './athletics/RegistrationApprovalModal';
 import { FieldEventScorepadModal } from './athletics/FieldEventScorepadModal';
 import { CourseDesignerModal } from './athletics/CourseDesignerModal';
+import { MultiJudgeMergeModal } from './athletics/MultiJudgeMergeModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -57,6 +59,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false);
   const [showFieldEventModal, setShowFieldEventModal] = useState<boolean>(false);
   const [showCourseDesignerModal, setShowCourseDesignerModal] = useState<boolean>(false);
+  const [showMultiJudgeModal, setShowMultiJudgeModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -595,6 +598,15 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
           <Route className="w-4 h-4 text-cyan-400" />
           <span>مصمم المسارات والخرائط 🗺️</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowMultiJudgeModal(true)}
+          className="col-span-2 py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900/80 to-amber-950/60 hover:from-amber-900/60 hover:to-amber-900/60 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <ShieldAlert className="w-4 h-4 text-amber-400" />
+          <span>مركز دمج تحكيم الهواتف وكشف الشذوذ ⚖️</span>
+        </button>
       </div>
 
       {/* نافذة عرض باركود الغرفة */}
@@ -613,7 +625,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         />
       )}
 
-      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات */}
+      {/* نوافذ منظومة العدائين والأندية والمدربين والمسابقات الميدانية والمسارات والشذوذ */}
       <AthletesDatabaseModal
         isOpen={showAthletesModal}
         onClose={() => setShowAthletesModal(false)}
@@ -642,6 +654,11 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <CourseDesignerModal
         isOpen={showCourseDesignerModal}
         onClose={() => setShowCourseDesignerModal(false)}
+      />
+
+      <MultiJudgeMergeModal
+        isOpen={showMultiJudgeModal}
+        onClose={() => setShowMultiJudgeModal(false)}
       />
     </div>
   );
