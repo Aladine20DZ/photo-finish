@@ -23,10 +23,13 @@ import {
   Sun,
   Moon,
   Sunset,
-  ScanLine
+  ScanLine,
+  PlusCircle,
+  Key
 } from 'lucide-react';
 import { useTranslation } from '../../services/i18nService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { portalAuthService, PortalType, PortalSession, RegisteredLeague } from '../../services/portalAuthService';
 
 export type NavTab = 'public' | 'league' | 'coach' | 'competition' | 'analytics' | 'admin';
 
@@ -38,36 +41,51 @@ export interface LeagueOption {
   logoCode: string;
 }
 
-const OFFICIAL_LEAGUES: LeagueOption[] = [
-  { id: 'faa_national', name: 'الاتحاد الجزائري لألعاب القوى', shortName: 'FAA', region: 'الجزائر العاصمة • المستوى الوطني', logoCode: '🇩🇿' },
-  { id: 'laa_algiers', name: 'الرابطة الولائية لألعاب القوى - الجزائر', shortName: 'LAA', region: 'الجزائر العاصمة', logoCode: '🏛️' },
-  { id: 'lao_oran', name: 'الرابطة الولائية لألعاب القوى - وهران', shortName: 'LAO', region: 'وهران • الغرب الجزائري', logoCode: '🏃' },
-  { id: 'lac_constantine', name: 'الرابطة الولائية لألعاب القوى - قسنطينة', shortName: 'LAC', region: 'قسنطينة • الشرق الجزائري', logoCode: '🌉' },
-  { id: 'las_setif', name: 'الرابطة الولائية لألعاب القوى - سطيف', shortName: 'LAS', region: 'سطيف • الهضاب العليا', logoCode: '🌲' },
-  { id: 'lach_chlef', name: 'الرابطة الولائية لألعاب القوى - الشلف', shortName: 'LACh', region: 'الشلف • حوض الشلف', logoCode: '🌾' },
-  { id: 'lrao_south', name: 'الرابطة الجهوية لألعاب القوى - ورقلة والجنوب', shortName: 'LRAO', region: 'ورقلة والجنوب الكبير', logoCode: '☀️' }
-];
-
 interface NavShellProps {
   currentTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   activeLeagueName?: string;
   onSelectLeague?: (league: LeagueOption) => void;
+  onOpenAuthModal?: (targetPortal?: PortalType) => void;
+  onOpenNewLeagueModal?: () => void;
 }
 
 export const NavShell: React.FC<NavShellProps> = ({
   currentTab,
   onTabChange,
   activeLeagueName = 'الاتحاد الجزائري لألعاب القوى (FAA)',
-  onSelectLeague
+  onSelectLeague,
+  onOpenAuthModal,
+  onOpenNewLeagueModal
 }) => {
   const { t, lang, setLanguage } = useTranslation();
   const isCloudOnline = isSupabaseConfigured();
   const [leagueDropdownOpen, setLeagueDropdownOpen] = useState(false);
   const [leagueSearch, setLeagueSearch] = useState('');
-  const [currentLeague, setCurrentLeague] = useState<LeagueOption>(() => 
-    OFFICIAL_LEAGUES.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName)) || OFFICIAL_LEAGUES[0]
-  );
+  const [allLeagues, setAllLeagues] = useState<RegisteredLeague[]>(() => portalAuthService.getAllLeagues());
+  const [leagueSession, setLeagueSession] = useState<PortalSession | null>(() => portalAuthService.getSession('league'));
+  const [coachSession, setCoachSession] = useState<PortalSession | null>(() => portalAuthService.getSession('coach'));
+
+  useEffect(() => {
+    const unsub = portalAuthService.subscribe(() => {
+      setAllLeagues(portalAuthService.getAllLeagues());
+      setLeagueSession(portalAuthService.getSession('league'));
+      setCoachSession(portalAuthService.getSession('coach'));
+    });
+    return unsub;
+  }, []);
+
+  const [currentLeague, setCurrentLeague] = useState<LeagueOption>(() => {
+    const leagues = portalAuthService.getAllLeagues();
+    const found = leagues.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName));
+    return found ? { id: found.id, name: found.name, shortName: found.shortName, region: found.region, logoCode: found.logoCode } : {
+      id: 'laa_algiers',
+      name: 'الرابطة الولائية لألعاب القوى - الجزائر',
+      shortName: 'LAA',
+      region: 'الجزائر العاصمة',
+      logoCode: '🏛️'
+    };
+  });
   const [currentTime, setCurrentTime] = useState<string>('');
   const [theme, setTheme] = useState<'dark' | 'sunlight' | 'light'>(() => {
     try {
@@ -95,10 +113,10 @@ export const NavShell: React.FC<NavShellProps> = ({
 
   useEffect(() => {
     if (activeLeagueName) {
-      const match = OFFICIAL_LEAGUES.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName));
+      const match = allLeagues.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName));
       if (match) setCurrentLeague(match);
     }
-  }, [activeLeagueName]);
+  }, [activeLeagueName, allLeagues]);
 
   // تحديث التوقيت الملائم للملعب
   useEffect(() => {
@@ -139,7 +157,7 @@ export const NavShell: React.FC<NavShellProps> = ({
     }
   };
 
-  const filteredLeagues = OFFICIAL_LEAGUES.filter(l => 
+  const filteredLeagues = allLeagues.filter(l => 
     l.name.toLowerCase().includes(leagueSearch.toLowerCase()) ||
     l.shortName.toLowerCase().includes(leagueSearch.toLowerCase()) ||
     l.region.toLowerCase().includes(leagueSearch.toLowerCase())
@@ -205,6 +223,18 @@ export const NavShell: React.FC<NavShellProps> = ({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
+
+                  {/* زر تسجيل حساب رابطة جديدة مباشرة من القائمة */}
+                  <button
+                    onClick={() => {
+                      setLeagueDropdownOpen(false);
+                      if (onOpenNewLeagueModal) onOpenNewLeagueModal();
+                    }}
+                    className="w-full mb-2.5 p-2 rounded-xl bg-gradient-to-r from-emerald-950 to-teal-950 hover:from-emerald-900 hover:to-teal-900 border border-emerald-600/60 text-emerald-300 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>+ تسجيل حساب رابطة جديدة</span>
+                  </button>
 
                   <div className="relative mb-2">
                     <Search className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -287,6 +317,22 @@ export const NavShell: React.FC<NavShellProps> = ({
             >
               <ScanLine className="w-3 h-3 text-emerald-400" />
               <span>كود المهمة 🔑</span>
+            </button>
+
+            {/* زر تسجيل الدخول وتبديل حساب البوابات */}
+            <button
+              onClick={() => onOpenAuthModal && onOpenAuthModal(currentTab === 'coach' ? 'coach' : currentTab === 'admin' ? 'admin' : currentTab === 'competition' ? 'judge' : 'league')}
+              className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-emerald-600/60 text-[10px] font-black text-amber-300 transition-all cursor-pointer shadow-sm"
+              title="تسجيل الدخول / تبديل حساب البوابة"
+            >
+              <Key className="w-3 h-3 text-amber-400" />
+              <span>
+                {leagueSession 
+                  ? `🏛️ ${leagueSession.leagueShort || 'الرابطة'}` 
+                  : coachSession 
+                  ? `🏃 ${coachSession.clubName?.split(' ')[0] || 'المدرب'}` 
+                  : 'دخول البوابات 🔐'}
+              </span>
             </button>
 
             {/* محدد اللغات السريع */}

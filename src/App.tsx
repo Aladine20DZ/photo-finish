@@ -38,6 +38,11 @@ import { PublicPortal } from './components/public/PublicPortal';
 import { LeagueExecutiveSuite } from './components/league/LeagueExecutiveSuite';
 import { CoachRegistrationWizard } from './components/coach/CoachRegistrationWizard';
 import { DutyCodeCheckIn } from './components/public/DutyCodeCheckIn';
+import { PortalAuthModal } from './components/auth/PortalAuthModal';
+import { LeagueRegistrationModal } from './components/league/LeagueRegistrationModal';
+import { LeagueGate } from './components/league/LeagueGate';
+import { CoachGate } from './components/coach/CoachGate';
+import { portalAuthService, PortalType, PortalSession } from './services/portalAuthService';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -161,6 +166,19 @@ export const App: React.FC = () => {
     return 'public';
   });
   const [activeLeague, setActiveLeague] = useState<string>('الاتحاد الجزائري لألعاب القوى (FAA)');
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [targetAuthPortal, setTargetAuthPortal] = useState<PortalType>('league');
+  const [showNewLeagueModal, setShowNewLeagueModal] = useState<boolean>(false);
+  const [leagueSession, setLeagueSession] = useState<PortalSession | null>(() => portalAuthService.getSession('league'));
+  const [coachSession, setCoachSession] = useState<PortalSession | null>(() => portalAuthService.getSession('coach'));
+
+  useEffect(() => {
+    const unsub = portalAuthService.subscribe(() => {
+      setLeagueSession(portalAuthService.getSession('league'));
+      setCoachSession(portalAuthService.getSession('coach'));
+    });
+    return unsub;
+  }, []);
 
   // مزامنة عنوان URL مع الدور والغرفة ورمز الجلسة الحالية دون إعادة تحميل الصفحة
   useEffect(() => {
@@ -1015,6 +1033,11 @@ export const App: React.FC = () => {
           currentTab={currentTab}
           activeLeagueName={activeLeague}
           onSelectLeague={(league) => setActiveLeague(league.name)}
+          onOpenAuthModal={(target) => {
+            setTargetAuthPortal(target || 'league');
+            setShowAuthModal(true);
+          }}
+          onOpenNewLeagueModal={() => setShowNewLeagueModal(true)}
           onTabChange={(tab) => {
             setCurrentTab(tab);
             try {
@@ -1067,11 +1090,28 @@ export const App: React.FC = () => {
         )}
 
         {!role && currentTab === 'league' && (
-          <LeagueExecutiveSuite onOpenFieldMode={() => setCurrentTab('competition')} />
+          leagueSession ? (
+            <LeagueExecutiveSuite 
+              onOpenFieldMode={() => setCurrentTab('competition')} 
+              onSwitchPortal={() => setLeagueSession(null)}
+            />
+          ) : (
+            <LeagueGate 
+              onAuthenticated={(sess) => setLeagueSession(sess)}
+              onOpenFieldMode={() => setCurrentTab('competition')}
+            />
+          )
         )}
 
         {!role && currentTab === 'coach' && (
-          <CoachRegistrationWizard onFinished={() => setCurrentTab('public')} />
+          coachSession ? (
+            <CoachRegistrationWizard onFinished={() => setCurrentTab('public')} />
+          ) : (
+            <CoachGate 
+              onAuthenticated={(sess) => setCoachSession(sess)} 
+              onBackToPublic={() => setCurrentTab('public')}
+            />
+          )
         )}
 
         {!role && currentTab === 'admin' && (
@@ -1341,6 +1381,38 @@ export const App: React.FC = () => {
           onClose={() => setShowJudgesModal(false)}
         />
       )}
+
+      {/* نافذة تسجيل الدخول الشاملة لبوابات المنظومة */}
+      <PortalAuthModal
+        isOpen={showAuthModal}
+        initialPortal={targetAuthPortal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthSuccess={(sess) => {
+          if (sess.portal === 'league') {
+            setLeagueSession(sess);
+            setCurrentTab('league');
+          } else if (sess.portal === 'coach') {
+            setCoachSession(sess);
+            setCurrentTab('coach');
+          } else if (sess.portal === 'judge') {
+            setCurrentTab('competition');
+          } else if (sess.portal === 'admin') {
+            setCurrentTab('admin');
+          }
+        }}
+      />
+
+      {/* نافذة تسجيل حساب رابطة جديدة الشاملة */}
+      <LeagueRegistrationModal
+        isOpen={showNewLeagueModal}
+        onClose={() => setShowNewLeagueModal(false)}
+        onSuccess={(newLeague) => {
+          setShowNewLeagueModal(false);
+          setActiveLeague(newLeague.name);
+          setLeagueSession(portalAuthService.getSession('league'));
+          setCurrentTab('league');
+        }}
+      />
     </div>
   );
 };
