@@ -281,3 +281,63 @@ export interface AthleteDuplicateMatch {
   recommendedAction: 'block' | 'warn' | 'merge_suggestion';
 }
 
+// ═══════════════════════════════════════════════════
+// المرحلة C2: بوابة المدربين ومسار الموافقات الإداري
+// ═══════════════════════════════════════════════════
+
+export interface Coach {
+  id: string;                  // UUID فريد
+  clubId: string;              // معرف النادي المنتمي إليه حصراً (عزل كامل)
+  clubName: string;            // اسم النادي
+  name: string;                // اسم المدرب الكامل
+  pinCode: string;             // رمز المرور السريع للدخول الميداني (4 إلى 6 أرقام)
+  phone?: string;              // رقم الهاتف
+  email?: string;              // البريد الإلكتروني
+  licenseNumber: string;       // رقم رخصة التدريب الاتحادية
+  role: 'head_coach' | 'assistant_coach' | 'club_admin';
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type RegistrationStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
+export interface CompetitionRegistration {
+  id: string;                  // معرف فريد للطلب UUID
+  competitionId: string;       // معرف المنافسة
+  competitionName: string;     // اسم المنافسة
+  clubId: string;              // معرف النادي
+  clubName: string;            // اسم النادي
+  coachId: string;             // معرف المدرب مقدم الطلب
+  coachName: string;           // اسم المدرب
+  athleteId: string;           // معرف العداء
+  athleteName: string;         // اسم العداء
+  licenseNumber: string;       // رقم رخصة العداء
+  birthDate: string;           // تاريخ الميلاد
+  calculatedCategory: AgeCategory; // الفئة المحسوبة
+  targetEvents: string[];      // السباقات المرشح لها (e.g. ['100m', '200m'] أو ['cross_country'])
+  medicalClearanceValid: boolean; // هل شهادة الكفاءة الطبية سارية
+  status: RegistrationStatus;  // حالة الطلب
+  bibAssigned?: number;        // رقم الصدرية المخصص عند الاعتماد
+  rejectionReason?: string;    // سبب الرفض إن وجد
+  submittedAt?: number;        // وقت تقديم الطلب
+  reviewedAt?: number;         // وقت المراجعة والاعتماد
+  reviewedByJudgeId?: string;  // معرف الحكم / المدير الفني المعتمد
+  reviewedByName?: string;     // اسم المدير الفني
+  notes?: string;              // ملاحظات
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface RegistrationAuditEntry {
+  id: string;
+  registrationId: string;
+  action: 'submit' | 'approve' | 'reject' | 'bib_assign' | 'edit';
+  performedById: string;
+  performedByName: string;
+  role: string;
+  timestamp: number;
+  details: string;
+}
+
+

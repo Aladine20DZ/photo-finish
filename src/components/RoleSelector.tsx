@@ -17,7 +17,8 @@ import {
   Smartphone, 
   MapPin, 
   Route,
-  Building2
+  Building2,
+  ShieldCheck
 } from 'lucide-react';
 import { PhoneRole, LicensePoolInfo } from '../types/race';
 import { PhoneQrModal } from './PhoneQrModal';
@@ -26,6 +27,8 @@ import { pricingService } from '../services/pricingService';
 import { licenseManager } from '../services/licenseManager';
 import { AthletesDatabaseModal } from './athletics/AthletesDatabaseModal';
 import { ClubsDatabaseModal } from './athletics/ClubsDatabaseModal';
+import { CoachPortalModal } from './athletics/CoachPortalModal';
+import { RegistrationApprovalModal } from './athletics/RegistrationApprovalModal';
 
 interface RoleSelectorProps {
   roomCode: string;
@@ -48,6 +51,8 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
   const [showAthletesModal, setShowAthletesModal] = useState<boolean>(false);
   const [showClubsModal, setShowClubsModal] = useState<boolean>(false);
+  const [showCoachModal, setShowCoachModal] = useState<boolean>(false);
+  const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false);
 
   const activeLicense = licenseManager.activeLicense;
   const isTrialExpired = pricingService.isTrialExpired();
@@ -531,7 +536,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         )}
       </div>
 
-      {/* ═══ 7. قسم قاعدة بيانات ألعاب القوى والأندية ═══ */}
+      {/* ═══ 7. قسم قاعدة بيانات ألعاب القوى وبوابة المدربين والاعتماد ═══ */}
       <div className="w-full grid grid-cols-2 gap-2 text-xs pt-0.5">
         <button
           type="button"
@@ -549,6 +554,24 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         >
           <Building2 className="w-4 h-4 text-emerald-400" />
           <span>دليل الأندية 🏛️</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowCoachModal(true)}
+          className="py-2.5 px-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-indigo-500/30 text-indigo-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <Users className="w-4 h-4 text-indigo-400" />
+          <span>بوابة المدربين 📋</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowApprovalModal(true)}
+          className="py-2.5 px-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-amber-500/30 text-amber-300 font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-95"
+        >
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <span>اعتماد المشاركات ⚖️</span>
         </button>
       </div>
 
@@ -568,7 +591,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
         />
       )}
 
-      {/* نوافذ منظومة العدائين والأندية */}
+      {/* نوافذ منظومة العدائين والأندية والمدربين */}
       <AthletesDatabaseModal
         isOpen={showAthletesModal}
         onClose={() => setShowAthletesModal(false)}
@@ -577,6 +600,16 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <ClubsDatabaseModal
         isOpen={showClubsModal}
         onClose={() => setShowClubsModal(false)}
+      />
+
+      <CoachPortalModal
+        isOpen={showCoachModal}
+        onClose={() => setShowCoachModal(false)}
+      />
+
+      <RegistrationApprovalModal
+        isOpen={showApprovalModal}
+        onClose={() => setShowApprovalModal(false)}
       />
     </div>
   );
