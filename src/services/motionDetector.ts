@@ -8,32 +8,156 @@ export interface OpticalLaneResult {
   lane: number;
   motionScore: number;
   isTriggered: boolean;
+  /**
+   * اللحظة الحقيقية المستوفاة رياضياً للمس خط النهاية (بالمللي ثانية، على مقياس ساعة السباق نفسه)
+   * أدق من زمن "اكتشاف" العبور لأنها تُحسب رجعياً بين آخر عيّنة دون العتبة والعيّنة التي تجاوزتها.
+   * استخدم هذه القيمة بدل زمن استدعاء scan() نفسه عند تسجيل وصول العداء.
+   */
+  interpolatedCrossMs: number | null;
+}
+
+export interface MultiGateScanResult {
+  laneResults: OpticalLaneResult[];
+  isPreGateTriggered: boolean;
+  preGateScore: number;
+  isPostGateTriggered: boolean;
+  postGateScore: number;
 }
 
 export class OpticalGateDetector {
   private prevFrameData: Uint8ClampedArray | null = null;
+  private prevPreGateData: Uint8ClampedArray | null = null;
+  private prevPostGateData: Uint8ClampedArray | null = null;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private preCanvas: HTMLCanvasElement;
+  private preCtx: CanvasRenderingContext2D;
+  private postCanvas: HTMLCanvasElement;
+  private postCtx: CanvasRenderingContext2D;
   private triggeredLanes: Set<number> = new Set();
+
+  // تاريخ آخر عيّنة (النسبة المئوية + زمن السباق) لكل رواق، لازم لتأكيد العبور واستيفاء لحظته الحقيقية
+  private laneScoreHistory: Map<number, { score: number; t: number }> = new Map();
+  // عداد التأكيد: نطلب تجاوز العتبة في عيّنتين متتاليتين قبل اعتباره عبوراً حقيقياً (يلغي ضوضاء اللحظة الواحدة)
+  private laneConfirmCount: Map<number, number> = new Map();
 
   constructor() {
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
+    this.preCanvas = document.createElement('canvas');
+    this.preCtx = this.preCanvas.getContext('2d', { willReadFrequently: true })!;
+    this.postCanvas = document.createElement('canvas');
+    this.postCtx = this.postCanvas.getContext('2d', { willReadFrequently: true })!;
   }
 
   public reset() {
     this.prevFrameData = null;
+    this.prevPreGateData = null;
+    this.prevPostGateData = null;
     this.triggeredLanes.clear();
+    this.laneScoreHistory.clear();
+    this.laneConfirmCount.clear();
   }
 
   /**
-   * فحص الحساس الضوئي لكل رواق عند خط النهاية
+   * فحص حركة خط ما قبل النهاية (Pre-Finish Gate) لبدء التصوير المتتالي
+   */
+  public checkPreGateMotion(
+    video: HTMLVideoElement,
+    preLineXPercent: number = 0.22,
+    threshold: number = 20
+  ): { motionScore: number; isTriggered: boolean } {
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) return { motionScore: 0, isTriggered: false };
+
+    const bandWidth = 20;
+    const lineX = Math.floor(width * preLineXPercent);
+    const startX = Math.max(0, lineX - Math.floor(bandWidth / 2));
+
+    this.preCanvas.width = bandWidth;
+    this.preCanvas.height = height;
+    this.preCtx.drawImage(video, startX, 0, bandWidth, height, 0, 0, bandWidth, height);
+    const frame = this.preCtx.getImageData(0, 0, bandWidth, height);
+    const currData = frame.data;
+
+    if (!this.prevPreGateData || this.prevPreGateData.length !== currData.length) {
+      this.prevPreGateData = new Uint8ClampedArray(currData);
+      return { motionScore: 0, isTriggered: false };
+    }
+
+    const prev = this.prevPreGateData;
+    let changed = 0;
+    let total = 0;
+    for (let i = 0; i < currData.length; i += 16) {
+      const gCurr = currData[i] * 0.299 + currData[i + 1] * 0.587 + currData[i + 2] * 0.114;
+      const gPrev = prev[i] * 0.299 + prev[i + 1] * 0.587 + prev[i + 2] * 0.114;
+      if (Math.abs(gCurr - gPrev) > threshold) changed++;
+      total++;
+    }
+
+    const score = total > 0 ? (changed / total) * 100 : 0;
+    this.prevPreGateData.set(currData);
+    return {
+      motionScore: Math.round(score),
+      isTriggered: score > 12 // حساسية مناسبة لرصد مقدمة العداء أو ظله قبل خط النهاية
+    };
+  }
+
+  /**
+   * فحص حركة خط ما بعد النهاية (Post-Finish Gate)
+   */
+  public checkPostGateMotion(
+    video: HTMLVideoElement,
+    postLineXPercent: number = 0.52,
+    threshold: number = 20
+  ): { motionScore: number; isTriggered: boolean } {
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) return { motionScore: 0, isTriggered: false };
+
+    const bandWidth = 20;
+    const lineX = Math.floor(width * postLineXPercent);
+    const startX = Math.max(0, lineX - Math.floor(bandWidth / 2));
+
+    this.postCanvas.width = bandWidth;
+    this.postCanvas.height = height;
+    this.postCtx.drawImage(video, startX, 0, bandWidth, height, 0, 0, bandWidth, height);
+    const frame = this.postCtx.getImageData(0, 0, bandWidth, height);
+    const currData = frame.data;
+
+    if (!this.prevPostGateData || this.prevPostGateData.length !== currData.length) {
+      this.prevPostGateData = new Uint8ClampedArray(currData);
+      return { motionScore: 0, isTriggered: false };
+    }
+
+    const prev = this.prevPostGateData;
+    let changed = 0;
+    let total = 0;
+    for (let i = 0; i < currData.length; i += 16) {
+      const gCurr = currData[i] * 0.299 + currData[i + 1] * 0.587 + currData[i + 2] * 0.114;
+      const gPrev = prev[i] * 0.299 + prev[i + 1] * 0.587 + prev[i + 2] * 0.114;
+      if (Math.abs(gCurr - gPrev) > threshold) changed++;
+      total++;
+    }
+
+    const score = total > 0 ? (changed / total) * 100 : 0;
+    this.prevPostGateData.set(currData);
+    return {
+      motionScore: Math.round(score),
+      isTriggered: score > 14
+    };
+  }
+
+  /**
+   * فحص الحساس الضوئي لكل رواق عند خط النهاية الرسمي
    */
   public scan(
     video: HTMLVideoElement,
     laneCount: number = 4,
     finishLineXPercent: number = 0.35,
-    threshold: number = 20
+    threshold: number = 20,
+    currentRaceTimeMs: number = 0
   ): OpticalLaneResult[] {
     const width = video.videoWidth;
     const height = video.videoHeight;
@@ -57,7 +181,7 @@ export class OpticalGateDetector {
     if (!this.prevFrameData || this.prevFrameData.length !== currData.length) {
       this.prevFrameData = new Uint8ClampedArray(currData);
       for (let l = 1; l <= laneCount; l++) {
-        results.push({ lane: l, motionScore: 0, isTriggered: false });
+        results.push({ lane: l, motionScore: 0, isTriggered: false, interpolatedCrossMs: null });
       }
       return results;
     }
@@ -87,17 +211,48 @@ export class OpticalGateDetector {
       }
 
       const scorePercent = totalSamples > 0 ? (changedPixels / totalSamples) * 100 : 0;
-      // انطلاق الحساس الفوري عند قطع خط النهاية
-      const isTriggered = scorePercent > 16;
+
+      // --- تأكيد العبور + استيفاء اللحظة الحقيقية ---
+      const prevSample = this.laneScoreHistory.get(laneNumber) || { score: 0, t: currentRaceTimeMs };
+      let isTriggered = false;
+      let interpolatedCrossMs: number | null = null;
+
+      if (scorePercent > 16) {
+        const confirmCount = (this.laneConfirmCount.get(laneNumber) || 0) + 1;
+        this.laneConfirmCount.set(laneNumber, confirmCount);
+        if (confirmCount >= 2) {
+          isTriggered = true;
+          // استيفاء خطي بين آخر عيّنة دون العتبة (prevSample) والعيّنة الحالية، لاسترجاع لحظة اللمس الحقيقية
+          const frac = scorePercent > prevSample.score
+            ? (16 - prevSample.score) / (scorePercent - prevSample.score)
+            : 0;
+          const clampedFrac = Math.max(0, Math.min(1, frac));
+          interpolatedCrossMs = prevSample.t + clampedFrac * (currentRaceTimeMs - prevSample.t);
+        }
+      } else {
+        this.laneConfirmCount.set(laneNumber, 0);
+      }
+
+      this.laneScoreHistory.set(laneNumber, { score: scorePercent, t: currentRaceTimeMs });
 
       results.push({
         lane: laneNumber,
         motionScore: Math.round(scorePercent),
-        isTriggered
+        isTriggered,
+        interpolatedCrossMs
       });
     }
 
     this.prevFrameData.set(currData);
+
+    // --- حماية من التحفيز الجماعي الزائف (اهتزاز الكاميرا / ومضة ضوئية / تغيّر إضاءة مفاجئ) ---
+    // إذا تجاوز أكثر من نصف الأروقة العتبة في نفس اللحظة تقريباً، هذا اضطراب عام للمشهد كله
+    // وليس وصولاً حقيقياً متزامناً، فنُلغي هذه الدفعة من التحفيزات لتفادي تسجيل أزمنة خاطئة.
+    const triggeredCount = results.filter(r => r.isTriggered).length;
+    if (triggeredCount > 0 && triggeredCount > Math.ceil(laneCount / 2)) {
+      results.forEach(r => { r.isTriggered = false; r.interpolatedCrossMs = null; });
+    }
+
     return results;
   }
 

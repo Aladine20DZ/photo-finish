@@ -100,9 +100,13 @@ function raceRelayPlugin(): Plugin {
         const clientToken = url.searchParams.get('token') || '';
         const clientId = `ws-${role}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-        // التحقق من Session Token (إذا كانت الغرفة موجودة مسبقاً)
+        // التحقق من Session Token (تحصين الجلسة):
+        // - رمز صحيح = قبول دائماً
+        // - رمز 'new' يُقبل فقط عند تهيئة الغرفة (أول جهاز) لمنع تداخل السباقات
+        // - الأجهزة المرفوضة تتحول تلقائياً إلى MQTT السحابي مع بقاء المزامنة
         const sessionToken = getOrCreateSession(room);
-        const tokenValid = !clientToken || clientToken === sessionToken || clientToken === 'new';
+        const roomIsEmpty = !wsRooms.has(room) || wsRooms.get(room)!.size === 0;
+        const tokenValid = clientToken === sessionToken || (clientToken === 'new' && roomIsEmpty);
 
         if (!tokenValid) {
           ws.close(4001, 'Invalid session token');

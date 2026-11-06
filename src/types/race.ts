@@ -2,6 +2,16 @@ export type GunSoundType = 'official_starter_gun'; // صوت طلقة مسدس �
 
 export type StarterMode = 'auto_random' | 'manual';
 
+/**
+ * هندسة وضعية كاميرا خط النهاية (Camera Placement Geometry)
+ * تلعب دوراً حاسماً في دقة التوقيت: أي ميلان عن امتداد خط النهاية يولّد خطأ منظور (Parallax)
+ * يجعل الأروقة تُسجّل في لحظات مختلفة رغم وصولها معاً على أرض الواقع — ولا يمكن لأي خوارزمية تصحيحه لاحقاً.
+ */
+export type CameraPlacementMode =
+  | 'tele_parallel'   // موازية لخط النهاية من الخلف + تكبير (الوضع الأولمبي المعتمد — الأدق)
+  | 'angled_behind'   // خلفية بزاوية خفيفة (حل وسط عند محدودية المساحة)
+  | 'side_classic';   // جانبية كلاسيكية من الجانب (الأسلوب التقليدي — خطأ منظور مرتفع)
+
 export interface Runner {
   id: number;
   bib: number;           // رقم الصدرية (Dossard)
@@ -58,9 +68,13 @@ export interface RaceSettings {
   heatNumber: number;            // رقم القائمة الحالية (1، 2، 3...)
   heatName: string;              // اسم القائمة الحالية (تصفية 1، النهائي...)
   laneCount: number;             // عدد الأروقة (2، 4، 6، 8)
-  finishLineXPercent: number;    // موقع خط النهاية (مثلاً 35%)
+  finishLineXPercent: number;    // موقع خط النهاية الرسمي (مثلاً 35%)
   finishLineColor: string;       // لون خط النهاية
   finishLineWidth: number;       // سُمك خط النهاية
+  preFinishLineXPercent?: number;  // موقع خط ما قبل النهاية (بدء التصوير التلقائي)
+  preFinishLineColor?: string;     // لون خط ما قبل النهاية
+  postFinishLineXPercent?: number; // موقع خط ما بعد النهاية (انتهاء التصوير)
+  postFinishLineColor?: string;    // لون خط ما بعد النهاية
   motionThreshold: number;       // حساسية حساس خط النهاية
   laserBeamVisible: boolean;     // إظهار شعاع الحساس الضوئي
   gunSoundType: GunSoundType;    // نوع صوت طلقة الانطلاق
@@ -75,6 +89,7 @@ export interface RaceSettings {
   slitScanWidth: number;         // عرض شريحة المسح الشريطي
   windSpeed: string;             // سرعة الرياح الرسمية (+1.2 m/s)
   autoStopAfterLastRunner: boolean;
+  cameraPlacement?: CameraPlacementMode; // هندسة وضعية كاميرا خط النهاية (اختياري للتوافق مع الإعدادات المحفوظة سابقاً)
 }
 
 export interface NetworkPeerMessage {
@@ -96,12 +111,16 @@ export interface NetworkPeerMessage {
     | 'JUDGE_UPDATE_RUNNER'     // تعديل النتيجة أو الترتيب من هاتف الحكم
     | 'HEAT_CHANGE'             // تبديل القائمة النشطة (قائمة 1، قائمة 2...)
     | 'HEAT_DISPATCH'           // أمر "إلى خط الانطلاق (Au Départ)" من هاتف البداية
+    | 'HEAT_CANCEL_DISPATCH'    // إلغاء أمر خط الانطلاق وسحب القائمة
     | 'HEATS_SYNC'              // مزامنة جميع القوائم والعدائين
     | 'HEATS_REORDER'           // إعادة ترتيب القوائم يدوياً أو تلقائياً
     | 'DELETE_HEAT'             // حذف قائمة/سلسلة
     | 'SLIT_SCAN_IMAGE'         // بث شريط المسح البانورامي المستمر الكامل
     | 'REQUEST_STATE_SYNC'      // طلب مزامنة الحالة الكاملة عند دخول هاتف جديد
-    | 'RESPONSE_STATE_SYNC';    // إرسال الحالة الكاملة للهاتف المنضم
+    | 'RESPONSE_STATE_SYNC'     // إرسال الحالة الكاملة للهاتف المنضم
+    | 'LICENSE_SHARE_POOL'      // تقاسم التفعيل الشبكي 1*4 بين الهواتف في نفس الجلسة
+    | 'LICENSE_REVOKE_AND_TRANSFER' // نقل الترخيص المتبقي إلى هاتف آخر وإبطاله في الهاتف الأول
+    | 'LICENSE_TRANSFER_ACK';   // تأكيد الهاتف الجديد استلام التفعيل ونقله بنجاح
   timestamp: number;            // ساعة الحائط Date.now() — للعرض
   senderTime: number;           // ساعة الحائط وقت الإرسال
   perfNow?: number;             // ساعة أحادية الاتجاه performance.now() — للتوقيت الدقيق
@@ -114,4 +133,35 @@ export interface LaneMotionState {
   isTriggered: boolean;
   hasFinished: boolean;
   finishTime?: number;
+}
+
+// ═══ منظومة التراخيص الشبكية 1*4 ونقل التفعيل المشفر ═══
+export type LicenseTierCode = 'CLB8' | 'ENTX';
+
+export interface LicensePoolInfo {
+  hostDeviceId: string;
+  hostRole: PhoneRole;
+  licenseCode: string;
+  tier: LicenseTierCode;
+  tierName: string;
+  expiryDate: string;
+  maxSharedSlots: number; // 4 هواتف (1*4)
+  activeMembers: { role: PhoneRole; deviceId: string }[];
+  isShared: boolean;
+  timestamp: number;
+}
+
+export interface LicenseTransferTicket {
+  ticketId: string;
+  sourceDeviceId: string;
+  targetDeviceId: string;
+  tier: LicenseTierCode;
+  tierName: string;
+  originalCode: string;
+  voucherCode: string;
+  expiryDate: string;
+  remainingDays: number;
+  signature: string;
+  revocationProof: string;
+  timestamp: number;
 }

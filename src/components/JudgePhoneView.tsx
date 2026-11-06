@@ -23,7 +23,8 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
-  AlertCircle
+  AlertCircle,
+  Flag
 } from 'lucide-react';
 import { Runner, RaceStatus, RaceSettings, Heat } from '../types/race';
 import { CertificateExporter } from '../utils/certificateExporter';
@@ -43,6 +44,7 @@ interface JudgePhoneViewProps {
   onReorderHeats?: (newHeats: Heat[]) => void;
   onUpdateRunner: (lane: number, updates: Partial<Runner>) => void;
   onUpdateRunnersList: (newRunners: Runner[]) => void;
+  onFinishRace?: (panoramaUrl?: string) => void;
   onSharedResetRace: () => void;
   onViewPhotoFinish: () => void;
   onOpenSettings?: () => void;
@@ -63,6 +65,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
   onReorderHeats,
   onUpdateRunner,
   onUpdateRunnersList,
+  onFinishRace,
   onSharedResetRace,
   onViewPhotoFinish,
   onOpenSettings,
@@ -334,7 +337,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-2 sm:p-5 space-y-3 sm:space-y-4 text-slate-100" dir="rtl">
+    <div className="w-full max-w-4xl mx-auto p-2 sm:p-5 space-y-3 sm:space-y-4 text-slate-100" dir="rtl">
       {/* رأس شاشة الحكم العام: السلاسل / القوائم والمؤقت الرقمي */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-900/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6 shadow-2xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
@@ -572,6 +575,29 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* زر إنهاء السباق واعتماد النتائج من هاتف الحكم (Clôturer l'Arrivée & Valider) */}
+        {onFinishRace && (raceStatus === 'racing' || (raceStatus === 'finished' && finishedRunners.length > 0)) && (
+          <button
+            type="button"
+            onClick={() => {
+              const panorama = currentSlitPanorama || undefined;
+              onFinishRace(panorama);
+            }}
+            className={`w-full py-4 px-4 rounded-2xl font-black text-base flex items-center justify-center gap-3 transition-all shadow-2xl active:scale-95 cursor-pointer ${
+              raceStatus === 'racing'
+                ? 'bg-gradient-to-r from-red-600 via-amber-500 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-slate-950 border-2 border-yellow-300 animate-pulse shadow-amber-500/40'
+                : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white border-2 border-emerald-300 shadow-emerald-500/30'
+            }`}
+          >
+            <Flag className="w-6 h-6" />
+            <span>
+              {raceStatus === 'racing'
+                ? '🏁 خط النهاية: إنهاء السباق ومعاينة النتائج (Clôturer l\'Arrivée & Valider)'
+                : '✅ اعتماد نتائج القائمة ومعاينة Photo Finish'}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* شريط التبويبات الرئيسي (Tabs) متجاوب مع تمرير سلس للهواتف */}
@@ -740,6 +766,10 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
 
           {/* جدول النتائج التفصيلي */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <div className="sm:hidden px-3 py-1.5 bg-slate-950/80 border-b border-slate-800 text-[10px] text-amber-400/90 flex items-center justify-between font-mono">
+              <span>← اسحب أفقياً لمشاهدة باقي الأعمدة والصور →</span>
+              <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-bold">{runners.length} أروقة</span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 border-b border-slate-800 font-bold">

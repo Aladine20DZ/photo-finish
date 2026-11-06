@@ -165,14 +165,18 @@ export class AthleticsNetworkService {
     }
 
     try {
+      // دعم خادم ترحيل سحابي مخصص عبر متغير البيئة VITE_RELAY_WS_URL
+      // مثال: VITE_RELAY_WS_URL=wss://my-relay.up.railway.app
+      // عند غيابه يُستخدم نفس المضيف (يعمل مع npm run dev / vite preview محلياً)
+      const envRelay = (import.meta.env.VITE_RELAY_WS_URL || '').trim().replace(/\/+$/, '');
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = location.host;
+      const base = envRelay || `${protocol}//${location.host}`;
       const params = new URLSearchParams({
         room: this.roomCode,
         role: this.role || 'viewer',
         token: this.sessionToken || 'new'
       });
-      const wsUrl = `${protocol}//${host}/ws/relay?${params.toString()}`;
+      const wsUrl = `${base}/ws/relay?${params.toString()}`;
 
       this.localWs = new WebSocket(wsUrl);
 

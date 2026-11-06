@@ -47,7 +47,7 @@ export const ResultsPodium: React.FC<ResultsPodiumProps> = ({
   };
 
   return (
-    <div className="max-w-md mx-auto p-3 space-y-3.5" dir="rtl">
+    <div className="w-full max-w-md mx-auto p-3 space-y-3.5" dir="rtl">
       {/* منصة التتويج الأولمبية (Podium) */}
       <div className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden text-center">
         <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold mb-3">

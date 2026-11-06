@@ -10,12 +10,20 @@ import { RaceSettingsModal } from './components/RaceSettingsModal';
 import { InternetBridgeModal } from './components/InternetBridgeModal';
 import { ChambreDappelView } from './components/ChambreDappelView';
 import { RaceSchedulePanel } from './components/RaceSchedulePanel';
-import { Runner, PhoneRole, RaceStatus, RaceSettings, NetworkPeerMessage, Heat } from './types/race';
+import { SubscriptionModal } from './components/SubscriptionModal';
+import { LicenseTransferModal } from './components/LicenseTransferModal';
+import { Runner, PhoneRole, RaceStatus, RaceSettings, NetworkPeerMessage, Heat, LicensePoolInfo } from './types/race';
+import { licenseManager } from './services/licenseManager';
+import { pricingService } from './services/pricingService';
 import { athleticsAudio } from './services/audioService';
 import { athleticsNetwork } from './services/networkService';
 import { slitScanEngine } from './services/slitScanEngine';
 import { opticalGateDetector } from './services/motionDetector';
 import { burstCaptureService } from './services/burstCaptureService';
+import { athleticsArchive } from './services/archiveService';
+import { ArchiveModal } from './components/ArchiveModal';
+import { PwaInstallButton } from './components/PwaInstallButton';
+import { AdminGate } from './components/AdminGate';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -73,6 +81,10 @@ const DEFAULT_SETTINGS: RaceSettings = {
   finishLineXPercent: 0.35,
   finishLineColor: '#EF4444',
   finishLineWidth: 2,
+  preFinishLineXPercent: 0.22,
+  preFinishLineColor: '#00E5FF',
+  postFinishLineXPercent: 0.52,
+  postFinishLineColor: '#A855F7',
   motionThreshold: 20,
   laserBeamVisible: true,
   gunSoundType: 'official_starter_gun',
@@ -87,6 +99,7 @@ const DEFAULT_SETTINGS: RaceSettings = {
   slitScanWidth: 2,
   windSpeed: '+1.2 m/s',
   autoStopAfterLastRunner: true,
+  cameraPlacement: 'side_classic', // الوضعية التاريخية الافتراضية — يُنصح بالتحويل إلى tele_parallel من الإعدادات
 };
 
 const getInitialRoleAndRoom = (): { initialRole: PhoneRole; initialRoom: string; initialToken?: string } => {
@@ -220,11 +233,34 @@ export const App: React.FC = () => {
   const [isReceivingBellAlert, setIsReceivingBellAlert] = useState<boolean>(false);
   const bellHoldTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // النوافذ المشروطة (Modals)
+  // النوافذ المشروطة (Modals) وحالة التراخيص والاشتراك
   const [showPhotoFinishViewer, setShowPhotoFinishViewer] = useState<boolean>(false);
   const [showPodium, setShowPodium] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showInternetBridgeModal, setShowInternetBridgeModal] = useState<boolean>(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState<boolean>(false);
+  const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
+  const [activeLicense, setActiveLicense] = useState(() => licenseManager.activeLicense);
+  const [sharedPoolLicense, setSharedPoolLicense] = useState<LicensePoolInfo | null>(() => licenseManager.sharedPoolLicense);
+  const [isTrialExpired, setIsTrialExpired] = useState<boolean>(() => pricingService.isTrialExpired());
+  const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsubLicense = licenseManager.subscribe(() => {
+      setActiveLicense(licenseManager.activeLicense);
+      setSharedPoolLicense(licenseManager.sharedPoolLicense);
+    });
+    const unsubPricing = pricingService.subscribe(() => {
+      setIsTrialExpired(pricingService.isTrialExpired());
+    });
+    return () => {
+      unsubLicense();
+      unsubPricing();
+    };
+  }, []);
+
+  // شرط قفل التطبيق الإجباري: انتهاء الـ 7 أيام التجريبية مع عدم وجود اشتراك نشط أو مشاركة شبكية 1*4
+  const isAppLocked = isTrialExpired && !activeLicense && !sharedPoolLicense;
 
   const clockIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const raceStartTimeRef = useRef<number>(0);
@@ -265,6 +301,36 @@ export const App: React.FC = () => {
       clockIntervalRef.current = null;
     }
   }, []);
+
+  // حفظ السباق المكتمل في الأرشيف الدائم (IndexedDB) — يعمل بدون إنترنت ولا تُفقد النتائج
+  const saveRaceToArchive = useCallback((opts: { runners: Runner[]; fullPhotoFinishUrl?: string }) => {
+    try {
+      const heat = heatsRef.current[currentHeatIndexRef.current];
+      athleticsArchive
+        .saveRace({
+          roomCode: roomCode,
+          heatId: heat?.id || 'heat',
+          heatName: heat?.name || settingsRef.current.heatName,
+          heatNumber: heat?.number ?? settingsRef.current.heatNumber,
+          distance: heat?.distance || settingsRef.current.distance,
+          windSpeed: heat?.windSpeed || settingsRef.current.windSpeed,
+          laneCount: settingsRef.current.laneCount,
+          completedAt: Date.now(),
+          runners: opts.runners.map((r) => ({
+            bib: r.bib,
+            name: r.name,
+            country: r.country,
+            lane: r.lane,
+            finishTime: r.finishTime,
+            rank: r.rank,
+            status: r.status,
+          })),
+          fullPhotoFinishUrl: opts.fullPhotoFinishUrl,
+        })
+        .then((id) => console.log('[Archive] ✅ تم حفظ السباق في الأرشيف الدائم:', id))
+        .catch(() => {});
+    } catch (e) {}
+  }, [roomCode]);
 
   // إعادة ضبط محلية فورية
   const handleLocalReset = useCallback(() => {
@@ -345,6 +411,11 @@ export const App: React.FC = () => {
             return updated;
           });
         }
+        // أرشفة السباق تلقائياً على هذا الهاتف أيضاً (نسخة محلية من النتيجة الرسمية)
+        saveRaceToArchive({
+          runners: msg.payload?.runners || runnersRef.current,
+          fullPhotoFinishUrl: msg.payload?.fullPhotoFinishUrl,
+        });
         setShowPodium(true);
         break;
 
@@ -437,6 +508,18 @@ export const App: React.FC = () => {
         break;
       }
 
+      case 'HEAT_CANCEL_DISPATCH': {
+        setDispatchedHeatId(null);
+        setHeats(prev => prev.map(h => ({
+          ...h,
+          isDispatched: false,
+          dispatchedAt: undefined
+        })));
+        setRaceStatus('waiting');
+        athleticsAudio.playBeep(300, 0.3);
+        break;
+      }
+
       case 'HEATS_REORDER': {
         if (msg.payload?.heats) {
           setHeats(msg.payload.heats);
@@ -504,10 +587,44 @@ export const App: React.FC = () => {
         setIsPeerSirenRinging(true);
         break;
 
+      case 'LICENSE_SHARE_POOL':
+        if (msg.payload) {
+          licenseManager.setReceivedSharedPool(msg.payload);
+          setSharedPoolLicense(msg.payload);
+          if (msg.payload.tier === 'ENTX' && settingsRef.current.laneCount < 10) {
+            setSettings(prev => ({ ...prev, laneCount: 10 }));
+          } else if (msg.payload.tier === 'CLB8' && settingsRef.current.laneCount < 8) {
+            setSettings(prev => ({ ...prev, laneCount: Math.max(prev.laneCount, 8) }));
+          }
+        }
+        break;
+
+      case 'LICENSE_REVOKE_AND_TRANSFER':
+        if (msg.payload?.sourceDeviceId === licenseManager.deviceId) {
+          licenseManager.resetToTrial();
+          setSharedPoolLicense(null);
+        }
+        break;
+
       default:
         break;
     }
-  }, [handleLocalReset, startLocalClock, stopLocalClock, role]);
+  }, [handleLocalReset, startLocalClock, stopLocalClock, role, saveRaceToArchive]);
+
+  // بث التفعيل الشبكي 1*4 للهواتف الثلاثة الأخرى عند الدخول للغرفة
+  useEffect(() => {
+    if (role) {
+      const pool = licenseManager.createPoolShareMessage(role);
+      if (pool) {
+        athleticsNetwork.sendMessage({
+          type: 'LICENSE_SHARE_POOL',
+          timestamp: Date.now(),
+          senderTime: Date.now(),
+          payload: pool
+        });
+      }
+    }
+  }, [role, roomCode]);
 
   // إرسال واستجابة جرس لفت الانتباه وفحص الإشارة
   const handleStopBellSignal = useCallback(() => {
@@ -707,6 +824,12 @@ export const App: React.FC = () => {
       }
     });
 
+    // أرشفة السباق المكتمل تلقائياً مع شريط الـ Photo Finish الرسمي
+    saveRaceToArchive({
+      runners: runnersRef.current.length > 0 ? runnersRef.current : runners,
+      fullPhotoFinishUrl: fullPanorama || undefined,
+    });
+
     if (fullPanorama) {
       athleticsNetwork.sendMessage({
         type: 'SLIT_SCAN_IMAGE',
@@ -887,6 +1010,34 @@ export const App: React.FC = () => {
     });
   };
 
+  // إلغاء أمر خط الانطلاق وسحب القائمة (Annuler / Rappel)
+  const handleCancelDispatchHeat = (heatId?: string) => {
+    setDispatchedHeatId(null);
+    setRaceStatus('waiting');
+    const updated = heats.map(h => ({
+      ...h,
+      isDispatched: false,
+      dispatchedAt: undefined
+    }));
+    setHeats(updated);
+
+    athleticsAudio.playBeep(300, 0.3);
+
+    athleticsNetwork.sendMessage({
+      type: 'HEAT_CANCEL_DISPATCH',
+      timestamp: Date.now(),
+      senderTime: Date.now(),
+      payload: { heatId }
+    });
+
+    athleticsNetwork.sendMessage({
+      type: 'HEATS_SYNC',
+      timestamp: Date.now(),
+      senderTime: Date.now(),
+      payload: { heats: updated }
+    });
+  };
+
   // تعديل حكم الهاتف الثالث لعداء محدد
   const handleJudgeUpdateRunner = (lane: number, updates: Partial<Runner>) => {
     setRunners(prev => {
@@ -1007,6 +1158,10 @@ export const App: React.FC = () => {
         onOpenSettings={() => setShowSettingsModal(true)}
         onOpenInternetBridge={() => setShowInternetBridgeModal(true)}
         onOpenSchedulePanel={() => setShowSchedulePanel(true)}
+        onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
+        onOpenTransferModal={() => setShowTransferModal(true)}
+        sharedPoolLicense={sharedPoolLicense}
+        onOpenArchive={() => setShowArchiveModal(true)}
         onSharedResetRace={handleSharedResetRace}
         onStartBellSignal={handleStartBellSignal}
         onStopBellSignal={handleStopBellSignal}
@@ -1017,11 +1172,20 @@ export const App: React.FC = () => {
       {/* الشاشات الرئيسية حسب دور الهاتف المختار */}
       <main className="flex-1 flex flex-col">
         {!role && (
-          <RoleSelector
-            roomCode={roomCode}
-            onSetRoomCode={setRoomCode}
-            onSelectRole={(selectedRole) => setRole(selectedRole)}
-          />
+          <>
+            <RoleSelector
+              roomCode={roomCode}
+              onSetRoomCode={setRoomCode}
+              onSelectRole={(selectedRole) => setRole(selectedRole)}
+              onOpenSubscriptionModal={() => setShowSubscriptionModal(true)}
+              onOpenTransferModal={() => setShowTransferModal(true)}
+              sharedPoolLicense={sharedPoolLicense}
+            />
+            {/* زر تثبيت التطبيق كـ PWA — يظهر فقط عند توفر إمكانية التثبيت */}
+            <div className="px-4 pb-6 max-w-xl mx-auto w-full">
+              <PwaInstallButton />
+            </div>
+          </>
         )}
 
         {role === 'start' && !showPodium && (
@@ -1034,6 +1198,7 @@ export const App: React.FC = () => {
             currentHeatIndex={currentHeatIndex}
             onSelectHeat={handleSelectHeat}
             onDispatchHeat={handleDispatchHeat}
+            onCancelDispatchHeat={handleCancelDispatchHeat}
             onOpenSchedulePanel={() => setShowSchedulePanel(true)}
             onCommandOnMarks={handleCommandOnMarks}
             onCommandSet={handleCommandSet}
@@ -1083,6 +1248,7 @@ export const App: React.FC = () => {
             onReorderHeats={handleReorderHeats}
             onUpdateRunner={handleJudgeUpdateRunner}
             onUpdateRunnersList={handleUpdateRunnersList}
+            onFinishRace={handleFinishRace}
             onSharedResetRace={handleSharedResetRace}
             onViewPhotoFinish={() => setShowPhotoFinishViewer(true)}
             onOpenSettings={() => setShowSettingsModal(true)}
@@ -1170,8 +1336,56 @@ export const App: React.FC = () => {
           onSendTestPing={() => athleticsNetwork.performTimeSync()}
         />
       )}
+
+      {/* نافذة خطط الاشتراكات والأسعار والتفعيل (عند النقر على زر الاشتراك) */}
+      {showSubscriptionModal && !isAppLocked && (
+        <SubscriptionModal
+          onClose={() => setShowSubscriptionModal(false)}
+          isPaywallLock={false}
+          currentRoomCode={roomCode}
+          onConnectToMeshRoom={(newRoom) => {
+            setRoomCode(newRoom);
+            setShowSubscriptionModal(false);
+          }}
+          sharedPoolLicense={sharedPoolLicense}
+        />
+      )}
+
+      {/* قفل التطبيق الإجباري (Paywall Gate) بعد انتهاء فترة الـ 7 أيام التجريبية: لا يفتح إلا بالاشتراك أو الاتصال بشبكة 1*4 */}
+      {isAppLocked && (
+        <SubscriptionModal
+          onClose={() => {}}
+          isPaywallLock={true}
+          currentRoomCode={roomCode}
+          onConnectToMeshRoom={(newRoom) => {
+            setRoomCode(newRoom);
+          }}
+          sharedPoolLicense={sharedPoolLicense}
+        />
+      )}
+
+      {/* نافذة تحويل ونقل الترخيص المشفر لمنع الازدواجية */}
+      {showTransferModal && (
+        <LicenseTransferModal
+          onClose={() => setShowTransferModal(false)}
+        />
+      )}
+
+      {/* نافذة أرشيف السباقات الدائم */}
+      {showArchiveModal && (
+        <ArchiveModal onClose={() => setShowArchiveModal(false)} />
+      )}
     </div>
   );
 };
 
-export default App;
+// ═══ الجذر: يوجه إلى ADMIN SUITE عند وجود ?admin في الرابط ═══
+// مثال: https://<domain>/?admin → بوابة رمز المدير → لوحة التراخيص
+const AppRoot: React.FC = () => {
+  const [adminMode] = useState<boolean>(() => {
+    try { return new URLSearchParams(window.location.search).has('admin'); } catch { return false; }
+  });
+  return adminMode ? <AdminGate /> : <App />;
+};
+
+export default AppRoot;

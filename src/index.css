@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    /* منع أي تمرير/تجاوز أفقي على مستوى الصفحة كاملة (clip لا يكسر position: sticky) */
+    overflow-x: clip;
+  }
+
   body {
     font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+    max-width: 100vw;
+  }
+
+  /* الوسائط لا تتمدد أبداً أبعد من حاويتها */
+  img, video, canvas {
+    max-width: 100%;
   }
 
   /* خط الأرقام الرياضية الرقمية للساعة */
