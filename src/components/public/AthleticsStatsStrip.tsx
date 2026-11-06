@@ -4,8 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Flag, Building2, Users, Trophy, Award, Timer } from 'lucide-react';
-import { useTranslation } from '../../services/i18nService';
+import { Flag, Building2, Users, Trophy, Award } from 'lucide-react';
 
 export interface PlatformLiveStats {
   leagues: number;
@@ -24,7 +23,6 @@ const DEFAULT_STATS: PlatformLiveStats = {
 };
 
 export const AthleticsStatsStrip: React.FC<{ stats?: Partial<PlatformLiveStats> }> = ({ stats: customStats }) => {
-  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
@@ -112,3 +110,4 @@ const CounterItem: React.FC<{
     </div>
   );
 };
+

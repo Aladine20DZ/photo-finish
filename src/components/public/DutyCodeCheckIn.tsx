@@ -13,11 +13,9 @@ import {
   MapPin, 
   WifiOff, 
   Timer, 
-  QrCode, 
   Loader2, 
   AlertCircle,
-  ArrowRight,
-  ShieldAlert
+  ArrowRight
 } from 'lucide-react';
 import { PhoneRole } from '../../types/race';
 
@@ -295,3 +293,4 @@ const Row: React.FC<{ label: string; value: string; isMono?: boolean }> = ({ lab
     </span>
   </div>
 );
+

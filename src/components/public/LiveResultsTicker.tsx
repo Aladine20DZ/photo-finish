@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Flag, Wind, Timer, Award } from 'lucide-react';
+import { Flag, Wind } from 'lucide-react';
 
 export interface TickerResultItem {
   id: string;
@@ -72,3 +72,4 @@ export const LiveResultsTicker: React.FC<{ items?: TickerResultItem[] }> = ({ it
     </section>
   );
 };
+

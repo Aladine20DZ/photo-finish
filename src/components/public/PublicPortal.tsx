@@ -14,14 +14,7 @@ import {
   Wind, 
   Timer, 
   Building2, 
-  Sparkles,
-  Medal,
-  ChevronRight,
-  ShieldCheck,
-  Eye,
-  Flag,
-  Radio,
-  ExternalLink
+  Medal
 } from 'lucide-react';
 import { 
   publicPortalService, 
@@ -318,12 +311,12 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
                         <td className="py-3 px-4 text-center font-bold">
                           {r.rank === 1 ? '🥇 1' : r.rank === 2 ? '🥈 2' : r.rank === 3 ? '🥉 3' : r.rank}
                         </td>
-                        <td className="py-3 px-4 font-mono font-bold text-amber-400">#{r.bib}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-amber-400">#{r.bib_number || '-'}</td>
                         <td className="py-3 px-4 font-black text-white">{r.athlete_name}</td>
                         <td className="py-3 px-4 text-slate-300">{r.club_name}</td>
-                        <td className="py-3 px-4 text-center font-mono">{r.lane || '-'}</td>
-                        <td className="py-3 px-4 font-mono font-black text-emerald-300 text-sm">{formatTime(r.mark_millis)}</td>
-                        <td className="py-3 px-4 font-mono text-slate-400">{r.rank === 1 ? '—' : `+${((r.mark_millis! - (results[0]?.mark_millis || 0)) / 1000).toFixed(2)}s`}</td>
+                        <td className="py-3 px-4 text-center font-mono">{(r as any).lane_number || (r as any).lane || '-'}</td>
+                        <td className="py-3 px-4 font-mono font-black text-emerald-300 text-sm">{formatTime(r.time_millis)}</td>
+                        <td className="py-3 px-4 font-mono text-slate-400">{r.rank === 1 ? '—' : `+${(((r.time_millis || 0) - (results[0]?.time_millis || 0)) / 1000).toFixed(2)}s`}</td>
                         <td className="py-3 px-4 text-center">
                           <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 text-[10px] font-bold border border-emerald-800/60">
                             معتمد ✓

@@ -9,15 +9,8 @@ import {
   ClipboardList, 
   Radar, 
   ChevronDown, 
-  ShieldCheck, 
-  HelpCircle, 
-  Building2, 
-  Flag, 
-  ExternalLink,
-  Timer,
-  CheckCircle2
+  HelpCircle
 } from 'lucide-react';
-import { useTranslation } from '../../services/i18nService';
 
 export const HowItWorksSection: React.FC = () => {
   const steps = [
@@ -250,3 +243,4 @@ export const PlatformFooter: React.FC = () => {
     </footer>
   );
 };
+

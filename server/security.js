@@ -191,12 +191,51 @@ export function getPublicKeyBase64() {
   return PUB_KEY_RAW.toString('base64');
 }
 
+// ═══ توقيع رموز نقاط المراقبة (Checkpoint QR Signing) ═══
+// النص القياسي الموقع: PFP_CP1|cid|cpid|code|km|iat|exp
+// التوقيع Ed25519 يتحقق على العميل أوفلاين بالمفتاح العام — لا يوجد أي سر في الواجهة.
+
+/**
+ * بناء النص القياسي (Canonical String) لحمولة نقطة مراقبة
+ */
+export function buildCheckpointCanonical({ cid, cpid, code, km, iat, exp }) {
+  return `PFP_CP1|${cid}|${cpid}|${code}|${km}|${iat}|${exp}`;
+}
+
+/**
+ * توقيع حمولة نقطة مراقبة بـ Ed25519 من الخادم
+ * @returns {string} توقيع Base64Url (64 بايت)
+ */
+export function signCheckpointQr({ cid, cpid, code, km, iat, exp }) {
+  const canonical = buildCheckpointCanonical({ cid, cpid, code, km, iat, exp });
+  const signatureBuffer = crypto.sign(null, Buffer.from(canonical, 'utf8'), privateKeyObject);
+  return signatureBuffer.toString('base64url');
+}
+
+/**
+ * التحقق من توقيع نقطة مراقبة (للاختبار والفحص الخادمي)
+ */
+export function verifyCheckpointQrSignature({ cid, cpid, code, km, iat, exp }, sigBase64Url) {
+  const canonical = buildCheckpointCanonical({ cid, cpid, code, km, iat, exp });
+  const SPKI_HEADER = Buffer.from('302a300506032b6570032100', 'hex');
+  const publicKeyObject = crypto.createPublicKey({
+    key: Buffer.concat([SPKI_HEADER, PUB_KEY_RAW]),
+    format: 'der',
+    type: 'spki'
+  });
+  const sigBytes = Buffer.from(String(sigBase64Url || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  return crypto.verify(null, Buffer.from(canonical, 'utf8'), publicKeyObject, sigBytes);
+}
+
 export default {
   verifyAdminLogin,
   verifyAdminToken,
   generateEd25519License,
   verifyEd25519Signature,
   getPublicKeyBase64,
+  buildCheckpointCanonical,
+  signCheckpointQr,
+  verifyCheckpointQrSignature,
   PUB_KEY_RAW,
   PRIV_KEY_RAW
 };

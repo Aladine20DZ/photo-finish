@@ -5,8 +5,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Radio, ArrowDown, Timer, ShieldCheck, Trophy, Sparkles, ChevronRight, Zap } from 'lucide-react';
-import { useTranslation } from '../../services/i18nService';
+import { Radio, ArrowDown, Timer, ShieldCheck, Trophy, ChevronRight, Zap } from 'lucide-react';
 
 interface SlitScanHeroProps {
   onEnterFieldMode: () => void;
@@ -21,7 +20,6 @@ export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
   onOpenLeague,
   onOpenCoach,
 }) => {
-  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ms, setMs] = useState(0);
 
@@ -296,3 +294,4 @@ export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
     </section>
   );
 };
+

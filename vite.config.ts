@@ -7,6 +7,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import type { ServerResponse, IncomingMessage } from "http";
 import { WebSocketServer, type WebSocket as WsWebSocket } from "ws";
 import * as security from "./server/security.js";
+import { handleSyncRequest } from "./server/syncApi.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +43,8 @@ interface WsClient {
 function raceRelayPlugin(): Plugin {
   const rooms = new Map<string, Map<string, ConnectedClient>>();
   const wsRooms = new Map<string, Map<string, WsClient>>();
-  const roomSessions = new Map<string, string>(); // room → sessionToken
+  const roomSessions = new Map<string, string>();
+  const cpSignAttempts = new Map<string, { count: number; resetAt: number }>(); // room → sessionToken
 
   // توليد أو استرجاع Session Token للغرفة
   function getOrCreateSession(room: string): string {
@@ -455,6 +457,96 @@ function raceRelayPlugin(): Plugin {
           }
         });
         return;
+      }
+
+      
+      // 8. توقيع رموز نقاط المراقبة Ed25519 (Checkpoint QR Signing)
+      if (parsedUrl.pathname === '/api/checkpoint/sign' && req.method === 'POST') {
+        const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+        const now = Date.now();
+        const rec = cpSignAttempts.get(clientIp) || { count: 0, resetAt: now + 3600_000 };
+        if (now > rec.resetAt) { rec.count = 0; rec.resetAt = now + 3600_000; }
+        rec.count++;
+        cpSignAttempts.set(clientIp, rec);
+        if (rec.count > 120) {
+          res.writeHead(429, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'تم تجاوز حد توقيع رموز نقاط المراقبة لهذه الساعة.' }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', (chunk: any) => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const { cid, cpid, code, km, iat, exp } = JSON.parse(body || '{}');
+            if (!cid || !cpid || !code || typeof km !== 'number' || typeof iat !== 'number' || typeof exp !== 'number') {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'حمولة توقيع غير مكتملة (cid, cpid, code, km, iat, exp)' }));
+              return;
+            }
+            if (exp <= iat || exp - iat > 30 * 86400_000) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'مدة صلاحية رمز غير مقبولة (الحد الأقصى 30 يوماً).' }));
+              return;
+            }
+            const signature = (security as any).signCheckpointQr ? (security as any).signCheckpointQr({ cid, cpid, code, km, iat, exp }) : 'UNSIGNED';
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, signature }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+          }
+        });
+        return;
+      }
+
+      // 9. مزامنة offline-first: دفتر إلغاء التكرار + الاسترجاع + النسخ الاحتياطي
+      if (parsedUrl.pathname.startsWith('/api/sync/') ||
+          parsedUrl.pathname.startsWith('/api/backup/') ||
+          parsedUrl.pathname === '/api/audit') {
+        const isPost = req.method === 'POST';
+        if (!isPost) {
+          const result = handleSyncRequest({
+            pathname: parsedUrl.pathname,
+            searchParams: parsedUrl.searchParams,
+            method: req.method || 'GET',
+            body: null,
+            getOrCreateSession,
+            verifyAdminToken: (t: string) => security.verifyAdminToken(t)
+          });
+          if (result) {
+            res.writeHead(result.status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result.json));
+            return;
+          }
+        } else {
+          let raw = '';
+          req.on('data', (chunk: any) => { raw += chunk; });
+          req.on('end', () => {
+            let parsedBody: any = null;
+            try { parsedBody = JSON.parse(raw || '{}'); } catch (e) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+              return;
+            }
+            const result = handleSyncRequest({
+              pathname: parsedUrl.pathname,
+              searchParams: parsedUrl.searchParams,
+              method: 'POST',
+              body: parsedBody,
+              getOrCreateSession,
+              verifyAdminToken: (t: string) => security.verifyAdminToken(t)
+            });
+            if (result) {
+              res.writeHead(result.status, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(result.json));
+              return;
+            }
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+          });
+          return;
+        }
       }
 
       next();

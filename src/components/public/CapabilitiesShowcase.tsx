@@ -3,7 +3,7 @@
  * High-fidelity code-drawn interactive mockups demonstrating system capabilities.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Timer, 
   Layers, 
@@ -11,17 +11,11 @@ import {
   Trophy, 
   WifiOff, 
   FileText, 
-  CheckCircle2, 
   Scan, 
-  Radio, 
-  MapPin,
   Sparkles
 } from 'lucide-react';
-import { useTranslation } from '../../services/i18nService';
 
 export const CapabilitiesShowcase: React.FC<{ onLaunchFeature?: (featureId: string) => void }> = ({ onLaunchFeature }) => {
-  const { t } = useTranslation();
-  const [activeMock, setActiveMock] = useState<number | null>(null);
 
   const capabilities = [
     {
@@ -93,11 +87,9 @@ export const CapabilitiesShowcase: React.FC<{ onLaunchFeature?: (featureId: stri
 
       {/* شبكة البطاقات التفاعلية */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {capabilities.map((c, i) => (
+        {capabilities.map((c) => (
           <article
             key={c.id}
-            onMouseEnter={() => setActiveMock(i)}
-            onMouseLeave={() => setActiveMock(null)}
             className="rounded-3xl border border-slate-800 bg-slate-900/70 hover:border-emerald-500/50 hover:bg-slate-900 transition-all duration-300 overflow-hidden flex flex-col group shadow-xl hover:shadow-emerald-950/40"
           >
             {/* الشاشة التجريبية المصغرة */}
@@ -273,3 +265,4 @@ function CertifiedReportMockup() {
     </div>
   );
 }
+
