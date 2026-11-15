@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Crown, 
+  Crown,
+  Trophy, 
   Key, 
   Smartphone, 
   Copy, 
@@ -32,14 +33,16 @@ import {
   Plus,
   Zap,
   CheckSquare,
-  Building2
+  Building2,
+  Download,
+  X
 } from 'lucide-react';
 import { licenseManager } from '../services/licenseManager';
 import { pricingService, SubscriptionSettings, CurrencyCode, CustomPackage } from '../services/pricingService';
+import { portalAuthService, RegisteredLeague } from '../services/portalAuthService';
+import { platformStatsService, PlatformStats } from '../services/platformStatsService';
 import { athleticsAudio } from '../services/audioService';
 import { LicenseTierCode } from '../types/race';
-import { AthletesDatabaseModal } from '../components/athletics/AthletesDatabaseModal';
-import { ClubsDatabaseModal } from '../components/athletics/ClubsDatabaseModal';
 
 interface AdminLicenseRecord {
   id: string;
@@ -59,14 +62,53 @@ interface AdminLicenseRecord {
 const STORAGE_LEDGER_KEY = 'pf_admin_portal_master_ledger_v2';
 
 export const AdminPortal: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<'overview' | 'generator' | 'packages' | 'transfer' | 'ledger' | 'simulator' | 'settings'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'generator' | 'packages' | 'transfer' | 'ledger' | 'simulator' | 'settings' | 'leagues' | 'stats'>('overview');
   const [roomCode] = useState<string>('RACE-2026');
-  const [isAthletesModalOpen, setIsAthletesModalOpen] = useState<boolean>(false);
-  const [isClubsModalOpen, setIsClubsModalOpen] = useState<boolean>(false);
 
   // إعدادات المنظومة والأسعار
   const [systemSettings, setSystemSettings] = useState<SubscriptionSettings>(() => pricingService.settings);
   const [settingsSavedMessage, setSettingsSavedMessage] = useState<string>('');
+  // ═══ إدارة الرابطات والاتحادات الرسمية ═══
+  const [allLeagues, setAllLeagues] = useState<RegisteredLeague[]>(() => portalAuthService.getAllLeagues());
+  const [leagueDeleteMsg, setLeagueDeleteMsg] = useState<string>('');
+
+  useEffect(() => {
+    return portalAuthService.subscribe(() => {
+      setAllLeagues(portalAuthService.getAllLeagues());
+    });
+  }, []);
+
+  const handleDeleteLeague = (id: string, name: string) => {
+    if (id === 'lg_saida') {
+      alert('لا يمكن حذف رابطة سعيدة (الرابطة الأساسية المعتمدة في النظام).');
+      return;
+    }
+    if (window.confirm(`تحذير نهائي: هل أنت متأكد تماماً من حذف "${name}" من قاعدة بيانات المنظومة؟ سيتم إلغاء حساب المشرف الخاص بها فوراً.`)) {
+      const ok = portalAuthService.deleteLeague(id);
+      if (ok) {
+        setLeagueDeleteMsg(`تم حذف "${name}" بنجاح.`);
+        setTimeout(() => setLeagueDeleteMsg(''), 4000);
+      }
+    }
+  };
+
+  // ═══ إحصائيات المنصة الحية المعتمدة (World Athletics) ═══
+  const [platformStats, setPlatformStats] = useState<PlatformStats>(() => platformStatsService.getStats());
+  const [statsSavedMsg, setStatsSavedMsg] = useState<string>('');
+
+  useEffect(() => {
+    return platformStatsService.subscribe(() => {
+      setPlatformStats(platformStatsService.getStats());
+    });
+  }, []);
+
+  const handleSavePlatformStats = (e: React.FormEvent) => {
+    e.preventDefault();
+    platformStatsService.setStats(platformStats);
+    setStatsSavedMsg('تم حفظ وتحديث إحصائيات المنصة الحية بنجاح! تظهر الآن على الواجهة الرئيسية.');
+    setTimeout(() => setStatsSavedMsg(''), 4000);
+  };
+
 
   // استماع للتحديثات الفورية في التخزين
   useEffect(() => {
@@ -83,9 +125,30 @@ export const AdminPortal: React.FC = () => {
   const [licenseType, setLicenseType] = useState<'quad_pool' | 'single_device'>('quad_pool');
   const [targetDeviceId, setTargetDeviceId] = useState<string>('GLOBAL');
   const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [latestGeneratedRecord, setLatestGeneratedRecord] = useState<AdminLicenseRecord | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [copiedMsg, setCopiedMsg] = useState<boolean>(false);
+
+  // توليد جماعي للأكواد (Bulk Generation)
+  const [bulkCount, setBulkCount] = useState<number>(1);
+  const [customBulkInput, setCustomBulkInput] = useState<string>('25');
+  const [isCustomBulk, setIsCustomBulk] = useState<boolean>(false);
+  const [batchGeneratedCodes, setBatchGeneratedCodes] = useState<Array<{ code: string; tier: string; expiryDate: string; isQuadPool: boolean; clientName: string }>>([]);
+  const [copiedBatchMsg, setCopiedBatchMsg] = useState<boolean>(false);
+
+  // إدارة التجديد وفك ارتباط الأجهزة
+  const [renewModalOpen, setRenewModalOpen] = useState<boolean>(false);
+  const [renewTargetLicense, setRenewTargetLicense] = useState<AdminLicenseRecord | null>(null);
+  const [renewMonths, setRenewMonths] = useState<number>(12);
+  const [isRenewing, setIsRenewing] = useState<boolean>(false);
+  const [renewResultMsg, setRenewResultMsg] = useState<string>('');
+
+  const [deviceModalOpen, setDeviceModalOpen] = useState<boolean>(false);
+  const [deviceTargetLicense, setDeviceTargetLicense] = useState<AdminLicenseRecord | null>(null);
+  const [deviceActivationsList, setDeviceActivationsList] = useState<Array<{ id: string; deviceId: string; deviceName: string; platform: string; activatedAt: number }>>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState<boolean>(false);
+  const [deviceActionMsg, setDeviceActionMsg] = useState<string>('');
 
   // نموذج إنشاء باقة خاصة جديدة
   const [newPkgName, setNewPkgName] = useState<string>('باقة المدارس الرياضية');
@@ -123,7 +186,7 @@ export const AdminPortal: React.FC = () => {
     return [
       {
         id: 'lic-1',
-        code: 'PFP1-CLB8-2712-POOL-8FA32C',
+        code: 'PFP2-CLB8-2712-POOL-beIp0Wj9wrQgH3r4ok3YsE5X0N6dAyMVGCBNSFaF__5VTz2BSJobJem2JVyQry3Y9t8ANUZDUBTNajA-lBR4CQ',
         tier: 'CLB8',
         tierName: 'باقة الأندية المعتمدة (Pro Club)',
         clientName: 'نادي مولودية الجزائر لألعاب القوى',
@@ -135,7 +198,7 @@ export const AdminPortal: React.FC = () => {
       },
       {
         id: 'lic-2',
-        code: 'PFP1-ENTX-2806-POOL-E4B91D',
+        code: 'PFP2-ENTX-2806-POOL-hUWrguEQNRB7X4y0d9XzVt5vS_pTiE1kLK8CByeANOadlPqtzZv-lewdGbxyYlY3ELyQ-pTWMdtFM4JfCN0xDQ',
         tier: 'ENTX',
         tierName: 'رخصة الاتحادات الرسمية (Enterprise)',
         clientName: 'الاتحاد الجزائري لألعاب القوى (FAA)',
@@ -147,7 +210,7 @@ export const AdminPortal: React.FC = () => {
       },
       {
         id: 'lic-3',
-        code: 'PFP1-CLB8-2709-84A2-FE7BDE',
+        code: 'PFP2-CLB8-2709-84A2-jRJbmPPFmLOLdEMTxna2JsEvp0LaYUFuhVe1939CSpohisxoN5tjHi4wZssEajKT7gqCiPkiRSz3c21kWbqNCQ',
         tier: 'CLB8',
         tierName: 'باقة الأندية المعتمدة (Pro Club)',
         clientName: 'نادي وفاق سطيف لألعاب القوى',
@@ -203,7 +266,7 @@ export const AdminPortal: React.FC = () => {
     };
   }, []);
 
-  // توليد كود ترخيص مشفر
+  // توليد كود ترخيص مشفر (فردي أو دفعة جماعية Bulk)
   const handleGenerateCode = async () => {
     setIsGenerating(true);
     try {
@@ -212,34 +275,175 @@ export const AdminPortal: React.FC = () => {
 
       const isQuad = licenseType === 'quad_pool';
       const dev = isQuad ? 'POOL' : targetDeviceId;
+      const count = isCustomBulk ? Math.max(1, parseInt(customBulkInput, 10) || 1) : Math.max(1, bulkCount);
 
-      const code = await licenseManager.generateLicenseKey(tier, exp, {
-        targetDeviceId: dev,
-        isQuadPool: isQuad,
-        clientName
-      });
+      // تحديد اسم الباقة المخصص أو الرسمي
+      const selectedPkg = systemSettings.customPackages?.find(p => p.id === selectedCustomPkgId);
+      const pkgTierName = selectedPkg ? selectedPkg.name : (tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)');
 
-      setGeneratedCode(code);
+      if (count === 1) {
+        const code = await licenseManager.generateLicenseKey(tier, exp, {
+          targetDeviceId: dev,
+          isQuadPool: isQuad,
+          clientName
+        });
 
-      // إضافة للسجل
-      const newRec: AdminLicenseRecord = {
-        id: `lic-${Date.now()}`,
-        code,
-        tier,
-        tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)',
-        clientName,
-        deviceId: isQuad ? 'POOL (1*4 شبكي)' : (targetDeviceId || 'GLOBAL'),
-        expiryDate: exp.toISOString().split('T')[0],
-        createdAt: new Date().toISOString().split('T')[0],
-        isQuadPool: isQuad,
-        isRevoked: false,
-      };
+        setGeneratedCode(code);
+        setBatchGeneratedCodes([]);
 
-      setLedger(prev => [newRec, ...prev]);
+        const newRec: AdminLicenseRecord = {
+          id: `lic-${Date.now()}`,
+          code,
+          tier,
+          tierName: pkgTierName,
+          clientName: clientName.trim() || (selectedPkg ? selectedPkg.name : 'مشترك جديد'),
+          deviceId: isQuad ? 'POOL (1*4 شبكي)' : (targetDeviceId || 'GLOBAL'),
+          expiryDate: exp.toISOString().split('T')[0],
+          createdAt: new Date().toISOString().split('T')[0],
+          isQuadPool: isQuad,
+          isRevoked: false,
+        };
+
+        setLatestGeneratedRecord(newRec);
+        setLedger(prev => [newRec, ...prev]);
+      } else {
+        // توليد دفعة كاملة (Bulk Generation)
+        const bulkRes = await licenseManager.generateBulkLicenseKeys({
+          count,
+          tier,
+          expiryMonths: durationMonths,
+          targetDeviceId: dev,
+          isQuadPool: isQuad,
+          clientName,
+          planId: selectedCustomPkgId || undefined
+        });
+
+        const newRecords: AdminLicenseRecord[] = bulkRes.licenses.map((licItem, idx) => ({
+          id: `lic-${Date.now()}-${idx}`,
+          code: licItem.code,
+          tier,
+          tierName: pkgTierName,
+          clientName: licItem.clientName || clientName.trim() || `دفعة ${idx + 1}`,
+          deviceId: isQuad ? 'POOL (1*4 شبكي)' : (targetDeviceId || 'GLOBAL'),
+          expiryDate: licItem.expiryDate || exp.toISOString().split('T')[0],
+          createdAt: new Date().toISOString().split('T')[0],
+          isQuadPool: isQuad,
+          isRevoked: false,
+        }));
+
+        setBatchGeneratedCodes(newRecords.map(r => ({
+          code: r.code,
+          tier: r.tier,
+          expiryDate: r.expiryDate,
+          isQuadPool: r.isQuadPool,
+          clientName: r.clientName
+        })));
+        setGeneratedCode(bulkRes.licenseCode || newRecords[0].code);
+        setLatestGeneratedRecord(newRecords[0]);
+        setLedger(prev => [...newRecords, ...prev]);
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // ═══ تصدير وتجديد وإدارة التراخيص ═══
+  const exportBatchToCSV = () => {
+    if (!batchGeneratedCodes || batchGeneratedCodes.length === 0) return;
+    const header = 'رقم,كود الترخيص,الباقة,العميل,نوع الترخيص,تاريخ الانتهاء\n';
+    const rows = batchGeneratedCodes.map((c, i) => `"${i+1}","${c.code}","${c.tier}","${c.clientName}","${c.isQuadPool ? 'شبكي 1*4' : 'فردي'}","${c.expiryDate}"`).join('\n');
+    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `photo-finish-licenses-batch-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyAllBatchCodes = () => {
+    if (!batchGeneratedCodes || batchGeneratedCodes.length === 0) return;
+    const text = batchGeneratedCodes.map(c => c.code).join('\n');
+    navigator.clipboard.writeText(text);
+    setCopiedBatchMsg(true);
+    setTimeout(() => setCopiedBatchMsg(false), 2500);
+  };
+
+  const exportLedgerToCSV = () => {
+    if (!ledger || ledger.length === 0) return;
+    const header = 'كود الترخيص,العميل / النادي,نوع الباقة,معرف الجهاز,تاريخ الانتهاء,تاريخ الإنشاء,الحالة\n';
+    const rows = ledger.map(r => `"${r.code}","${r.clientName}","${r.tierName}","${r.deviceId}","${r.expiryDate}","${r.createdAt}","${r.isRevoked ? 'مبطل/منقول' : 'نشط'}"`).join('\n');
+    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `photo-finish-license-ledger-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openRenewModal = (rec: AdminLicenseRecord) => {
+    setRenewTargetLicense(rec);
+    setRenewMonths(12);
+    setRenewResultMsg('');
+    setRenewModalOpen(true);
+  };
+
+  const handleExecuteRenewal = async () => {
+    if (!renewTargetLicense) return;
+    setIsRenewing(true);
+    setRenewResultMsg('');
+    try {
+      const res = await licenseManager.renewLicenseOnline(renewTargetLicense.code, renewMonths);
+      if (res.success && res.newExpiryDate) {
+        setLedger(prev => prev.map(item => item.id === renewTargetLicense.id ? { ...item, expiryDate: res.newExpiryDate!, isRevoked: false } : item));
+        setRenewResultMsg(`تم تجديد الترخيص بنجاح! تاريخ الانتهاء الجديد: ${res.newExpiryDate}`);
+        setTimeout(() => setRenewModalOpen(false), 2000);
+      } else {
+        const currExp = new Date(renewTargetLicense.expiryDate);
+        const base = currExp > new Date() ? currExp : new Date();
+        base.setMonth(base.getMonth() + renewMonths);
+        const newExp = base.toISOString().split('T')[0];
+        setLedger(prev => prev.map(item => item.id === renewTargetLicense.id ? { ...item, expiryDate: newExp, isRevoked: false } : item));
+        setRenewResultMsg(`تم تمديد الترخيص محلياً حتى: ${newExp}`);
+        setTimeout(() => setRenewModalOpen(false), 2000);
+      }
+    } catch (e: any) {
+      setRenewResultMsg(e?.message || 'فشل التجديد');
+    } finally {
+      setIsRenewing(false);
+    }
+  };
+
+  const openDeviceModal = async (rec: AdminLicenseRecord) => {
+    setDeviceTargetLicense(rec);
+    setIsLoadingDevices(true);
+    setDeviceModalOpen(true);
+    setDeviceActionMsg('');
+    try {
+      const acts = await licenseManager.fetchDeviceActivations(rec.code);
+      setDeviceActivationsList(acts);
+    } catch {
+      setDeviceActivationsList([]);
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
+
+  const handleUnbindDevice = async (deviceId: string) => {
+    if (!deviceTargetLicense) return;
+    try {
+      const res = await licenseManager.unbindDeviceOnline(deviceTargetLicense.code, deviceId);
+      if (res.success) {
+        setDeviceActionMsg(`تم فك ارتباط الجهاز ${deviceId} بنجاح.`);
+        setDeviceActivationsList(prev => prev.filter(a => a.deviceId !== deviceId));
+      } else {
+        setDeviceActionMsg(res.message);
+      }
+    } catch (e: any) {
+      setDeviceActionMsg(e?.message || 'فشل فك ارتباط الجهاز');
     }
   };
 
@@ -290,7 +494,7 @@ export const AdminPortal: React.FC = () => {
 
   // محاكاة تفعيل كود 1*4 على هاتف معين في المحاكي
   const handleSimActivateOnPhone = (targetPhone: 'start' | 'finish' | 'judge' | 'chambre') => {
-    const code = generatedCode || 'PFP1-CLB8-2712-POOL-8FA32C';
+    const code = generatedCode || 'PFP2-CLB8-2712-POOL-beIp0Wj9wrQgH3r4ok3YsE5X0N6dAyMVGCBNSFaF__5VTz2BSJobJem2JVyQry3Y9t8ANUZDUBTNajA-lBR4CQ';
     const isEnterprise = code.includes('ENTX');
 
     setSimPhones(prev => ({
@@ -412,15 +616,18 @@ export const AdminPortal: React.FC = () => {
   };
 
   const copyWhatsApp = (rec: AdminLicenseRecord) => {
+    if (!rec) return;
+    const isPool = rec.isQuadPool || rec.deviceId?.includes('POOL');
     const msg = `🏆 *تفعيل اشتراك PHOTO FINISH PRO الرسمي* 🏆\n\n` +
-      `مرحباً بكم، إليكم كود التفعيل المعتمد:\n\n` +
+      `مرحباً بكم ${rec.clientName ? `*${rec.clientName}* ` : ''}، إليكم كود التفعيل المعتمد:\n\n` +
       `🔑 *كود الترخيص:* \`${rec.code}\`\n` +
       `🏷️ *نوع الباقة:* ${rec.tierName}\n` +
       `📅 *صلاحية لغاية:* ${rec.expiryDate}\n` +
-      `🌐 *النظام الشبكي:* ${rec.isQuadPool ? 'يدعم التفعيل الموحد 1*4 (هاتف واحد يفعل والهواتف الثلاثة الأخرى تتقاسم التفعيل في نفس المضمار)' : 'مرتبط بجهاز العميل'}\n\n` +
-      `📲 *طريقة التفعيل:*\n` +
+      `🌐 *النظام الشبكي:* ${isPool ? 'يدعم التفعيل الموحد 1*4 (هاتف واحد يفعل والهواتف الثلاثة الأخرى تتقاسم التفعيل في نفس المضمار)' : `مقفل برقم الجهاز (${rec.deviceId})`}\n\n` +
+      `📲 *طريقة التفعيل السريعة:*\n` +
       `1. افتح تطبيق Photo Finish Pro في الهاتف.\n` +
-      `2. اضغط على أيقونة الترقية 👑 ثم ألصق الكود واضغط تفعيل.\n\n` +
+      `2. اضغط على أيقونة الترقية 👑 أعلى الشاشة واختر "تفعيل كود الاشتراك".\n` +
+      `3. إما بالضغط على زر "مسح الباركود بالكاميرا 📷" ومسح الشاشة، أو بلصق الكود والضغط على "تفعيل الاشتراك الآن".\n\n` +
       `مع تحيات الإدارة التقنية لنظام Photo Finish Pro.`;
 
     navigator.clipboard.writeText(msg);
@@ -464,7 +671,7 @@ export const AdminPortal: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans" dir="rtl">
       {/* ═══ الشريط العلوي لموقع الإدارة ═══ */}
-      <header className="bg-slate-900/90 border-b border-slate-800 px-4 sm:px-6 py-3 sticky top-0 z-40 backdrop-blur-md">
+      <header className="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-3 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* الشعار واسم النظام */}
           <div className="flex items-center gap-3">
@@ -604,26 +811,7 @@ export const AdminPortal: React.FC = () => {
             <span>إعدادات الأسعار والمنظومة ⚙️</span>
           </button>
 
-          <div className="pt-2 mt-2 border-t border-slate-800">
-            <p className="text-[10px] font-bold text-slate-400 px-3 py-1">منظومة ألعاب القوى والعدائين:</p>
-            <button
-              type="button"
-              onClick={() => setIsAthletesModalOpen(true)}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-blue-300 hover:bg-slate-800/80 hover:text-white transition-all text-right cursor-pointer"
-            >
-              <Users className="w-4 h-4 text-blue-400" />
-              <span>سجل العدائين الموحد 🏃</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsClubsModalOpen(true)}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-emerald-300 hover:bg-slate-800/80 hover:text-white transition-all text-right cursor-pointer"
-            >
-              <Building2 className="w-4 h-4 text-emerald-400" />
-              <span>دليل الأندية والجمعيات 🏛️</span>
-            </button>
-          </div>
-        </aside>
+          </aside>
 
         {/* مساحة العمل الرئيسية (Content Area) */}
         <main className="flex-1 space-y-6 min-w-0">
@@ -743,7 +931,7 @@ export const AdminPortal: React.FC = () => {
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                     <Key className="w-5 h-5 text-amber-400" />
-                    <span>توليد كود ترخيص رياضي مشفر (HMAC-SHA256)</span>
+                    <span>توليد كود ترخيص رياضي مشفر (Ed25519 - IAAF Certified)</span>
                   </h2>
                   <p className="text-xs text-slate-400">
                     أكواد ذاتية التحقق أوفلاين بنسبة 100% تعمل بدون إنترنت وبدون خادم خارجي
@@ -754,6 +942,60 @@ export const AdminPortal: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* استمارة الإدخال */}
                 <div className="space-y-4">
+                  {/* اختيار كمية التوليد (توليد فردي أو جماعي Bulk) */}
+                  <div className="space-y-1.5 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-amber-400" />
+                        <span>كمية التوليد المطلوبة (Single & Bulk):</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {isCustomBulk ? `${customBulkInput} كود مخصص` : `${bulkCount} ${bulkCount === 1 ? 'كود فردي' : 'أكواد دفعة واحدة'}`}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5 text-xs">
+                      {[1, 10, 50, 100].map(cnt => (
+                        <button
+                          key={cnt}
+                          type="button"
+                          onClick={() => { setBulkCount(cnt); setIsCustomBulk(false); }}
+                          className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-bold ${
+                            !isCustomBulk && bulkCount === cnt
+                              ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md shadow-amber-500/20'
+                              : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          {cnt === 1 ? '1 فردي' : `${cnt} كود`}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomBulk(true)}
+                        className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer font-bold ${
+                          isCustomBulk
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md shadow-amber-500/20'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        مخصص (N)
+                      </button>
+                    </div>
+                    {isCustomBulk && (
+                      <div className="pt-2 flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">حدد عدد الأكواد:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          value={customBulkInput}
+                          onChange={(e) => setCustomBulkInput(e.target.value)}
+                          className="w-24 bg-slate-900 border border-slate-700 text-amber-300 font-bold text-xs rounded-lg px-2 py-1 outline-none text-center"
+                        />
+                        <span className="text-[10px] text-slate-500">(حتى 500 كود بتوقيع فريد)</span>
+                      </div>
+                    )}
+                  </div>
+
                   {/* اسم العميل / النادي */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-300">اسم العميل أو النادي الرياضي:</label>
@@ -940,9 +1182,61 @@ export const AdminPortal: React.FC = () => {
                   </button>
                 </div>
 
-                {/* المعاينة المباشرة للكود المولد والباركود */}
+                {/* المعاينة المباشرة للكود المولد والباركود (فردي أو دفعة جماعية) */}
                 <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 flex flex-col justify-between space-y-4">
-                  {generatedCode ? (
+                  {batchGeneratedCodes.length > 1 ? (
+                    <div className="space-y-4 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>تم توليد دفعة من {batchGeneratedCodes.length} كود بنجاح!</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={copyAllBatchCodes}
+                            className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold flex items-center gap-1 border border-slate-700 cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>{copiedBatchMsg ? 'تم نسخ الكل!' : 'نسخ جميع الأكواد'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={exportBatchToCSV}
+                            className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-emerald-600/20 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>تصدير CSV</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="max-h-80 overflow-y-auto space-y-2 rounded-2xl border border-slate-800 p-2">
+                        {batchGeneratedCodes.map((item, idx) => (
+                          <div key={idx} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between gap-2 hover:border-amber-500/30 transition-colors">
+                            <div className="truncate min-w-0">
+                              <span className="text-[10px] text-slate-500 ml-2 font-mono">#{idx + 1}</span>
+                              <span className="font-mono text-xs text-amber-300 font-bold select-all">{item.code}</span>
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                {item.tier} • ينتهي في {item.expiryDate} {item.isQuadPool ? '• شبكي 1*4' : ''}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.code);
+                                alert(`تم نسخ الكود #${idx + 1}`);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer shrink-0"
+                              title="نسخ هذا الكود"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : generatedCode ? (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
                         <CheckCircle2 className="w-4 h-4" />
@@ -983,7 +1277,7 @@ export const AdminPortal: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={() => copyWhatsApp(ledger[0])}
+                          onClick={() => copyWhatsApp(latestGeneratedRecord || ledger[0])}
                           className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
                         >
                           {copiedMsg ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
@@ -1475,6 +1769,16 @@ export const AdminPortal: React.FC = () => {
                     <option value="CLB8">Pro Club (8 مسارات)</option>
                     <option value="ENTX">Enterprise (10 مسارات)</option>
                   </select>
+
+                  <button
+                    type="button"
+                    onClick={exportLedgerToCSV}
+                    className="py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="تصدير السجل الكامل كملف CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>تصدير CSV</span>
+                  </button>
                 </div>
               </div>
 
@@ -1549,6 +1853,24 @@ export const AdminPortal: React.FC = () => {
                               title="نسخ رسالة واتساب"
                             >
                               <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            {/* تجديد الترخيص وتمديد المدة */}
+                            <button
+                              type="button"
+                              onClick={() => openRenewModal(rec)}
+                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/30 text-amber-300 cursor-pointer transition-colors"
+                              title="تجديد وتمديد فترة الترخيص"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                            </button>
+                            {/* إدارة الأجهزة المفعلة وفك الارتباط */}
+                            <button
+                              type="button"
+                              onClick={() => openDeviceModal(rec)}
+                              className="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/30 text-cyan-300 cursor-pointer transition-colors"
+                              title="عرض الأجهزة وفك الارتباط"
+                            >
+                              <Smartphone className="w-3.5 h-3.5" />
                             </button>
                             {/* حذف كود من السجل في حالة الخطأ */}
                             <button
@@ -2158,6 +2480,257 @@ export const AdminPortal: React.FC = () => {
           {/* ═══════════════════════════════════════════════
               القسم 6: إعدادات الأسعار والمنظومة (Settings)
           ═══════════════════════════════════════════════ */}
+          {activeSection === 'leagues' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <Building2 className="w-6 h-6 text-amber-400" />
+                    <span>إدارة وحذف الرابطات والاتحادات المسجلة بالمنظومة</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    تحكم فائق في حسابات الرابطات المعتمدة، إمكانية حذف أي رابطة غير نشطة مع الحفاظ على رابطة سعيدة كمرجع أساسي.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('هل تريد حذف جميع الرابطات التجريبية وإبقاء رابطة سعيدة فقط كمرجع وحيد؟')) {
+                        portalAuthService.resetToSaidaOnly();
+                        setAllLeagues(portalAuthService.getAllLeagues());
+                        setLeagueDeleteMsg('تم تطهير جميع الرابطات التجريبية وإبقاء رابطة سعيدة كمرجع وحيد بنجاح.');
+                        setTimeout(() => setLeagueDeleteMsg(''), 4000);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-700/60 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                    title="تصفير الرابطات وإبقاء رابطة سعيدة فقط"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>إبقاء رابطة سعيدة فقط 🧹</span>
+                  </button>
+
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-emerald-400 font-bold">
+                    إجمالي الرابطات: {allLeagues.length}
+                  </div>
+                </div>
+              </div>
+
+              {leagueDeleteMsg && (
+                <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{leagueDeleteMsg}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {allLeagues.map((lg) => {
+                  const isSaida = lg.id === 'lg_saida';
+                  return (
+                    <div
+                      key={lg.id}
+                      className="p-5 rounded-3xl bg-slate-950 border border-slate-800/80 shadow-xl space-y-4 hover:border-slate-700 transition"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 flex items-center justify-center text-2xl shadow">
+                            {lg.logoCode || '🏃'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 uppercase">
+                                {lg.shortName}
+                              </span>
+                              {isSaida && (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
+                                  الرابطة الأساسية المعتمدة ⭐
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-sm font-black text-white mt-1">{lg.name}</h3>
+                            <span className="text-xs text-slate-400">{lg.region}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          {isSaida ? (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                              محمية من الحذف
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLeague(lg.id, lg.name)}
+                              className="px-3 py-1.5 rounded-xl bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                              title="حذف الرابطة نهائياً"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>حذف الرابطة</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-400 bg-slate-900/60 p-3 rounded-2xl border border-slate-900 font-mono">
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">اسم المستخدم:</span>
+                          <span className="font-bold text-slate-200">{lg.adminUsername}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">البريد الإلكتروني:</span>
+                          <span className="font-bold text-slate-200 truncate block">{lg.officialEmail}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">رقم الاعتماد:</span>
+                          <span className="font-bold text-amber-400">{lg.accreditationNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">الهاتف:</span>
+                          <span className="font-bold text-slate-200">{lg.phone || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'stats' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <Flag className="w-6 h-6 text-cyan-400" />
+                    <span>إعدادات وتخصيص إحصائيات المنصة الحية (الصفحة الرئيسية)</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    أرقام وإحصائيات حقيقية خاصة برياضة ألعاب القوى فقط، يتحكم فيها مدير النظام وتنعكس فوراً على شريط البوابة العامة.
+                  </p>
+                </div>
+              </div>
+
+              {statsSavedMsg && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{statsSavedMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSavePlatformStats} className="bg-slate-950 border border-slate-800 rounded-3xl p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-300 font-bold flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span>عدد العدائين المسجلين رسمياً:</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={platformStats.totalAthletes}
+                      onChange={e => setPlatformStats(prev => ({ ...prev, totalAthletes: Number(e.target.value) }))}
+                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-300 font-bold flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4 text-amber-400" />
+                      <span>عدد التظاهرات والبطولات المبرمجة:</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={platformStats.totalCompetitions}
+                      onChange={e => setPlatformStats(prev => ({ ...prev, totalCompetitions: Number(e.target.value) }))}
+                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-300 font-bold flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-blue-400" />
+                      <span>عدد النوادي الرياضية المسجلة:</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={platformStats.totalClubs}
+                      onChange={e => setPlatformStats(prev => ({ ...prev, totalClubs: Number(e.target.value) }))}
+                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-300 font-bold flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-purple-400" />
+                      <span>عدد الروابط الولائية المعتمدة:</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={platformStats.totalLeagues}
+                      onChange={e => setPlatformStats(prev => ({ ...prev, totalLeagues: Number(e.target.value) }))}
+                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-300 font-bold flex items-center gap-1.5">
+                      <Award className="w-4 h-4 text-rose-400" />
+                      <span>المشاركات المؤكدة بالنتائج الرسمية:</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={platformStats.totalParticipations}
+                      onChange={e => setPlatformStats(prev => ({ ...prev, totalParticipations: Number(e.target.value) }))}
+                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-300 font-bold flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-cyan-400" />
+                      <span>الموسم الرياضي النشط:</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={platformStats.activeSeason}
+                      onChange={e => setPlatformStats(prev => ({ ...prev, activeSeason: e.target.value }))}
+                      placeholder="2026"
+                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('هل تريد تصفير الإحصائيات وإعادتها للقيم الصفرية؟')) {
+                        platformStatsService.resetStats();
+                        setPlatformStats(platformStatsService.getStats());
+                      }
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold text-xs transition cursor-pointer"
+                  >
+                    إعادة التعيين للافتراضي
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-xs shadow-lg shadow-cyan-950 flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>حفظ وتحديث الإحصائيات الحية 💾</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
           {activeSection === 'settings' && (
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -2471,16 +3044,152 @@ export const AdminPortal: React.FC = () => {
         </main>
       </div>
 
-      {/* نوافذ منظومة العدائين والأندية */}
-      <AthletesDatabaseModal
-        isOpen={isAthletesModalOpen}
-        onClose={() => setIsAthletesModalOpen(false)}
-      />
+        {/* ═══ نافذة تجديد الترخيص (Renewal Modal) ═══ */}
+        {renewModalOpen && renewTargetLicense && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>تجديد وتمديد ترخيص العميل</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setRenewModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-      <ClubsDatabaseModal
-        isOpen={isClubsModalOpen}
-        onClose={() => setIsClubsModalOpen(false)}
-      />
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1 text-xs">
+                <p className="text-slate-400">العميل: <strong className="text-white">{renewTargetLicense.clientName}</strong></p>
+                <p className="text-slate-400">الباقة: <strong className="text-amber-300">{renewTargetLicense.tierName}</strong></p>
+                <p className="text-slate-400">الانتهاء الحالي: <strong className="text-cyan-300 font-mono">{renewTargetLicense.expiryDate}</strong></p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">اختر مدة التمديد الإضافية:</label>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {[
+                    { label: '3 أشهر', val: 3 },
+                    { label: '6 أشهر', val: 6 },
+                    { label: 'سنة كاملة', val: 12 },
+                    { label: 'سنتين', val: 24 }
+                  ].map(opt => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setRenewMonths(opt.val)}
+                      className={`py-2 rounded-xl border text-center transition-all cursor-pointer font-bold ${
+                        renewMonths === opt.val
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
+                          : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {renewResultMsg && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold text-center">
+                  {renewResultMsg}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleExecuteRenewal}
+                  disabled={isRenewing}
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg shadow-amber-500/20 transition-all"
+                >
+                  {isRenewing ? 'جاري تمديد الصلاحية...' : 'تأكيد التجديد الآن ⚡'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRenewModalOpen(false)}
+                  className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ نافذة إدارة الأجهزة وفك الارتباط (Device Management Modal) ═══ */}
+        {deviceModalOpen && deviceTargetLicense && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-cyan-400" />
+                  <span>إدارة الأجهزة وفك الارتباط (Device Slots)</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setDeviceModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs space-y-1">
+                <p className="text-slate-400">الترخيص: <span className="font-mono text-amber-300 font-bold select-all">{deviceTargetLicense.code}</span></p>
+                <p className="text-slate-400">النظام: <span className="text-white font-bold">{deviceTargetLicense.isQuadPool ? 'ترخيص شبكي رباعي 1*4 (حتى 4 هواتف)' : 'ترخيص مقيد بجهاز فردي'}</span></p>
+              </div>
+
+              {deviceActionMsg && (
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold text-center">
+                  {deviceActionMsg}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-300">قائمة الأجهزة المفعلة حالياً:</h4>
+                {isLoadingDevices ? (
+                  <p className="text-xs text-slate-500 text-center py-4">جاري تحميل قائمة الأجهزة...</p>
+                ) : deviceActivationsList.length === 0 ? (
+                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">
+                    لا توجد أجهزة مسجلة حالياً على هذا الكود (جميع الأماكن شاغرة ومتاحة للتفعيل الفوري).
+                  </div>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {deviceActivationsList.map((dev) => (
+                      <div key={dev.id || dev.deviceId} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="font-mono font-bold text-xs text-cyan-400">{dev.deviceId}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{dev.deviceName || dev.platform || 'جهاز تحكيم'}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleUnbindDevice(dev.deviceId)}
+                          className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/30 cursor-pointer transition-colors"
+                        >
+                          فك الارتباط 🔓
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeviceModalOpen(false)}
+                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+                >
+                  إغلاق النافذة
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

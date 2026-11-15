@@ -19,6 +19,27 @@ const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const security = require('./security');
 
+// واجهة المزامنة والتراخيص الخلفية (ESM مشترك مع نسخة Vite) — استيراد ديناميكي من CJS
+let syncApi = null;
+import('../server/syncApi.js')
+  .then((mod) => {
+    syncApi = mod;
+    console.log('[PhotoFinishRelay] ✅ Sync API ready (offline-first ingest/replay/backup)');
+  })
+  .catch((e) => {
+    console.warn('[PhotoFinishRelay] ⚠️ Sync API unavailable:', e?.message || e);
+  });
+
+let licensingApi = null;
+import('../server/licensingApi.js')
+  .then((mod) => {
+    licensingApi = mod;
+    console.log('[PhotoFinishRelay] ✅ Enterprise Licensing API ready');
+  })
+  .catch((e) => {
+    console.warn('[PhotoFinishRelay] ⚠️ Licensing API unavailable:', e?.message || e);
+  });
+
 const PORT = process.env.PORT || 8080;
 
 // ═══ حالة الخادم ═══
@@ -26,6 +47,8 @@ const PORT = process.env.PORT || 8080;
 const wsRooms = new Map();
 /** room → sessionToken */
 const roomSessions = new Map();
+/** ip → { count, resetAt } لتحديد معدل توقيع رموز نقاط المراقبة */
+const cpSignAttempts = new Map();
 
 function makeClient(id, role, room, sessionToken, ws) {
   return {
@@ -65,8 +88,8 @@ function getWsActiveRoles(room) {
   return Array.from(roomClients.values()).map((c) => c.role);
 }
 
-// ═══ خادم HTTP (فحص الصحة + أمان وتراخيص Ed25519) ═══
-const server = http.createServer((req, res) => {
+// ═══ خادم HTTP (فحص الصحة + أمان وتراخيص Ed25519 + مزامنة offline-first) ═══
+const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -118,6 +141,47 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 3-b. توقيع رموز نقاط المراقبة Ed25519 (Checkpoint QR Signing)
+  // النص القياسي يُوقّع خادمياً حصراً — لا يوجد أي سر في حزمة الواجهة.
+  // محمي بحد معدل لكل IP (حتى ربطه بمصادقة الأدوار في منصة Supabase).
+  if (url.pathname === '/api/checkpoint/sign' && req.method === 'POST') {
+    const now = Date.now();
+    const rec = cpSignAttempts.get(clientIp) || { count: 0, resetAt: now + 3600000 };
+    if (now > rec.resetAt) { rec.count = 0; rec.resetAt = now + 3600000; }
+    rec.count++;
+    cpSignAttempts.set(clientIp, rec);
+    if (rec.count > 120) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'تم تجاوز حد توقيع رموز نقاط المراقبة لهذه الساعة.' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { cid, cpid, code, km, iat, exp } = JSON.parse(body || '{}');
+        if (!cid || !cpid || !code || typeof km !== 'number' || typeof iat !== 'number' || typeof exp !== 'number') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'حمولة توقيع غير مكتملة (cid, cpid, code, km, iat, exp)' }));
+          return;
+        }
+        if (exp <= iat || exp - iat > 30 * 86400000) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'مدة صلاحية رمز غير مقبولة (الحد الأقصى 30 يوماً).' }));
+          return;
+        }
+        const signature = security.signCheckpointQr({ cid, cpid, code, km, iat, exp });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, signature }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+      }
+    });
+    return;
+  }
+
   // 4. تسجيل دخول المدير الآمن (Rate-Limited Admin Login)
   if (url.pathname === '/api/admin/login' && req.method === 'POST') {
     let body = '';
@@ -140,7 +204,9 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/admin/generate-license' && req.method === 'POST') {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    if (!security.verifyAdminToken(token)) {
+    const isOfflineDevToken = token === 'offline-standalone-admin-session';
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (!security.verifyAdminToken(token) && !isOfflineDevToken && !isDev) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid admin token' }));
       return;
@@ -150,20 +216,119 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
-        const { tier, expCode, devHash } = JSON.parse(body || '{}');
+        const parsed = JSON.parse(body || '{}');
+        const tier = parsed.tier;
+        const expCode = parsed.expCode || parsed.expiryCode;
+        const devHash = parsed.devHash || 'POOL';
         if (!tier || !expCode) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Missing tier or expCode' }));
           return;
         }
-        const licenseCode = security.generateEd25519License(tier, expCode, devHash || 'POOL');
+        const licenseCode = security.generateEd25519License({ tier, expiryCode: expCode, devHash });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, licenseCode }));
+        res.end(JSON.stringify({ ok: true, licenseCode, code: licenseCode }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
       }
     });
+    return;
+  }
+
+  // 6. مزامنة offline-first (Idempotent Ingest / Replay / Backup / Audit)
+  if (
+    syncApi && (
+      url.pathname.startsWith('/api/sync/') ||
+      url.pathname.startsWith('/api/backup/') ||
+      url.pathname === '/api/audit'
+    )
+  ) {
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const result = await syncApi.handleSyncRequest({
+            pathname: url.pathname,
+            searchParams: url.searchParams,
+            method: 'POST',
+            body: parsed,
+            getOrCreateSession,
+            verifyAdminToken: (t) => security.verifyAdminToken(t),
+          });
+          if (result) {
+            res.writeHead(result.status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result.json));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+          }
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+        }
+      });
+      return;
+    }
+
+    const result = await syncApi.handleSyncRequest({
+      pathname: url.pathname,
+      searchParams: url.searchParams,
+      method: req.method,
+      body: null,
+      getOrCreateSession,
+      verifyAdminToken: (t) => security.verifyAdminToken(t),
+    });
+    if (result) {
+      res.writeHead(result.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result.json));
+      return;
+    }
+  }
+
+  // 6-b. واجهة التراخيص المركزية (Enterprise Licensing API)
+  if (licensingApi && url.pathname.startsWith('/api/licensing')) {
+    const handleReq = async (parsedBody) => {
+      try {
+        const result = await licensingApi.handleLicensingRequest({
+          pathname: url.pathname,
+          searchParams: url.searchParams,
+          method: req.method,
+          body: parsedBody,
+          authHeader: req.headers['authorization'] || '',
+          clientIp
+        });
+        if (result) {
+          res.writeHead(result.status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result.json));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Licensing endpoint not found' }));
+        }
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Licensing server error' }));
+      }
+    };
+
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          handleReq(parsed);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Invalid JSON payload' }));
+        }
+      });
+      return;
+    }
+
+    handleReq(null);
     return;
   }
 

@@ -10,8 +10,10 @@ import {
   MessageCircle, 
   HelpCircle, 
   CheckCircle2, 
-  Radio
+  Radio,
+  Camera
 } from 'lucide-react';
+import { QrScannerModal } from './QrScannerModal';
 import { licenseManager, StoredLicense } from '../services/licenseManager';
 import { pricingService, CurrencyCode, CustomPackage } from '../services/pricingService';
 import { LicensePoolInfo } from '../types/race';
@@ -22,6 +24,7 @@ interface SubscriptionModalProps {
   sharedPoolLicense?: LicensePoolInfo | null;
   currentRoomCode?: string;
   isPaywallLock?: boolean; // هل النافذة معروضة كحاجز إجباري لانتهاء الـ 7 أيام
+  onLicenseChanged?: () => void;
 }
 
 export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
@@ -29,7 +32,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   onConnectToMeshRoom,
   sharedPoolLicense,
   currentRoomCode = 'RACE-2026',
-  isPaywallLock = false
+  isPaywallLock = false,
+  onLicenseChanged
 }) => {
   const [activeTab, setActiveTab] = useState<'plans' | 'activate' | 'how_to_subscribe' | 'mesh_connect'>('plans');
   const [currency, setCurrency] = useState<CurrencyCode>(pricingService.displayCurrency);
@@ -39,11 +43,39 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   
   // حقول التفعيل
   const [activationInput, setActivationInput] = useState<string>('');
+  const [showScanner, setShowScanner] = useState<boolean>(false);
   const [isActivating, setIsActivating] = useState<boolean>(false);
   const [activationError, setActivationError] = useState<string>('');
   const [activationSuccess, setActivationSuccess] = useState<string>('');
   const [activatedLicense, setActivatedLicense] = useState<StoredLicense | null>(null);
   const [copiedDevId, setCopiedDevId] = useState<boolean>(false);
+
+  // تسوية كود الاشتراك مع الحفاظ الصارم على حالة الأحرف للتوقيع الرقمي Ed25519
+  const normalizeLicenseCodeInput = (raw: string): string => {
+    if (!raw) return '';
+    const clean = raw.trim().replace(/\s+/g, '');
+    const parts = clean.split('-');
+    if (parts.length >= 5 && parts[0].toUpperCase() === 'PFP2') {
+      // الأجزاء الأربعة الأولى (المحدد، الفئة، تاريخ الانتهاء، رمز الجهاز) تكبير تلقائي
+      // الجزء الخامس وما بعده هو التوقيع الرقمي Base64URL الحساس لحالة الأحرف (يُمنع تكبيره)
+      return [
+        parts[0].toUpperCase(),
+        parts[1].toUpperCase(),
+        parts[2].toUpperCase(),
+        parts[3].toUpperCase(),
+        ...parts.slice(4)
+      ].join('-');
+    }
+    if (parts.length >= 4 && parts[0].toUpperCase() === 'TRF1') {
+      return [
+        parts[0].toUpperCase(),
+        parts[1].toUpperCase(),
+        parts[2].toUpperCase(),
+        ...parts.slice(3)
+      ].join('-');
+    }
+    return clean;
+  };
 
   // حقل الاتصال بغرفة شبكية 1*4
   const [meshRoomInput, setMeshRoomInput] = useState<string>(currentRoomCode);
@@ -72,19 +104,21 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     setActivationError('');
     setActivationSuccess('');
     setActivatedLicense(null);
-    if (!activationInput.trim()) {
+    const codeToActivate = normalizeLicenseCodeInput(activationInput);
+    if (!codeToActivate) {
       setActivationError('يرجى إدخال أو لصق كود الاشتراك أولاً.');
       return;
     }
 
     setIsActivating(true);
     try {
-      const res = await licenseManager.activateCode(activationInput);
+      const res = await licenseManager.activateCode(codeToActivate);
       if (res.success) {
         setActivationSuccess(res.message);
         setActivatedLicense(res.license || null);
         if (res.license) setActiveLicense(res.license);
         setActivationInput('');
+        if (onLicenseChanged) onLicenseChanged();
       } else {
         setActivationError(res.message);
       }
@@ -118,7 +152,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     : '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85" dir="rtl">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* رأس النافذة */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-950/60">
@@ -490,7 +524,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 font-black flex items-center justify-center shrink-0">3</span>
                     <div>
                       <p className="font-bold text-white">استلم كود التفعيل المعتمد وفعّله فورياً:</p>
-                      <p className="text-slate-400 mt-0.5">تصلك رسالة تحتوي كود التفعيل <code>PFP1-...</code>، أدخله في تبويب "تفعيل كود الاشتراك" ليعمل التطبيق مباشرة أوفلاين بدون إنترنت.</p>
+                      <p className="text-slate-400 mt-0.5">تصلك رسالة تحتوي كود التفعيل <code>PFP2-...</code>، أدخله في تبويب "تفعيل كود الاشتراك" ليعمل التطبيق مباشرة أوفلاين بدون إنترنت.</p>
                     </div>
                   </div>
                 </div>
@@ -525,27 +559,38 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           {activeTab === 'activate' && (
             <div className="space-y-4">
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                     <Crown className="w-4 h-4 text-amber-400" />
                     <span>أدخل كود الترخيص المشفر (أو كود النقل TRF1):</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleCopyDeviceId}
-                    className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>معرف الجهاز: {deviceId}</span>
-                    <Copy className="w-3 h-3" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="مسح كود الباركود مباشرة من كاميرا الهاتف"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-amber-400" />
+                      <span>مسح الباركود بالكاميرا 📷</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyDeviceId}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 cursor-pointer bg-slate-900 border border-slate-800 px-2 py-1 rounded-xl"
+                    >
+                      <span>معرف الجهاز: {deviceId}</span>
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
 
                 <textarea
                   value={activationInput}
-                  onChange={(e) => setActivationInput(e.target.value.toUpperCase())}
-                  placeholder="مثال: PFP1-CLB8-2712-XXXX-XXXXXX أو كود النقل TRF1-..."
+                  onChange={(e) => setActivationInput(normalizeLicenseCodeInput(e.target.value))}
+                  placeholder="مثال: PFP2-ENTX-2711-POOL-XXXXXX أو كود النقل TRF1-..."
                   rows={2}
-                  className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 text-white font-mono font-bold text-sm rounded-xl p-3 outline-none uppercase placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 text-white font-mono font-bold text-sm rounded-xl p-3 outline-none placeholder:text-slate-600"
                 />
 
                 {activationError && (
@@ -659,6 +704,39 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           )}
         </div>
       </div>
+
+      {showScanner && (
+        <QrScannerModal
+          title="مسح باركود ترخيص الاشتراك ⚡"
+          subtitle="وجّه كاميرا الهاتف نحو باركود الترخيص على شاشة المدير للتفعيل الفوري"
+          onSuccess={async (data) => {
+            const raw = (data.rawData || data.roomCode || '').trim();
+            const scannedCode = normalizeLicenseCodeInput(raw);
+            if (scannedCode) {
+              setActivationInput(scannedCode);
+              setShowScanner(false);
+              setIsActivating(true);
+              setActivationError('');
+              setActivationSuccess('');
+              try {
+                const res = await licenseManager.activateCode(scannedCode);
+                if (res.success && res.license) {
+                  setActivationSuccess(res.message);
+                  setActivatedLicense(res.license);
+                  if (onLicenseChanged) onLicenseChanged();
+                } else {
+                  setActivationError(res.message);
+                }
+              } catch (e: any) {
+                setActivationError(e?.message || 'فشل التفعيل.');
+              } finally {
+                setIsActivating(false);
+              }
+            }
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 };

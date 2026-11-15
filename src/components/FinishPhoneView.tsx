@@ -1,13 +1,15 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, SwitchCamera, Flashlight, Sliders, Award, Crosshair, RotateCcw, Zap, BellRing, Film, Globe, LocateFixed, AlertTriangle, MapPin } from 'lucide-react';
+import { Camera, Timer, SwitchCamera, Flashlight, Sliders, Award, Crosshair, RotateCcw, Zap, BellRing, Film, Globe, LocateFixed, AlertTriangle, MapPin } from 'lucide-react';
 import { Runner, RaceStatus, RaceSettings } from '../types/race';
 import { opticalGateDetector, OpticalLaneResult } from '../services/motionDetector';
 import { slitScanEngine } from '../services/slitScanEngine';
 import { athleticsAudio } from '../services/audioService';
 import { burstCaptureService } from '../services/burstCaptureService';
+import { LaneTapTimingDeck } from './athletics/LaneTapTimingDeck';
 import { getPlacementOption, CAMERA_PLACEMENT_OPTIONS } from '../services/cameraPlacement';
 
 interface FinishPhoneViewProps {
+  roomCode?: string;
   raceStatus: RaceStatus;
   runners: Runner[];
   clockTimeMs: number;
@@ -25,6 +27,7 @@ interface FinishPhoneViewProps {
 }
 
 export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
+  roomCode = 'RACE-100',
   raceStatus,
   runners,
   clockTimeMs,
@@ -54,6 +57,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
   const [cameraError, setCameraError] = useState<string>('');
   const [showCalibration, setShowCalibration] = useState<boolean>(false);
   const [showPlacementGuide, setShowPlacementGuide] = useState<boolean>(false);
+  const [finishMode, setFinishMode] = useState<'camera' | 'lane_tap'>('camera');
 
   // حالات التصوير المتتالي فائق السرعة (Burst Capture)
   const [isBurstActive, setIsBurstActive] = useState<boolean>(false);
@@ -376,6 +380,46 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
 
   return (
     <div className="w-full max-w-lg mx-auto p-2 sm:p-4 space-y-2.5 sm:space-y-3" dir="rtl">
+      {/* ═══ شريط تبديل نمط خط النهاية: كاميرا المسح الشريطي vs كبس الأورقة المباشر ═══ */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-between text-xs shadow-md">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-300 hidden sm:inline">نمط التحكيم:</span>
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setFinishMode('camera')}
+              className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                finishMode === 'camera'
+                  ? 'bg-cyan-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>كاميرا المسح الشريطي 📸</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFinishMode('lane_tap')}
+              className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                finishMode === 'lane_tap'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Timer className="w-3.5 h-3.5" />
+              <span>كبس الأورقة المباشر ⏱️</span>
+            </button>
+          </div>
+        </div>
+        <span className="text-[11px] font-mono text-cyan-400 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+          غرفة: {roomCode}
+        </span>
+      </div>
+
+      {finishMode === 'lane_tap' ? (
+        <LaneTapTimingDeck roomCode={roomCode} />
+      ) : (
+        <>
       {/* نافذة الكاميرا وخطوط الأروقة وخط النهاية */}
       <div 
         onClick={() => {
@@ -529,14 +573,14 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
 
         {/* رأس مؤشرات الكاميرا في الأعلى */}
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-auto">
-          <div className="bg-black/70 backdrop-blur-md px-3 py-1 rounded-full text-white font-mono font-bold text-xs flex items-center gap-2 border border-white/10 shadow-lg">
+          <div className="bg-black/85 px-3 py-1 rounded-full text-white font-mono font-bold text-xs flex items-center gap-2 border border-white/20 shadow-lg">
             <span className={`w-2.5 h-2.5 rounded-full ${raceStatus === 'racing' ? 'bg-red-500 animate-ping' : 'bg-emerald-400'}`} />
             <span>{formatClock(clockTimeMs)}</span>
           </div>
 
           {/* مؤشر التصوير المتتالي فائق السرعة فور وصول أول عداء */}
           {isBurstActive && (
-            <div className="bg-red-600/90 backdrop-blur-md px-2.5 py-1 rounded-full text-white font-black text-[11px] flex items-center gap-1.5 border border-yellow-300 animate-pulse shadow-lg shadow-red-600/50">
+            <div className="bg-red-600 px-2.5 py-1 rounded-full text-white font-black text-[11px] flex items-center gap-1.5 border border-yellow-300 animate-pulse shadow-lg shadow-red-600/50">
               <span className="w-2 h-2 rounded-full bg-yellow-300 animate-ping" />
               <span>📸 تصوير متتالي فائق ({burstFrameCount} إطار)</span>
             </div>
@@ -546,7 +590,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             {onOpenInternetBridge && (
               <button
                 onClick={onOpenInternetBridge}
-                className="p-1.5 rounded-lg bg-black/60 border border-white/10 text-cyan-300 hover:text-cyan-200 backdrop-blur-md flex items-center gap-1 text-[11px] font-bold"
+                className="p-1.5 rounded-lg bg-black/80 border border-white/20 text-cyan-300 hover:text-cyan-200 flex items-center gap-1 text-[11px] font-bold"
                 title="جسر الإنترنت للمسافات البعيدة"
               >
                 <Globe className="w-3.5 h-3.5 text-cyan-400" />
@@ -555,7 +599,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             )}
             <button
               onClick={toggleTorch}
-              className={`p-1.5 rounded-lg border backdrop-blur-md ${
+              className={`p-1.5 rounded-lg border ${
                 torchEnabled ? 'bg-amber-500 border-amber-400 text-black' : 'bg-black/60 border-white/10 text-white'
               }`}
               title="فلاش الكاميرا"
@@ -564,14 +608,14 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             </button>
             <button
               onClick={() => setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')}
-              className="p-1.5 rounded-lg bg-black/60 border border-white/10 text-white backdrop-blur-md"
+              className="p-1.5 rounded-lg bg-black/80 border border-white/20 text-white"
               title="تبديل الكاميرا"
             >
               <SwitchCamera className="w-4 h-4" />
             </button>
             <button
               onClick={() => setShowCalibration(!showCalibration)}
-              className={`p-1.5 rounded-lg border backdrop-blur-md ${
+              className={`p-1.5 rounded-lg border ${
                 showCalibration ? 'bg-cyan-500 border-cyan-400 text-black' : 'bg-black/60 border-white/10 text-white'
               }`}
               title="محاذاة خط النهاية"
@@ -580,7 +624,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             </button>
             <button
               onClick={() => setShowPlacementGuide(!showPlacementGuide)}
-              className={`p-1.5 rounded-lg border backdrop-blur-md ${
+              className={`p-1.5 rounded-lg border ${
                 showPlacementGuide ? 'bg-emerald-500 border-emerald-400 text-black' : 'bg-black/60 border-white/10 text-emerald-300'
               }`}
               title="دليل وضعية الكاميرا (دقة التوقيت)"
@@ -590,7 +634,7 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
             {onOpenSettings && (
               <button
                 onClick={onOpenSettings}
-                className="p-1.5 rounded-lg bg-black/60 border border-white/10 text-amber-400 hover:text-amber-300 backdrop-blur-md"
+                className="p-1.5 rounded-lg bg-black/80 border border-white/20 text-amber-400 hover:text-amber-300"
                 title="إعدادات السباق والأروقة"
               >
                 <Sliders className="w-4 h-4 text-amber-400" />
@@ -930,6 +974,10 @@ export const FinishPhoneView: React.FC<FinishPhoneViewProps> = ({
           })}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };
+
+export default FinishPhoneView;

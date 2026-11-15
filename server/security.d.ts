@@ -1,5 +1,6 @@
 export function verifyAdminLogin(password: string, clientIp: string): { success: boolean; status: number; error?: string; adminToken?: string; token?: string };
 export function verifyAdminToken(token: string): boolean;
+export function generateEd25519License(params: { tier: string; expiryCode?: string; expCode?: string; devHash?: string }): string;
 export function generateEd25519License(tier: string, expiryDateStr: string, deviceId?: string): string;
 export function verifyEd25519Signature(payload: string, signatureBuffer: Buffer): boolean;
 export function getPublicKeyBase64(): string;

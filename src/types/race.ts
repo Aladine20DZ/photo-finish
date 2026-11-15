@@ -40,7 +40,7 @@ export interface Runner {
 }
 
 // الأدوار الرسمية للنظام: هاتف البداية، هاتف الكاميرا، هاتف التحكيم، غرفة النداء، حكم نقطة المراقبة، وإدارة ألعاب القوى
-export type PhoneRole = 'start' | 'finish' | 'judge' | 'chambre_dappel' | 'checkpoint_judge' | 'athletics_manager' | null;
+export type PhoneRole = 'start' | 'finish' | 'judge' | 'chambre_dappel' | 'checkpoint_judge' | 'athletics_manager' | 'manual_timing' | null;
 
 export type RaceStatus = 
   | 'idle'
@@ -289,6 +289,29 @@ export interface AthleticsViolationPayload {
   [key: string]: any;
 }
 
+export interface AthleticsPurgeCommandPayload {
+  commandId: string;
+  competitionId: string;
+  issuedAt: number;
+  issuedBy: string;
+  force?: boolean;
+  [key: string]: any;
+}
+
+export interface AthleticsPurgeAckPayload {
+  commandId: string;
+  competitionId: string;
+  deviceId: string;
+  judgeId?: string;
+  judgeRole?: string;
+  status: 'purged_successfully' | 'blocked_pending_sync' | 'error';
+  deletedItemsCount?: number;
+  unsyncedCount?: number;
+  message?: string;
+  timestamp: number;
+  [key: string]: any;
+}
+
 export interface NetworkMessagePayloadMap {
   SYNC_PING: { pingId?: string; clientTime?: number; [key: string]: any } | undefined;
   SYNC_PONG: { originalSenderTime?: any; clientTime?: number; serverTime?: number; [key: string]: any } | undefined;
@@ -322,6 +345,8 @@ export interface NetworkMessagePayloadMap {
   ATHLETICS_JUDGE_HEARTBEAT: AthleticsJudgeHeartbeatPayload;
   ATHLETICS_COMPETITION_SYNC: AthleticsCompetitionSyncPayload;
   ATHLETICS_VIOLATION: AthleticsViolationPayload;
+  ATHLETICS_PURGE_COMMAND: AthleticsPurgeCommandPayload;
+  ATHLETICS_PURGE_ACK: AthleticsPurgeAckPayload;
 }
 
 export type NetworkMessageType = keyof NetworkMessagePayloadMap;

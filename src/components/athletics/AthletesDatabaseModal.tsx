@@ -221,7 +221,7 @@ export const AthletesDatabaseModal: React.FC<AthletesDatabaseModalProps> = ({ is
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 md:p-4 text-white overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 md:p-4 text-white overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
@@ -424,7 +424,7 @@ export const AthletesDatabaseModal: React.FC<AthletesDatabaseModalProps> = ({ is
       {/* نافذة إضافة / تعديل العداء مع كشف التكرار اللحظي */}
       {/* ═══════════════════════════════════════════════════ */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl p-6 text-right max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
               <div className="flex items-center gap-2 font-bold text-lg text-white">
@@ -669,7 +669,7 @@ export const AthletesDatabaseModal: React.FC<AthletesDatabaseModalProps> = ({ is
       {/* نافذة عرض وإضافة الأرقام القياسية الشخصية (PB / SB) */}
       {/* ═══════════════════════════════════════════════════ */}
       {viewingRecordsAthlete && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl shadow-2xl p-6 text-right max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-2">

@@ -18,9 +18,17 @@
 import mqtt, { MqttClient } from 'mqtt';
 import Peer, { DataConnection } from 'peerjs';
 import { NetworkPeerMessage, PhoneRole } from '../types/race';
-import { isMessagePermitted, computeMessageHmac } from './securityService';
+import {
+  isMessagePermitted,
+  computeMessageHmac,
+  verifyMessageHmac,
+  encryptJsonPayload,
+  decryptJsonPayload,
+  throttledSecurityLog
+} from './securityService';
+import { syncQueueService } from './syncQueueService';
 
-export type ConnectionMode = 'local_ws' | 'cloud_mqtt' | 'webrtc_bridge' | 'local_hub' | 'local_broadcast' | 'dual_sync' | 'internet_bridge' | 'disconnected';
+export type ConnectionMode = 'local_ws' | 'cloud_mqtt' | 'webrtc_bridge' | 'local_hub' | 'local_broadcast' | 'dual_sync' | 'internet_bridge' | 'sync_replay' | 'disconnected';
 
 export interface ConnectionQuality {
   localWsConnected: boolean;
@@ -92,7 +100,7 @@ export class AthleticsNetworkService {
       this.broadcastChannel = new BroadcastChannel('athletics_photo_finish_v4');
       this.broadcastChannel.onmessage = (event) => {
         if (event.data && this.onMessageCallback) {
-          this.handleIncomingMessage(event.data, 'local_broadcast');
+          void this.handleIncomingMessage(event.data, 'local_broadcast');
         }
       };
     } catch (e) {
@@ -153,7 +161,24 @@ export class AthleticsNetworkService {
 
     // 6. مزامنة التوقيت المتقدمة
     this.startTimeSync();
+
+    // 7. طابور المزامنة الدائم (offline-first: صفر فقدان/تكرار بعد الانقطاع)
+    syncQueueService.configure(this.roomCode, this.sessionToken);
+    syncQueueService.setPullCallback((msg) => {
+      // رسائل الاسترجاع من الخادم تعبر البوابة الأمنية نفسها (توقيع/مصفوفة/إلغاء تكرار)
+      void this.handleIncomingMessage(msg, 'sync_replay');
+    });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleNetworkOnline);
+    }
   }
+
+  private handleNetworkOnline = () => {
+    // العودة من الانقطاع: ادفع ما تراكم + اسحب ما فاتنا من الخادم
+    syncQueueService.configure(this.roomCode, this.sessionToken);
+    void syncQueueService.flush(true);
+    void syncQueueService.pullReplay(true);
+  };
 
   // ═══════════════════════════════════════════════════
   // ██ الطبقة 1: WebSocket المحلي (الأساسي)       ██
@@ -197,10 +222,16 @@ export class AthleticsNetworkService {
             this.sessionToken = data.sessionToken || this.sessionToken;
             this.connectedRoles = data.connectedRoles || [];
             this.localWsConnected = true;
+            syncQueueService.configure(this.roomCode, this.sessionToken);
             this.updateConnectionState();
 
+            // عودة الاتصال المحلي: ادفع رصيد الطابور + عوّض أي فجوة زمنية
+            void syncQueueService.flush(true);
+            void syncQueueService.pullReplay();
+
             // طلب مزامنة الحالة من بقية الهواتف
-            this.sendViaLocalWs({
+            // (عبر sendMessage ليُوقّع بـ HMAC ويحمل معرف رسالة فريداً)
+            void this.sendMessage({
               type: 'REQUEST_STATE_SYNC',
               timestamp: Date.now(),
               senderTime: Date.now(),
@@ -233,7 +264,7 @@ export class AthleticsNetworkService {
           }
 
           // رسالة عادية
-          this.handleIncomingMessage(data, 'local_ws');
+          void this.handleIncomingMessage(data, 'local_ws');
         } catch (e) {
           console.warn('[WS] Parse error:', e);
         }
@@ -317,7 +348,7 @@ export class AthleticsNetworkService {
           const parsed = JSON.parse(payload.toString());
           // تجاهل الرسائل الصادرة من نفس الجهاز
           if (parsed._senderId === this.myAddress) return;
-          this.handleIncomingMessage(parsed, 'cloud_mqtt');
+          void this.handleIncomingMessage(parsed, 'cloud_mqtt');
         } catch (e) {
           console.warn('[MQTT] Parse error:', e);
         }
@@ -440,7 +471,7 @@ export class AthleticsNetworkService {
             this.updateConnectionState();
             return;
           }
-          this.handleIncomingMessage(parsed, 'local_hub');
+          void this.handleIncomingMessage(parsed, 'local_hub');
         } catch (e) {}
       };
 
@@ -551,7 +582,7 @@ export class AthleticsNetworkService {
     });
 
     conn.on('data', (data: any) => {
-      this.handleIncomingMessage(data, 'webrtc_bridge');
+      void this.handleIncomingMessage(data, 'webrtc_bridge');
     });
 
     conn.on('close', () => {
@@ -589,6 +620,9 @@ export class AthleticsNetworkService {
       } catch {}
     }
 
+    // التخزين الدائم قبل الإرسال (offline-first): رسالة رسمية تبقى حتى تصل للخادم
+    try { syncQueueService.enqueue(enriched); } catch { /* لا يُعطل الإرسال أبداً */ }
+
     const isCritical = ['START_GUN', 'RECALL_GUN', 'LANE_FINISH', 'RACE_COMPLETE', 'ON_MARKS', 'SET'].includes(msg.type);
 
     // 1. WebSocket المحلي (الأسرع — 1-3ms)
@@ -610,12 +644,21 @@ export class AthleticsNetworkService {
       return;
     }
 
-    // 3. MQTT السحابي (للرسائل العامة أو كاحتياطي)
+    // 3. MQTT السحابي (للرسائل العامة أو كاحتياطي) — الحمولة مشفرة AES-GCM
+    // الوسيط العام (broker.emqx.io) لا يستطيع قراءة المحتوى أو تزويره
     if (this.mqttClient && this.mqttConnected) {
       try {
         const sessionScope = (this.sessionToken || 'GLOBAL').slice(0, 8);
         const topic = `pfp/rooms/${this.roomCode}/${sessionScope}/events`;
-        this.mqttClient.publish(topic, JSON.stringify(enriched), { qos: 0 });
+        let wirePayload: string;
+        if (this.sessionToken) {
+          const envelope = await encryptJsonPayload(this.sessionToken, enriched);
+          wirePayload = JSON.stringify(envelope || enriched);
+        } else {
+          // بلا رمز جلسة لا يوجد مفتاح مشتق — تُرسل نصياً (الغرف المفتوحة التجريبية)
+          wirePayload = JSON.stringify(enriched);
+        }
+        this.mqttClient.publish(topic, wirePayload, { qos: 0 });
       } catch (e) {
         console.warn('[MQTT] Publish notice:', e);
       }
@@ -639,15 +682,75 @@ export class AthleticsNetworkService {
   }
 
   // ═══════════════════════════════════════════════════
-  // ██ معالجة الرسائل الواردة                        ██
+  // ██ معالجة الرسائل الواردة (بوابة أمنية أولاً)    ██
   // ═══════════════════════════════════════════════════
 
-  private handleIncomingMessage(msg: any, _source?: ConnectionMode) {
+  /**
+   * البوابة الأمنية الموحدة لكل رسالة واردة من أي قناة:
+   * 1) فك تشفير حمولات MQTT المشفرة (AES-GCM) عند توفر رمز الجلسة.
+   * 2) التحقق من توقيع HMAC للرسائل الموقعة — أي تلاعب يُرفض ويُدوَّن.
+   * 3) مصفوفة صلاحيات الأدوار — رسالة غير مصرح بها تُرفض وتُدوَّن.
+   * الرسائل المرفقة من الخادم (WS_WELCOME...) بلا دور مُرسل فتتجاوز البوابة.
+   */
+  private async handleIncomingMessage(msg: any, _source?: ConnectionMode) {
     if (!msg || !msg.type) return;
 
-    // فحص مصفوفة صلاحيات الأدوار الميدانية (Role Permission Matrix)
+    // ── 1) فك التشفير: مغلف MQTT المشفر (AES-GCM مشتق من رمز الجلسة) ──
+    if (msg._enc === 'A256GCM') {
+      if (!this.sessionToken) {
+        throttledSecurityLog('SEC_MQTT_ENVELOPE_NO_SESSION', {
+          reason: `مغلف مشفر بلا رمز جلسة محلي — تجاهل (${msg.iv ? 'iv موجود' : 'لا iv'})`,
+          target: 'cloud_mqtt'
+        });
+        return;
+      }
+      const decrypted = await decryptJsonPayload(this.sessionToken, msg);
+      if (!decrypted) {
+        // فشل فك التشفير = رسالة من غرفة أخرى أو محاولة حقن
+        throttledSecurityLog('SEC_MQTT_DECRYPT_FAIL', {
+          reason: 'فشل فك تشفير مغلف MQTT — مفتاح جلسة غير مطابق أو حمولة مسمومة',
+          target: 'cloud_mqtt'
+        });
+        return;
+      }
+      msg = decrypted;
+      if (!msg || !msg.type) return;
+      if (msg._senderId === this.myAddress) return; // صدى رسالتنا بعد فك التشفير
+    }
+
+    // ── 2) التحقق من توقيع HMAC (للرسائل التي تحمل دور مُرسل) ──
+    if (msg._senderRole && msg._sig && this.sessionToken) {
+      const sigOk = await verifyMessageHmac(
+        this.sessionToken,
+        msg.type,
+        msg.timestamp || 0,
+        String(msg._sig)
+      );
+      if (!sigOk) {
+        throttledSecurityLog('SEC_HMAC_REJECT', {
+          actorRole: msg._senderRole as PhoneRole,
+          reason: `توقيع HMAC غير صالح للرسالة ${msg.type} — رفض ومنع`,
+          target: msg._senderId || 'unknown'
+        });
+        return;
+      }
+    } else if (msg._senderRole && !msg._sig && _source === 'local_ws' && this.sessionToken) {
+      // على الشبكة المحلية المغلقة كل الأجهزة تعرف رمز الجلسة، فالرسالة غير الموقعة تعتبر دخيلاً
+      throttledSecurityLog('SEC_UNSIGNED_PEER_MSG', {
+        actorRole: msg._senderRole as PhoneRole,
+        reason: `رسالة زميل غير موقعة على WS المحلي (${msg.type}) — رفض`,
+        target: msg._senderId || 'unknown'
+      });
+      return;
+    }
+
+    // ── 3) مصفوفة صلاحيات الأدوار الميدانية (Role Permission Matrix) ──
     if (msg._senderRole && !isMessagePermitted(msg._senderRole as PhoneRole, msg.type)) {
-      console.warn(`[Security] تم حظر رسالة غير مصرح بها: ${msg.type} من دور: ${msg._senderRole}`);
+      throttledSecurityLog('SEC_ROLE_MATRIX_REJECT', {
+        actorRole: msg._senderRole as PhoneRole,
+        reason: `حظر رسالة غير مصرح بها من دور «${msg._senderRole}»`,
+        target: msg.type
+      });
       return;
     }
 
@@ -810,6 +913,12 @@ export class AthleticsNetworkService {
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
     if (this.timeSyncInterval) clearInterval(this.timeSyncInterval);
     if (this.wsReconnectTimer) clearTimeout(this.wsReconnectTimer);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleNetworkOnline);
+    }
+
+    // قبل الانفصال: حاول دفع الرصيد المتراكم (لا يمنع الإغلاق أبداً)
+    try { void syncQueueService.flush(true); } catch {}
 
     if (this.localWs) {
       try { this.localWs.close(); } catch (e) {}

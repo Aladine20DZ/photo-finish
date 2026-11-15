@@ -1,91 +1,77 @@
 /**
- * PHOTO FINISH PRO AI — Global Navigation Shell & Header (Upgraded)
+ * PHOTO FINISH PRO AI — Global Navigation Shell & Header
  * Elite Athletics Federation Design: World Athletics / Diamond League Aesthetics.
  * Dual-tier layout: Live Event Ribbon + Official Federation Navbar.
+ * Fully restored to the authentic dark athletics layout and colors:
+ * - Deep midnight slate (#020617) with vibrant athletics emerald (#10B981) and gold (#F59E0B) accents.
+ * - Top Ribbon: Live event ticker, venue, official clock, league selector dropdown with registration,
+ *   offline/cloud indicator, manual timing button, theme switcher, duty code / portal login, and language switcher.
+ * - Bottom Tier: Federation brand logo, official navigation tabs with glowing active pill, and field timing CTA.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
   Globe, 
   Shield, 
-  Users, 
   Timer, 
-  Cpu, 
-  Settings, 
   Cloud, 
-  ChevronDown,
   Radio,
-  CheckCircle2,
-  Search,
-  X,
-  ArrowRight,
   Sun,
   Moon,
   Sunset,
   ScanLine,
-  PlusCircle,
-  Key
+  Key,
+  Calendar,
+  ArrowRight,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useTranslation } from '../../services/i18nService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
-import { portalAuthService, PortalType, PortalSession, RegisteredLeague } from '../../services/portalAuthService';
+import { portalAuthService, PortalType, PortalSession } from '../../services/portalAuthService';
 
-export type NavTab = 'public' | 'league' | 'coach' | 'competition' | 'analytics' | 'admin';
-
-export interface LeagueOption {
-  id: string;
-  name: string;
-  shortName: string;
-  region: string;
-  logoCode: string;
-}
+export type NavTab = 
+  | 'public' 
+  | 'competitions' 
+  | 'competitions-bureau'
+  | 'entries'
+  | 'judges-office'
+  | 'planning'
+  | 'league' 
+  | 'coach' 
+  | 'competition' 
+  | 'analytics' 
+  | 'admin' 
+  | 'results' 
+  | 'design-system' 
+  | 'login';
 
 interface NavShellProps {
   currentTab: NavTab;
   onTabChange: (tab: NavTab) => void;
-  activeLeagueName?: string;
-  onSelectLeague?: (league: LeagueOption) => void;
   onOpenAuthModal?: (targetPortal?: PortalType) => void;
-  onOpenNewLeagueModal?: () => void;
+  onOpenManualTiming?: () => void;
 }
 
 export const NavShell: React.FC<NavShellProps> = ({
   currentTab,
   onTabChange,
-  activeLeagueName = 'الاتحاد الجزائري لألعاب القوى (FAA)',
-  onSelectLeague,
   onOpenAuthModal,
-  onOpenNewLeagueModal
+  onOpenManualTiming
 }) => {
-  const { t, lang, setLanguage } = useTranslation();
+  const { lang, setLanguage } = useTranslation();
   const isCloudOnline = isSupabaseConfigured();
-  const [leagueDropdownOpen, setLeagueDropdownOpen] = useState(false);
-  const [leagueSearch, setLeagueSearch] = useState('');
-  const [allLeagues, setAllLeagues] = useState<RegisteredLeague[]>(() => portalAuthService.getAllLeagues());
   const [leagueSession, setLeagueSession] = useState<PortalSession | null>(() => portalAuthService.getSession('league'));
   const [coachSession, setCoachSession] = useState<PortalSession | null>(() => portalAuthService.getSession('coach'));
 
   useEffect(() => {
     const unsub = portalAuthService.subscribe(() => {
-      setAllLeagues(portalAuthService.getAllLeagues());
       setLeagueSession(portalAuthService.getSession('league'));
       setCoachSession(portalAuthService.getSession('coach'));
     });
     return unsub;
   }, []);
 
-  const [currentLeague, setCurrentLeague] = useState<LeagueOption>(() => {
-    const leagues = portalAuthService.getAllLeagues();
-    const found = leagues.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName));
-    return found ? { id: found.id, name: found.name, shortName: found.shortName, region: found.region, logoCode: found.logoCode } : {
-      id: 'laa_algiers',
-      name: 'الرابطة الولائية لألعاب القوى - الجزائر',
-      shortName: 'LAA',
-      region: 'الجزائر العاصمة',
-      logoCode: '🏛️'
-    };
-  });
   const [currentTime, setCurrentTime] = useState<string>('');
   const [theme, setTheme] = useState<'dark' | 'sunlight' | 'light'>(() => {
     try {
@@ -109,14 +95,6 @@ export const NavShell: React.FC<NavShellProps> = ({
   const cycleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'sunlight' : prev === 'sunlight' ? 'light' : 'dark');
   };
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (activeLeagueName) {
-      const match = allLeagues.find(l => l.name === activeLeagueName || activeLeagueName.includes(l.shortName));
-      if (match) setCurrentLeague(match);
-    }
-  }, [activeLeagueName, allLeagues]);
 
   // تحديث التوقيت الملائم للملعب
   useEffect(() => {
@@ -129,45 +107,20 @@ export const NavShell: React.FC<NavShellProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // إغلاق القائمة المنسدلة عند النقر خارجها
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setLeagueDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
+  // عناصر شريط التنقل الرئيسي للواجهة العامة: الرئيسية، النتائج المعتمدة، المنافسات والرزنامة، النوادي والرياضيون، إدارة الرابطة
   const navItems: { id: NavTab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'public', label: t('nav_public'), icon: <Globe className="w-4 h-4" /> },
-    { id: 'league', label: t('nav_league'), icon: <Shield className="w-4 h-4" /> },
-    { id: 'coach', label: t('nav_coach'), icon: <Users className="w-4 h-4" /> },
-    { id: 'competition', label: t('nav_field'), icon: <Timer className="w-4 h-4 text-emerald-400" />, badge: '1/1000s' },
-    { id: 'analytics', label: t('nav_ai'), icon: <Cpu className="w-4 h-4 text-cyan-400" />, badge: 'AI' },
-    { id: 'admin', label: t('nav_admin'), icon: <Settings className="w-4 h-4" /> }
+    { id: 'public', label: 'الرئيسية', icon: <Globe className="w-4 h-4" /> },
+    { id: 'results', label: 'النتائج المعتمدة', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
+    { id: 'competitions', label: 'المنافسات والرزنامة', icon: <Calendar className="w-4 h-4 text-emerald-400" /> },
+    { id: 'entries', label: 'النوادي والرياضيون', icon: <FileSpreadsheet className="w-4 h-4 text-cyan-400" /> },
+    { id: 'league', label: 'إدارة الرابطة', icon: <Shield className="w-4 h-4 text-teal-400" /> },
   ];
 
-  const handleLeagueChoose = (league: LeagueOption) => {
-    setCurrentLeague(league);
-    setLeagueDropdownOpen(false);
-    if (onSelectLeague) {
-      onSelectLeague(league);
-    }
-  };
-
-  const filteredLeagues = allLeagues.filter(l => 
-    l.name.toLowerCase().includes(leagueSearch.toLowerCase()) ||
-    l.shortName.toLowerCase().includes(leagueSearch.toLowerCase()) ||
-    l.region.toLowerCase().includes(leagueSearch.toLowerCase())
-  );
-
   return (
-    <header className="sticky top-0 z-50 bg-slate-950/98 backdrop-blur-xl border-b border-emerald-950 shadow-2xl transition-all">
+    <header className="sticky top-0 z-50 bg-[var(--block,#0A0A0A)] text-white border-b-[3px] border-[var(--accent,#E5321B)] shadow-none transition-all" dir="rtl">
       
       {/* ═══ 1. الشريط الشرفي العلوي الرفيع (Top Utility / Live Ribbon) ═══ */}
-      <div className="bg-gradient-to-r from-emerald-950/90 via-slate-950 to-emerald-950/90 border-b border-emerald-900/30 text-[11px] font-semibold text-slate-300 py-1 px-3 sm:px-6">
+      <div className="bg-[#141413] border-b border-[#2E2E2B] text-[11px] font-semibold text-slate-300 py-1 px-3 sm:px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           
           {/* اليمين: مؤشر البث المباشر للبطولة والوقت الرسمي */}
@@ -179,10 +132,10 @@ export const NavShell: React.FC<NavShellProps> = ({
             
             <div className="hidden sm:flex items-center gap-2 text-slate-300 truncate">
               <span className="text-amber-300 font-extrabold truncate">
-                البطولة الوطنية لألعاب القوى للأكابر 2026
+                البطولة الولائية الصيفية لألعاب القوى - سعيدة 2026
               </span>
               <span className="text-slate-600">•</span>
-              <span className="text-slate-400 truncate">ملعب 5 جويلية، الجزائر العاصمة</span>
+              <span className="text-slate-400 truncate">مضمار 13 أفريل 1958، سعيدة</span>
             </div>
 
             {currentTime && (
@@ -193,89 +146,9 @@ export const NavShell: React.FC<NavShellProps> = ({
             )}
           </div>
 
-          {/* اليسار: محدد الرابطة، مؤشر السحابة، واللغات */}
-          <div className="flex items-center gap-2.5 shrink-0" ref={dropdownRef}>
+          {/* اليسار: مؤشر السحابة، التوقيت اليدوي، الثيم، الدخول واللغات */}
+          <div className="flex items-center gap-2 shrink-0">
             
-            {/* محدد الرابطة / الاتحاد مع قائمة منسدلة فاخرة */}
-            <div className="relative">
-              <button 
-                onClick={() => setLeagueDropdownOpen(!leagueDropdownOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-emerald-800/50 hover:border-emerald-500/80 text-[11px] font-bold text-slate-200 hover:text-emerald-300 transition-all shadow-inner"
-                title="تغيير الرابطة الولائية أو الاتحاد الوطني"
-              >
-                <span>{currentLeague.logoCode}</span>
-                <span className="truncate max-w-[150px] sm:max-w-[210px]">{currentLeague.shortName} • {currentLeague.name}</span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${leagueDropdownOpen ? 'rotate-180 text-emerald-400' : ''}`} />
-              </button>
-
-              {/* القائمة المنسدلة للرابطات */}
-              {leagueDropdownOpen && (
-                <div className="absolute left-0 sm:right-0 mt-1.5 w-80 sm:w-96 rounded-2xl bg-slate-900/95 backdrop-blur-2xl border border-emerald-700/60 shadow-2xl p-3 z-50 text-right animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                    <span className="text-xs font-black text-slate-100 flex items-center gap-1.5">
-                      <Shield className="w-4 h-4 text-emerald-400" />
-                      اختر الرابطة أو الاتحاد المنظّم
-                    </span>
-                    <button 
-                      onClick={() => setLeagueDropdownOpen(false)}
-                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* زر تسجيل حساب رابطة جديدة مباشرة من القائمة */}
-                  <button
-                    onClick={() => {
-                      setLeagueDropdownOpen(false);
-                      if (onOpenNewLeagueModal) onOpenNewLeagueModal();
-                    }}
-                    className="w-full mb-2.5 p-2 rounded-xl bg-gradient-to-r from-emerald-950 to-teal-950 hover:from-emerald-900 hover:to-teal-900 border border-emerald-600/60 text-emerald-300 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5 text-amber-400" />
-                    <span>+ تسجيل حساب رابطة جديدة</span>
-                  </button>
-
-                  <div className="relative mb-2">
-                    <Search className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
-                    <input 
-                      type="text"
-                      value={leagueSearch}
-                      onChange={(e) => setLeagueSearch(e.target.value)}
-                      placeholder="ابحث بالاسم أو الولاية..."
-                      className="w-full pr-8 pl-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="max-h-56 overflow-y-auto space-y-1.5 no-scrollbar">
-                    {filteredLeagues.map((league) => {
-                      const isSelected = currentLeague.id === league.id;
-                      return (
-                        <button
-                          key={league.id}
-                          onClick={() => handleLeagueChoose(league)}
-                          className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between gap-2 ${
-                            isSelected 
-                              ? 'bg-emerald-950/60 border-emerald-500/80 text-white shadow-md' 
-                              : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/50 text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="text-base">{league.logoCode}</span>
-                            <div className="truncate">
-                              <div className="text-xs font-bold text-slate-100 truncate">{league.name}</div>
-                              <div className="text-[10px] text-slate-400 truncate">{league.region}</div>
-                            </div>
-                          </div>
-                          {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* حالة السحابة والاتصال */}
             <div 
               className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
@@ -298,6 +171,17 @@ export const NavShell: React.FC<NavShellProps> = ({
               )}
             </div>
 
+            {/* زر التوقيت اليدوي السريع (Image 4) */}
+            {onOpenManualTiming && (
+              <button
+                onClick={onOpenManualTiming}
+                className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-teal-950/80 hover:bg-teal-900 border border-teal-500/50 text-[10px] font-black text-teal-300 hover:text-white transition-all cursor-pointer shadow-sm"
+                title="فتح وحدة التوقيت اليدوي للأروقة والمسافات"
+              >
+                <Timer className="w-3 h-3 text-teal-400" />
+                <span className="hidden sm:inline">توقيت يدوي</span>
+              </button>
+            )}
             
             {/* زر تبديل الثيم: ليلي / شمسي عالي التباين للميدان / نهاري */}
             <button
@@ -306,14 +190,14 @@ export const NavShell: React.FC<NavShellProps> = ({
               title="تبديل النمط: ليلي / وضع الشمس عالي التباين للميدان / نهاري"
             >
               {theme === 'sunlight' ? <Sun className="w-3 h-3 text-amber-400" /> : theme === 'light' ? <Sunset className="w-3 h-3 text-orange-400" /> : <Moon className="w-3 h-3 text-slate-300" />}
-              <span className="hidden sm:inline">{theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}</span>
+              <span className="hidden md:inline">{theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}</span>
             </button>
 
             {/* زر الدخول المباشر بكود المهمة */}
             <button
               onClick={() => onTabChange('competition')}
-              className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-[10px] font-black text-emerald-300 hover:bg-emerald-900 transition-all cursor-pointer shadow-sm"
-              title="دخول الحكام بكود التكليف الرسمي (مثال: LIG31-7K4M-Q9TX)"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-[10px] font-black text-emerald-300 hover:bg-emerald-900 transition-all cursor-pointer shadow-sm"
+              title="دخول الحكام بكود التكليف الرسمي"
             >
               <ScanLine className="w-3 h-3 text-emerald-400" />
               <span>كود المهمة 🔑</span>
@@ -339,19 +223,19 @@ export const NavShell: React.FC<NavShellProps> = ({
             <div className="flex items-center rounded-lg bg-slate-900 border border-slate-800 p-0.5 text-[10px] font-extrabold">
               <button 
                 onClick={() => setLanguage('ar')}
-                className={`px-1.5 py-0.5 rounded ${lang === 'ar' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-1.5 py-0.5 rounded cursor-pointer ${lang === 'ar' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
               >
                 عربي
               </button>
               <button 
                 onClick={() => setLanguage('fr')}
-                className={`px-1.5 py-0.5 rounded ${lang === 'fr' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-1.5 py-0.5 rounded cursor-pointer ${lang === 'fr' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
               >
                 FR
               </button>
               <button 
                 onClick={() => setLanguage('en')}
-                className={`px-1.5 py-0.5 rounded ${lang === 'en' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-1.5 py-0.5 rounded cursor-pointer ${lang === 'en' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
               >
                 EN
               </button>
@@ -362,14 +246,14 @@ export const NavShell: React.FC<NavShellProps> = ({
         </div>
       </div>
 
-      {/* ═══ 2. الشريط الرئيسي الفاخر (Main Federation Header) ═══ */}
+      {/* ═══ 2. الشريط الرئيسي الفاخر (Main Federation Header) (Image 4) ═══ */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        <div className="flex items-center justify-between h-18 gap-3">
+        <div className="flex items-center justify-between h-20 gap-3">
           
           {/* شعار المنظومة وهوية الرابطة الاحترافية */}
           <button 
             onClick={() => onTabChange('public')}
-            className="flex items-center gap-3 group text-start focus:outline-none shrink-0"
+            className="flex items-center gap-3 group text-start focus:outline-none shrink-0 cursor-pointer"
           >
             {/* الشعار الفاخر ثلاثي الأبعاد مع توهج */}
             <div className="relative">
@@ -385,29 +269,29 @@ export const NavShell: React.FC<NavShellProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-xl tracking-wider bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-200 bg-clip-text text-transparent drop-shadow-sm font-['Chakra_Petch',sans-serif]">
-                  PHOTO FINISH PRO
+              <div className="flex items-center gap-2">
+                <span className="font-black text-lg sm:text-xl tracking-wider text-white">
+                  رابطة ألعاب القوى سعيدة
                 </span>
-                <span className="px-1.5 py-0.5 text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 rounded-md tracking-tight shadow">
-                  AI
+                <span className="px-1.5 py-0.5 text-[10px] font-black bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-md tracking-tight shadow">
+                  LWAS
                 </span>
               </div>
-              <p className="text-[11px] text-emerald-400/90 font-bold truncate max-w-[280px]">
-                المنظومة الوطنية لإدارة وتحكيم وتوقيت ألعاب القوى
+              <p className="text-[11px] text-emerald-400/90 font-bold truncate max-w-[320px]">
+                SAIDA ATHLETICS LEAGUE • المنصة الرقمية الرسمية
               </p>
             </div>
           </button>
 
           {/* عناصر التنقل الرئيسية (Desktop Navigation Items) */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-900/70 p-1.5 rounded-2xl border border-emerald-900/30 shadow-inner">
+          <nav className="hidden xl:flex items-center gap-1 bg-slate-900/70 p-1.5 rounded-2xl border border-emerald-900/30 shadow-inner">
             {navItems.map((item) => {
               const active = currentTab === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all relative ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
                     active
                       ? 'bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/50'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -434,8 +318,21 @@ export const NavShell: React.FC<NavShellProps> = ({
             })}
           </nav>
 
-          {/* الزر الرئيسي للدعوة الميدانية (Call to Action Button) */}
+          {/* الزر الرئيسي للدعوة الميدانية (Call to Action Button) وحساب الرابطة النشط */}
           <div className="flex items-center gap-2">
+            {leagueSession && (
+              <button
+                type="button"
+                onClick={() => onTabChange('league')}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/50 text-xs font-bold text-amber-300 transition-all cursor-pointer shadow-sm"
+                title="لوحة تحكم حساب الرابطة"
+              >
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline">حساب الرابطة:</span>
+                <span className="font-black text-white">{leagueSession.leagueShort || 'الرابطة'}</span>
+              </button>
+            )}
+
             <button 
               onClick={() => onTabChange('competition')}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 hover:text-black font-black text-xs shadow-lg shadow-emerald-950/80 hover:shadow-emerald-500/30 transition-all border border-emerald-400/50 group cursor-pointer"
@@ -449,17 +346,17 @@ export const NavShell: React.FC<NavShellProps> = ({
         </div>
 
         {/* شريط التنقل للأجهزة المتوسطة والصغيرة (Mobile / Tablet Horizontal Tabs) */}
-        <div className="lg:hidden flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar border-t border-slate-900">
+        <div className="xl:hidden flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar border-t border-slate-900">
           {navItems.map((item) => {
             const active = currentTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
                   active
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md'
-                    : 'text-slate-400 bg-slate-900/60 border border-slate-800/80'
+                    : 'text-slate-400 bg-slate-900/60 border border-slate-800/80 hover:text-white'
                 }`}
               >
                 {item.icon}

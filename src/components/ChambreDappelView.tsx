@@ -409,7 +409,7 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
 
       {/* نافذة تأكيد حذف قائمة */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-rose-500/50 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-center">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
@@ -445,7 +445,7 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
 
       {/* نافذة إنشاء سلسلة / قائمة جديدة مع الاسم والمسافة */}
       {showAddSeriesModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">

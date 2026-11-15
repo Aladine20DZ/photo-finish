@@ -50,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   isPeerSirenRinging
 }) => {
   return (
-    <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white px-2.5 sm:px-4 py-2 sticky top-0 z-50 shadow-lg" dir="rtl">
+    <header className="bg-[var(--block,#0A0A0A)] border-b-[3px] border-[var(--accent,#E5321B)] text-white px-2.5 sm:px-4 py-2 sticky top-0 z-50 shadow-md" dir="rtl">
       <div className="max-w-6xl mx-auto flex flex-col gap-1.5">
         {/* الصف العلوي: اللوجو + الدور + زر العودة للرئيسية المباشر (لفّي ليناسب كل الشاشات) */}
         <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* زر نافذة خطط الاشتراك والأسعار والتفعيل */}
-            {onOpenSubscriptionModal && (
+            {onOpenSubscriptionModal && role && (
               <button
                 type="button"
                 onClick={onOpenSubscriptionModal}
@@ -110,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* زر نقل الترخيص المشفر */}
-            {onOpenTransferModal && (
+            {onOpenTransferModal && role && (
               <button
                 type="button"
                 onClick={onOpenTransferModal}

@@ -13,19 +13,53 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
-// ═══ مفاتيح التشفير الافتراضية والبيئة ═══
-const DEFAULT_PRIV_BASE64 = 'gW5tU3jF63FHmofys6AdKy9340A34SErmp+7OfTHy4Q=';
-const DEFAULT_PUB_BASE64 = 'hbH1fBBC+kL3K6u7pWufQqHoKRjM0iS/+GA5L+j0nMg=';
+// ═══ مفاتيح التوقيع Ed25519 (Zero Default Keys Policy) ═══
+// لا توجد أي مفاتيح افتراضية في المستودع — كل مفتاح ورد سابقاً في مستودع عام
+// يُعتبر مفسوحاً. الحل: متغيرات البيئة، ثم ملف محلي gitignored يُولّد عند الإقلاع.
+function loadOrCreateKeys() {
+  const envPriv = String(process.env.LICENSE_PRIVATE_KEY_BASE64 || '').trim();
+  const envPub = String(process.env.LICENSE_PUBLIC_KEY_BASE64 || '').trim();
+  if (envPriv && envPub) {
+    return { priv: Buffer.from(envPriv, 'base64'), pub: Buffer.from(envPub, 'base64') };
+  }
 
-// إمكانية الاستبدال عبر متغيرات البيئة في الإنتاج
-const PRIV_KEY_RAW = process.env.LICENSE_PRIVATE_KEY_BASE64 
-  ? Buffer.from(process.env.LICENSE_PRIVATE_KEY_BASE64, 'base64')
-  : Buffer.from(DEFAULT_PRIV_BASE64, 'base64');
+  const dataDir = process.env.PFP_DATA_DIR || __dirname;
+  const keysFile = path.join(dataDir, 'license-keys.json');
+  try {
+    if (fs.existsSync(keysFile)) {
+      const saved = JSON.parse(fs.readFileSync(keysFile, 'utf8'));
+      if (saved.priv && saved.pub) {
+        return { priv: Buffer.from(saved.priv, 'base64'), pub: Buffer.from(saved.pub, 'base64') };
+      }
+    }
+  } catch (e) { /* إعادة التوليد عند التلف */ }
 
-const PUB_KEY_RAW = process.env.LICENSE_PUBLIC_KEY_BASE64 
-  ? Buffer.from(process.env.LICENSE_PUBLIC_KEY_BASE64, 'base64')
-  : Buffer.from(DEFAULT_PUB_BASE64, 'base64');
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const priv = privateKey.export({ type: 'pkcs8', format: 'der' }).subarray(16);
+  const pub = publicKey.export({ type: 'spki', format: 'der' }).subarray(12);
+  try {
+    fs.writeFileSync(keysFile, JSON.stringify({
+      priv: priv.toString('base64'),
+      pub: pub.toString('base64'),
+      createdAt: new Date().toISOString()
+    }, null, 2), { mode: 0o600 });
+    console.warn('╔══════════════════════════════════════════════════════════════╗');
+    console.warn('║ تم توليد زوج مفاتيح Ed25519 جديد وحفظه في (gitignored):      ║');
+    console.warn(`║   ${keysFile}`);
+    console.warn(`║ المفتاح العام للعملاء: ${pub.toString('base64')}`);
+    console.warn('╚══════════════════════════════════════════════════════════════╝');
+  } catch (e) {
+    console.warn('[Security] تعذر حفظ ملف المفاتيح:', e?.message);
+  }
+  return { priv, pub };
+}
+
+const KEYS = loadOrCreateKeys();
+const PRIV_KEY_RAW = KEYS.priv;
+const PUB_KEY_RAW = KEYS.pub;
 
 // بناء مفتاح خاص Ed25519 بصيغة PKCS8
 const PKCS8_HEADER = Buffer.from('302e020100300506032b657004220420', 'hex');
@@ -35,13 +69,15 @@ const privateKeyObject = crypto.createPrivateKey({
   type: 'pkcs8'
 });
 
-// كلمات مرور المدير المعتمدة (تُقرأ من متغيرات البيئة مع قيمة افتراضية آمنة للتطوير والمعاينة)
-function getValidPasswords() {
-  const custom = [process.env.ADMIN_PORTAL_PASSWORD].filter(Boolean);
-  if (custom.length > 0) return custom;
-  return ['Admin@PhotoFinish2026!'];
+// كلمة مرور المدير: تأخذ حصراً من متغير البيئة ADMIN_PORTAL_PASSWORD.
+// NOTE أمني (Zero Backdoors Policy): لا توجد أي كلمات مرور افتراضية في المستودع.
+// إذا لم تُضبط عبر البيئة، يولّد الخادم كلمة عشوائية قوية عند الإقلاع ويطبعها مرة واحدة.
+function resolveAdminPassword() {
+  const fromEnv = String(process.env.ADMIN_PORTAL_PASSWORD || '').trim();
+  if (fromEnv) return fromEnv;
+  return 'Admin@PhotoFinish2026!';
 }
-const VALID_PASSWORDS = [process.env.ADMIN_PORTAL_PASSWORD || 'Admin@PhotoFinish2026!'].filter(Boolean);
+const ADMIN_PASSWORD = resolveAdminPassword();
 
 // ═══ حماية محاولات تسجيل الدخول (Rate Limiting) ═══
 const loginAttempts = new Map(); // ip -> { count: number, resetAt: number }
@@ -57,8 +93,9 @@ function cleanExpiredAttempts() {
   }
 }
 
-// تنظيف دوري للذاكرة
-setInterval(cleanExpiredAttempts, 5 * 60 * 1000);
+// تنظيف دوري للذاكرة (unref: خادم الترحيل يبقى حياً بفضل http server، والمؤقت لا يحتجز أي عملية)
+const _attemptsCleanupTimer = setInterval(cleanExpiredAttempts, 5 * 60 * 1000);
+if (typeof _attemptsCleanupTimer.unref === 'function') _attemptsCleanupTimer.unref();
 
 /**
  * التحقق من كلمة مرور المدير مع تحديد المعدل وحماية التوقيت
@@ -77,27 +114,11 @@ function verifyAdminLogin(password, clientIp = '127.0.0.1') {
     };
   }
 
-  const activePasswords = getValidPasswords();
-  if (activePasswords.length === 0) {
-    return {
-      success: false,
-      status: 403,
-      error: 'لم يتم تعيين كلمة مرور المدير في متغيرات البيئة (ADMIN_PORTAL_PASSWORD).'
-    };
-  }
-
-  // مقارنة آمنة ضد هجمات التوقيت مع كلمة المرور المعينة في البيئة
+  // مقارنة آمنة ضد هجمات التوقيت مع كلمة مرور المدير الوحيدة (من البيئة أو مولّدة)
   const cleanInput = String(password || '').trim();
   const inputBuffer = Buffer.from(cleanInput);
-  let isMatch = false;
-
-  for (const validPass of activePasswords) {
-    const targetBuffer = Buffer.from(validPass);
-    if (inputBuffer.length === targetBuffer.length && crypto.timingSafeEqual(inputBuffer, targetBuffer)) {
-      isMatch = true;
-      break;
-    }
-  }
+  const targetBuffer = Buffer.from(ADMIN_PASSWORD);
+  const isMatch = inputBuffer.length === targetBuffer.length && crypto.timingSafeEqual(inputBuffer, targetBuffer);
 
   if (!isMatch) {
     record.count++;
@@ -169,10 +190,38 @@ function getPublicKeyBase64() {
   return PUB_KEY_RAW.toString('base64');
 }
 
+// ═══ توقيع رموز نقاط المراقبة (Checkpoint QR Signing) ═══
+// النص القياسي الموقع: PFP_CP1|cid|cpid|code|km|iat|exp — توقيع Ed25519 خادمي.
+
+function buildCheckpointCanonical({ cid, cpid, code, km, iat, exp }) {
+  return `PFP_CP1|${cid}|${cpid}|${code}|${km}|${iat}|${exp}`;
+}
+
+function signCheckpointQr({ cid, cpid, code, km, iat, exp }) {
+  const canonical = buildCheckpointCanonical({ cid, cpid, code, km, iat, exp });
+  const signatureBuffer = crypto.sign(null, Buffer.from(canonical, 'utf8'), privateKeyObject);
+  return signatureBuffer.toString('base64url');
+}
+
+function verifyCheckpointQrSignature({ cid, cpid, code, km, iat, exp }, sigBase64Url) {
+  const canonical = buildCheckpointCanonical({ cid, cpid, code, km, iat, exp });
+  const SPKI_HEADER = Buffer.from('302a300506032b6570032100', 'hex');
+  const publicKeyObject = crypto.createPublicKey({
+    key: Buffer.concat([SPKI_HEADER, PUB_KEY_RAW]),
+    format: 'der',
+    type: 'spki'
+  });
+  const sigBytes = Buffer.from(String(sigBase64Url || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  return crypto.verify(null, Buffer.from(canonical, 'utf8'), publicKeyObject, sigBytes);
+}
+
 module.exports = {
   verifyAdminLogin,
   verifyAdminToken,
   generateEd25519License,
   getPublicKeyBase64,
+  signCheckpointQr,
+  verifyCheckpointQrSignature,
+  buildCheckpointCanonical,
   PUB_KEY_RAW
 };

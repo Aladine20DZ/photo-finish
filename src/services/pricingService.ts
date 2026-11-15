@@ -144,6 +144,9 @@ class PricingService {
 
   constructor() {
     this.load();
+    if (typeof window !== 'undefined') {
+      this.syncRemotePlans().catch(() => {});
+    }
   }
 
   public load() {
@@ -200,6 +203,44 @@ class PricingService {
     this.saveSettings(this._settings);
   }
 
+  // ═══ مزامنة الباقات المركزية مع الخادم (Enterprise Plans Sync) ═══
+  public async syncRemotePlans(): Promise<CustomPackage[]> {
+    try {
+      if (typeof fetch === 'undefined') return this._settings.customPackages;
+      const res = await fetch('/api/licensing/plans');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.plans) && data.plans.length > 0) {
+          const remotePackages: CustomPackage[] = data.plans.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description || '',
+            laneCount: Number(p.laneCount) || 8,
+            durationMonths: Number(p.durationMonths) || 12,
+            durationLabel: p.durationLabel || `${p.durationMonths || 12} شهر`,
+            priceDZD: Number(p.priceDZD) || 0,
+            priceEUR: Number(p.priceEUR) || 0,
+            priceUSD: Number(p.priceUSD) || 0,
+            features: Array.isArray(p.features) ? p.features : [],
+            badge: p.badge || '',
+            tierCode: p.tierCode === 'ENTX' ? 'ENTX' : 'CLB8',
+            isQuadPool: p.isQuadPool !== undefined ? Boolean(p.isQuadPool) : true,
+            createdAt: p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '2026-01-01'
+          }));
+          this._settings = { ...this._settings, customPackages: remotePackages };
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(this._settings));
+          }
+          this.notify();
+          return remotePackages;
+        }
+      }
+    } catch {
+      // Offline fallback: keep local packages
+    }
+    return this._settings.customPackages;
+  }
+
   // إدارة الباقات الخاصة المخصصة
   public addCustomPackage(pkg: Omit<CustomPackage, 'id' | 'createdAt'>): CustomPackage {
     const newPkg: CustomPackage = {
@@ -209,17 +250,45 @@ class PricingService {
     };
     const updated = [newPkg, ...(this._settings.customPackages || [])];
     this.saveSettings({ ...this._settings, customPackages: updated });
+
+    if (typeof fetch !== 'undefined') {
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      fetch('/api/licensing/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+        body: JSON.stringify(newPkg)
+      }).catch(() => {});
+    }
+
     return newPkg;
   }
 
   public updateCustomPackage(id: string, updates: Partial<CustomPackage>) {
     const updated = (this._settings.customPackages || []).map(p => p.id === id ? { ...p, ...updates } : p);
     this.saveSettings({ ...this._settings, customPackages: updated });
+
+    const targetPkg = updated.find(p => p.id === id);
+    if (targetPkg && typeof fetch !== 'undefined') {
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      fetch('/api/licensing/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+        body: JSON.stringify(targetPkg)
+      }).catch(() => {});
+    }
   }
 
   public deleteCustomPackage(id: string) {
     const updated = (this._settings.customPackages || []).filter(p => p.id !== id);
     this.saveSettings({ ...this._settings, customPackages: updated });
+
+    if (typeof fetch !== 'undefined') {
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      fetch(`/api/licensing/plans?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      }).catch(() => {});
+    }
   }
 
   public getPackagePrice(pkg: CustomPackage, currency?: CurrencyCode): number {

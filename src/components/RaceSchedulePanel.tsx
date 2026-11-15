@@ -41,7 +41,7 @@ export const RaceSchedulePanel: React.FC<RaceSchedulePanelProps> = ({
   const upcomingHeats = heats.filter(h => h.status !== 'completed' && h.id !== currentDispatchedHeat?.id);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl animate-scaleUp my-auto text-slate-100 flex flex-col max-h-[90vh]">
         {/* الترويسة */}
         <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 p-4 border-b border-slate-800 flex items-center justify-between">

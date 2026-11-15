@@ -95,7 +95,7 @@ export const CapabilitiesShowcase: React.FC<{ onLaunchFeature?: (featureId: stri
             {/* الشاشة التجريبية المصغرة */}
             <div className="h-40 bg-slate-950 relative overflow-hidden border-b border-slate-800/80">
               {c.mock}
-              <div className="absolute top-3 end-3 px-2.5 py-0.5 rounded-full bg-slate-900/90 border border-slate-700 text-[10px] font-bold text-slate-200 backdrop-blur-md">
+              <div className="absolute top-3 end-3 px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[10px] font-bold text-slate-200">
                 {c.badge}
               </div>
             </div>

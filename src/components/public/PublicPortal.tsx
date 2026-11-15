@@ -24,10 +24,11 @@ import {
 } from '../../services/publicPortalService';
 import { useTranslation } from '../../services/i18nService';
 import { SlitScanHero } from './SlitScanHero';
+import { AthleticsDisciplinesShowcase } from './AthleticsDisciplinesShowcase';
 import { AthleticsStatsStrip } from './AthleticsStatsStrip';
 import { LiveResultsTicker } from './LiveResultsTicker';
 import { CapabilitiesShowcase } from './CapabilitiesShowcase';
-import { HowItWorksSection, LeaguesDirectorySection, FaqSection, PlatformFooter } from './HowItWorksAndFaq';
+import { HowItWorksSection, FaqSection, PlatformFooter } from './HowItWorksAndFaq';
 
 export interface PublicPortalProps {
   onEnterFieldMode?: () => void;
@@ -96,13 +97,8 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
   };
 
   // بيانات جدول الميداليات وترتيب الفرق بموجب World Athletics Rule 19
-  const medalStandings = [
-    { rank: 1, club: 'مولودية الجزائر (MCA)', city: 'الجزائر العاصمة', gold: 5, silver: 3, bronze: 2, totalPoints: 36 },
-    { rank: 2, club: 'وفاق سطيف لألعاب القوى (ESS)', city: 'سطيف', gold: 4, silver: 2, bronze: 3, totalPoints: 29 },
-    { rank: 3, club: 'أولمبي الشلف للضاحية (ASO)', city: 'الشلف', gold: 3, silver: 4, bronze: 1, totalPoints: 28 },
-    { rank: 4, club: 'شباب قسنطينة (CSC)', city: 'قسنطينة', gold: 2, silver: 3, bronze: 4, totalPoints: 23 },
-    { rank: 5, club: 'وداد تلمسان (WAT)', city: 'تلمسان', gold: 1, silver: 2, bronze: 2, totalPoints: 13 },
-  ];
+  // يبدأ فارغاً للإنتاج ويُملأ بالنتائج المعتمدة الفعلية
+  const medalStandings: { rank: number; club: string; city: string; gold: number; silver: number; bronze: number; totalPoints: number }[] = [];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-12 selection:bg-emerald-500 selection:text-slate-950">
@@ -114,14 +110,26 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
           const el = document.getElementById('explore-section');
           if (el) el.scrollIntoView({ behavior: 'smooth' });
         }}
-        onOpenLeague={onOpenLeagueSuite}
         onOpenCoach={onOpenCoachWizard}
       />
 
-      {/* ═══ 2. شريط الأرقام والإحصائيات الحية ═══ */}
+      {/* ═══ 2. معرض تخصصات ألعاب القوى والصور والانتقالات المبهرة ═══ */}
+      <AthleticsDisciplinesShowcase
+        onSelectAction={(id) => {
+          if (id === 'photo_finish' || id === 'track_sprints' || id === 'field_events') {
+            onEnterFieldMode && onEnterFieldMode();
+          } else if (id === 'digital_passport') {
+            onOpenLeagueSuite && onOpenLeagueSuite();
+          } else if (id === 'cross_country') {
+            onEnterFieldMode && onEnterFieldMode();
+          }
+        }}
+      />
+
+      {/* ═══ 3. شريط الأرقام والإحصائيات الحية ═══ */}
       <AthleticsStatsStrip />
 
-      {/* ═══ 3. الشريط المتحرك للنتائج المعتمدة اللحظية ═══ */}
+      {/* ═══ 4. الشريط المتحرك للنتائج المعتمدة اللحظية ═══ */}
       <LiveResultsTicker />
 
       {/* ═══ 4. قسم البحث السريع واختيار التخصصات ═══ */}
@@ -165,7 +173,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
 
       {/* ═══ 5. شريط التبويب الرئيسي للأقسام التفاعلية ═══ */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-20">
-        <div className="p-1.5 rounded-2xl bg-slate-900/95 border border-emerald-900/50 shadow-2xl backdrop-blur-xl flex items-center justify-between overflow-x-auto no-scrollbar gap-1">
+        <div className="p-1.5 rounded-2xl bg-slate-900 border border-emerald-900/50 shadow-2xl flex items-center justify-between overflow-x-auto no-scrollbar gap-1">
           {[
             { id: 'results' as ActiveViewTab, label: 'النتائج المباشرة ومنصة التتويج', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
             { id: 'calendar' as ActiveViewTab, label: 'رزنامة وبرنامج المنافسات', icon: <Calendar className="w-4 h-4 text-emerald-400" /> },
@@ -204,7 +212,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
         {activeTab === 'results' && (
           <div className="space-y-6">
             
-            <div className="p-6 rounded-3xl bg-slate-900/80 border border-emerald-900/50 shadow-xl backdrop-blur-md">
+            <div className="p-6 rounded-3xl bg-slate-900 border border-emerald-900/50 shadow-xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -233,62 +241,80 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
               </div>
 
               {/* منصة التتويج البصرية الثلاثية */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                
-                {/* المركز الثاني (فضة) */}
-                <div className="p-5 rounded-2xl bg-gradient-to-t from-slate-900 to-slate-800/80 border border-slate-700/80 text-center relative order-2 md:order-1 flex flex-col justify-between">
-                  <div className="w-12 h-12 rounded-full bg-slate-700/80 border-2 border-slate-400 flex items-center justify-center text-xl mx-auto mb-3 shadow">
-                    🥈
+              {results.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  {/* المركز الثاني (فضة) */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-t from-slate-900 to-slate-800/80 border border-slate-700/80 text-center relative order-2 md:order-1 flex flex-col justify-between">
+                    <div className="w-12 h-12 rounded-full bg-slate-700/80 border-2 border-slate-400 flex items-center justify-center text-xl mx-auto mb-3 shadow">
+                      🥈
+                    </div>
+                    {results[1] ? (
+                      <>
+                        <div>
+                          <div className="text-xs font-bold text-slate-400">المركز الثاني • ميدالية فضية</div>
+                          <div className="text-base font-black text-white">{results[1].athlete_name}</div>
+                          <div className="text-xs text-slate-400">{results[1].club_name}</div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-slate-700/60">
+                          <span className="text-xl font-black font-mono text-slate-200">{formatTime(results[1].time_millis)}</span>
+                          <span className="text-[10px] text-slate-400 mr-2">(+{(Math.max(0, ((results[1].time_millis || 0) - (results[0].time_millis || 0))) / 1000).toFixed(2)}s)</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500 py-6 font-bold">في انتظار تحديد وصيف السباق</div>
+                    )}
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-400">المركز الثاني</div>
-                    <div className="text-base font-black text-white">سليمان بلمخفي</div>
-                    <div className="text-xs text-slate-400">وفاق سطيف (ESS) • سطيف</div>
+
+                  {/* المركز الأول (ذهب) */}
+                  <div className="p-6 rounded-2xl bg-gradient-to-t from-emerald-950/80 via-slate-900 to-amber-950/40 border-2 border-amber-400/80 text-center relative order-1 md:order-2 shadow-2xl flex flex-col justify-between transform md:-translate-y-2">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow">
+                      Champion • بطل السباق
+                    </div>
+                    <div className="w-14 h-14 rounded-full bg-amber-400/20 border-2 border-amber-400 flex items-center justify-center text-2xl mx-auto mb-3 shadow-lg shadow-amber-400/20">
+                      🥇
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-amber-300">المركز الأول والميدالية الذهبية</div>
+                      <div className="text-lg font-black text-white">{results[0].athlete_name}</div>
+                      <div className="text-xs text-emerald-400 font-bold">{results[0].club_name}</div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-amber-500/30">
+                      <span className="text-2xl font-black font-mono text-amber-300">{formatTime(results[0].time_millis)}</span>
+                      <span className="text-xs font-bold text-emerald-400 mr-2 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
+                        معتمد رسمياً ✓
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-700/60">
-                    <span className="text-xl font-black font-mono text-slate-200">10.04s</span>
-                    <span className="text-[10px] text-slate-400 mr-2">(+0.08s)</span>
+
+                  {/* المركز الثالث (برونز) */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-t from-slate-900 to-amber-950/20 border border-amber-700/50 text-center relative order-3 flex flex-col justify-between">
+                    <div className="w-12 h-12 rounded-full bg-amber-950/80 border-2 border-amber-600 flex items-center justify-center text-xl mx-auto mb-3 shadow">
+                      🥉
+                    </div>
+                    {results[2] ? (
+                      <>
+                        <div>
+                          <div className="text-xs font-bold text-slate-400">المركز الثالث • ميدالية برونزية</div>
+                          <div className="text-base font-black text-white">{results[2].athlete_name}</div>
+                          <div className="text-xs text-slate-400">{results[2].club_name}</div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-slate-700/60">
+                          <span className="text-xl font-black font-mono text-amber-200">{formatTime(results[2].time_millis)}</span>
+                          <span className="text-[10px] text-slate-400 mr-2">(+{(Math.max(0, ((results[2].time_millis || 0) - (results[0].time_millis || 0))) / 1000).toFixed(2)}s)</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500 py-6 font-bold">في انتظار تحديد صاحب المركز الثالث</div>
+                    )}
                   </div>
                 </div>
-
-                {/* المركز الأول (ذهب) */}
-                <div className="p-6 rounded-2xl bg-gradient-to-t from-emerald-950/80 via-slate-900 to-amber-950/40 border-2 border-amber-400/80 text-center relative order-1 md:order-2 shadow-2xl flex flex-col justify-between transform md:-translate-y-2">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow">
-                    Champion • بطل السباق
-                  </div>
-                  <div className="w-14 h-14 rounded-full bg-amber-400/20 border-2 border-amber-400 flex items-center justify-center text-2xl mx-auto mb-3 shadow-lg shadow-amber-400/20">
-                    🥇
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-amber-300">المركز الأول والميدالية الذهبية</div>
-                    <div className="text-lg font-black text-white">يوسف العبدلي</div>
-                    <div className="text-xs text-emerald-400 font-bold">الجزائر 🇩🇿 • مولودية الجزائر (MCA)</div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-amber-500/30">
-                    <span className="text-2xl font-black font-mono text-amber-300">09.96s</span>
-                    <span className="text-xs font-bold text-emerald-400 mr-2 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-                      رقم قياسي جديد 🌟
-                    </span>
-                  </div>
+              ) : (
+                <div className="mb-8 p-8 rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 text-center">
+                  <Trophy className="w-10 h-10 text-amber-400/50 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-300">في انتظار انطلاق التظاهرة واعتماد نتائج الـ Photo Finish</p>
+                  <p className="text-xs text-slate-500 mt-1">تُعرض أسماء الفائزين وأزمنتهم الرسمية فور اعتماد المحضر من قبل الحكم العام</p>
                 </div>
-
-                {/* المركز الثالث (برونز) */}
-                <div className="p-5 rounded-2xl bg-gradient-to-t from-slate-900 to-amber-950/20 border border-amber-700/50 text-center relative order-3 flex flex-col justify-between">
-                  <div className="w-12 h-12 rounded-full bg-amber-950/80 border-2 border-amber-600 flex items-center justify-center text-xl mx-auto mb-3 shadow">
-                    🥉
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-400">المركز الثالث</div>
-                    <div className="text-base font-black text-white">نبيل زبيري</div>
-                    <div className="text-xs text-slate-400">أولمبي الشلف (ASO) • الشلف</div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-slate-700/60">
-                    <span className="text-xl font-black font-mono text-amber-200">10.12s</span>
-                    <span className="text-[10px] text-slate-400 mr-2">(+0.16s)</span>
-                  </div>
-                </div>
-
-              </div>
+              )}
 
               {/* جدول النتائج الكامل المعتمد */}
               <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
@@ -437,21 +463,29 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">
-                    {medalStandings.map((s) => (
-                      <tr key={s.rank} className="hover:bg-slate-900/60 transition-colors">
-                        <td className="py-3.5 px-4 text-center font-black text-sm">
-                          {s.rank === 1 ? '🥇 1' : s.rank === 2 ? '🥈 2' : s.rank === 3 ? '🥉 3' : s.rank}
-                        </td>
-                        <td className="py-3.5 px-4 font-black text-white">{s.club}</td>
-                        <td className="py-3.5 px-4 text-slate-400">{s.city}</td>
-                        <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-400">{s.gold}</td>
-                        <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-300">{s.silver}</td>
-                        <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-600">{s.bronze}</td>
-                        <td className="py-3.5 px-4 text-center font-mono font-black text-emerald-300 text-sm">
-                          {s.totalPoints} نقطة
+                    {medalStandings.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400 text-xs font-bold">
+                          لا توجد نتائج مسجلة لجدول الميداليات بعد. ستظهر النتائج آلياً بمجرد اعتماد نتائج المنافسات من حكام الرابطة بموجب World Athletics Rule 19.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      medalStandings.map((s) => (
+                        <tr key={s.rank} className="hover:bg-slate-900/60 transition-colors">
+                          <td className="py-3.5 px-4 text-center font-black text-sm">
+                            {s.rank === 1 ? '🥇 1' : s.rank === 2 ? '🥈 2' : s.rank === 3 ? '🥉 3' : s.rank}
+                          </td>
+                          <td className="py-3.5 px-4 font-black text-white">{s.club}</td>
+                          <td className="py-3.5 px-4 text-slate-400">{s.city}</td>
+                          <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-400">{s.gold}</td>
+                          <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-300">{s.silver}</td>
+                          <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-600">{s.bronze}</td>
+                          <td className="py-3.5 px-4 text-center font-mono font-black text-emerald-300 text-sm">
+                            {s.totalPoints} نقطة
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -498,9 +532,6 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
 
       {/* ═══ 8. مسار العمل المتكامل (كيف تعمل المنصة) ═══ */}
       <HowItWorksSection />
-
-      {/* ═══ 9. دليل الرابطات والاتحادات الولائية ═══ */}
-      <LeaguesDirectorySection onSelectLeague={() => onOpenLeagueSuite && onOpenLeagueSuite()} />
 
       {/* ═══ 10. الأسئلة الشائعة والقوانين المعتمدة ═══ */}
       <FaqSection />

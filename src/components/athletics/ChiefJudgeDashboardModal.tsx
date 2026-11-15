@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Lock, Unlock, Award, CheckCircle2, AlertTriangle, 
   RefreshCw, FileText, Check, Ban, Eye, Search,
-  Smartphone, Battery, Wifi, Shield, FileCheck
+  Smartphone, Battery, Wifi, Shield, FileCheck, Trash2, FileSpreadsheet, Printer
 } from 'lucide-react';
 import { 
   AthleticsCompetition, 
@@ -15,6 +15,9 @@ import {
 import { chiefJudgeControlService } from '../../services/chiefJudgeControlService';
 import { multiJudgeMergeEngine } from '../../services/multiJudgeMergeEngine';
 import { checkpointStorage } from '../../services/checkpointStorage';
+import { OfficialFederationHeader, OfficialFederationFooter } from './OfficialFederationHeader';
+import { DisciplineJudgeSheet } from './DisciplineJudgeSheet';
+import { ClipboardList, FileCheck2 } from 'lucide-react';
 
 interface ChiefJudgeDashboardModalProps {
   isOpen: boolean;
@@ -42,6 +45,60 @@ export const ChiefJudgeDashboardModal: React.FC<ChiefJudgeDashboardModalProps> =
 
   // حوار فك القفل الإداري
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [showDisciplineSheet, setShowDisciplineSheet] = useState<boolean>(false);
+  const [showFederationHeaderPreview, setShowFederationHeaderPreview] = useState<boolean>(false);
+
+  const handleClearResults = () => {
+    if (window.confirm('هل أنت متأكد من تفريغ كافة نتائج هذه المسابقة ومسح السجل؟ ستتم إعادة تعيين الجدول إلى الصفر.')) {
+      setResults([]);
+      setAuditLog([]);
+      // Reset status
+      try { chiefJudgeControlService.unlockResults(selectedCompId, 'admin', 'الحكم العام', 'تفريغ النتائج'); } catch {}
+      setNotification('تم تفريغ كافة نتائج وسجلات المسابقة بنجاح! أصبحت القائمة فارغة وجاهزة لاستقبال التسجيلات الميدانية.');
+      setTimeout(() => setNotification(''), 4000);
+      try {
+        localStorage.removeItem(`pfp_chief_judge_lock_${selectedCompId}`);
+        localStorage.removeItem(`pfp_chief_audit_${selectedCompId}`);
+        // multiJudgeMergeEngine.resetSession();
+      } catch {}
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (results.length === 0) {
+      alert('لا توجد نتائج مسجلة لتصديرها.');
+      return;
+    }
+    const comp = activeCompetition;
+    const BOM = '\uFEFF';
+    const csvRows = [
+      `"محضر النتائج الرسمي - غرفة الحكم العام"`,
+      `"المسابقة: ${comp?.name || selectedCompId} | المكان: ${comp?.venue || '-'} | التاريخ: ${comp?.date || '-'}"`,
+      '',
+      'الترتيب,رقم الصدر,اسم العداء,النادي,الفئة,زمن البندقية (Gun Time),الزمن الصافي (Net Time),الفارق,الحلقات,الحالة الرسمية'
+    ];
+    results.forEach(r => {
+      csvRows.push([
+        r.rank > 0 && r.rank < 1000 ? r.rank : '-',
+        r.bibNumber,
+        `"${r.athleteName.replace(/"/g, '""')}"`,
+        `"${r.clubName.replace(/"/g, '""')}"`,
+        r.category,
+        r.formattedGunTime,
+        r.formattedNetTime,
+        r.formattedGap,
+        r.completedLaps,
+        r.status === 'finished' ? 'أنهى السباق' : r.status === 'dnf' ? 'انسحاب (DNF)' : r.status === 'dq' ? `استبعاد (DQ) - ${r.disqualificationReason || ''}` : 'غياب (DNS)'
+      ].join(','));
+    });
+    const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Official_Results_${(comp?.name || 'Race').replace(/\s+/g, '_')}_${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   const [unlockReason, setUnlockReason] = useState<string>('');
 
   // حوار تسجيل طعن جديد
@@ -215,7 +272,7 @@ export const ChiefJudgeDashboardModal: React.FC<ChiefJudgeDashboardModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 sm:p-5 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-5 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-slate-100">
         
         {/* شريط العنوان */}
@@ -313,6 +370,60 @@ export const ChiefJudgeDashboardModal: React.FC<ChiefJudgeDashboardModalProps> =
               </button>
             )}
 
+            <button
+              type="button"
+              onClick={() => setShowDisciplineSheet(true)}
+              className="px-3 py-1.5 rounded-xl bg-teal-950/90 hover:bg-teal-900 border border-teal-600/70 text-teal-300 font-bold flex items-center gap-1.5 cursor-pointer transition shadow"
+              title="فتح شيت التحكيم الميداني لتسجيل التوقيتات والمسافات والرمي المتزامن"
+            >
+              <ClipboardList className="w-3.5 h-3.5 text-teal-400" />
+              <span>شيت الحكام الميداني 📋</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowFederationHeaderPreview(!showFederationHeaderPreview)}
+              className={`px-3 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 cursor-pointer transition shadow ${
+                showFederationHeaderPreview 
+                  ? 'bg-amber-600 text-white border-amber-500' 
+                  : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300'
+              }`}
+              title="معاينة محضر النتائج الرسمي بالترويسة المعتمدة"
+            >
+              <FileCheck2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>{showFederationHeaderPreview ? 'إخفاء الترويسة' : 'الترويسة الرسمية 📄'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearResults}
+              className="px-3 py-1.5 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-red-300 font-bold flex items-center gap-1.5 cursor-pointer transition shadow"
+              title="تفريغ كافة النتائج وتصفير الجدول"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>تفريغ النتائج 🗑️</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-300 font-bold flex items-center gap-1.5 cursor-pointer transition"
+              title="تصدير النتائج بتنسيق Excel CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>تصدير CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-bold flex items-center gap-1.5 cursor-pointer transition"
+              title="طباعة محضر النتائج الرسمي بالترويسة الموحدة"
+            >
+              <Printer className="w-3.5 h-3.5 text-amber-400" />
+              <span>طباعة المحضر 🖨️</span>
+            </button>
+
             {onOpenStandingsModal && (
               <button
                 type="button"
@@ -407,6 +518,22 @@ export const ChiefJudgeDashboardModal: React.FC<ChiefJudgeDashboardModalProps> =
                 </div>
               </div>
 
+              {/* الترويسة الفيدرالية الموحدة — تظهر عند الطباعة أو عند تفعيل زر المعاينة */}
+              <div className={showFederationHeaderPreview ? 'block mb-4' : 'hidden print:block mb-4'}>
+                <OfficialFederationHeader
+                  documentTitle="محضر النتائج الرسمية المعتمدة لسباق ألعاب القوى"
+                  documentSubtitle="OFFICIAL CERTIFIED ATHLETICS PROTOCOL — WA TR19 / RULE 165"
+                  competitionName={activeCompetition?.name || 'البطولة الرسمية لألعاب القوى'}
+                  venue={activeCompetition?.venue || 'ملعب 5 جويلية'}
+                  date={activeCompetition?.date || new Date().toISOString().split('T')[0]}
+                  discipline={activeCompetition?.type === 'cross_country' ? `العدو الريفي ${activeCompetition.distanceKm} كم` : 'سباق المضمار والميدان'}
+                  category={activeCompetition?.category || 'أكابر'}
+                  gender={activeCompetition?.gender === 'M' ? 'رجال' : 'سيدات'}
+                  timingSystem="Fully Automatic Timing (FAT Photo Finish 1/1000s) + Multi-Judge Sync"
+                  chiefJudgeName="الحكم العام المعتمد"
+                />
+              </div>
+
               <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/40">
                 <table className="w-full text-right text-xs">
                   <thead className="bg-slate-900 text-slate-400 text-[11px] border-b border-slate-800">
@@ -456,6 +583,14 @@ export const ChiefJudgeDashboardModal: React.FC<ChiefJudgeDashboardModalProps> =
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* التذييل والتوقيعات الرسمية — يظهر عند الطباعة أو عند المعاينة */}
+              <div className={showFederationHeaderPreview ? "block mt-4" : "hidden print:block mt-4"}>
+                <OfficialFederationFooter
+                  chiefJudgeName="الحكم العام المعتمد"
+                  presidentName="رئيس الرابطة الولائية"
+                />
               </div>
             </div>
           )}
@@ -839,7 +974,17 @@ export const ChiefJudgeDashboardModal: React.FC<ChiefJudgeDashboardModalProps> =
           </div>
         )}
 
-        {/* الشريط السفلي */}
+{showDisciplineSheet && (
+        <div className="fixed inset-0 z-[60] bg-black/90 p-2 sm:p-4 overflow-y-auto">
+          <DisciplineJudgeSheet
+            competitionId={selectedCompId}
+            competitionTitle={activeCompetition?.name}
+            onClose={() => setShowDisciplineSheet(false)}
+          />
+        </div>
+      )}
+
+              {/* الشريط السفلي */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between text-xs">
           <div className="text-slate-400">
             نظام الاعتماد الرسمي والطعون متطابق مع لوائح الاتحاد الدولي لألعاب القوى (World Athletics Rule 8)

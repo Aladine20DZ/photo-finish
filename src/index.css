@@ -1,85 +1,338 @@
 @import "tailwindcss";
 
 @layer base {
+  /* ═════════════════════════════════════════════════════════════════
+     نظام تصميم مضمار (Track Pro) بنمط World Athletics الدولي
+     World Athletics Athletic Federation Design Tokens
+     ═════════════════════════════════════════════════════════════════ */
   :root {
-    --radius: 0.75rem;
-    --track: #e63917;
-    --night: #0b1b3a;
-    --live: #ff2d55;
-    --sun: #ffb100;
-    --background: #020617;
-    --foreground: #f8fafc;
-    --card: #090d16;
-    --card-foreground: #f8fafc;
-    --popover: #090d16;
-    --popover-foreground: #f8fafc;
-    --primary: #10b981;
-    --primary-foreground: #020617;
-    --secondary: #0b1b3a;
-    --secondary-foreground: #f8fafc;
-    --muted: #0f172a;
-    --muted-foreground: #94a3b8;
-    --accent: #1e293b;
-    --accent-foreground: #38bdf8;
-    --destructive: #ef4444;
-    --border: #1e293b;
-    --input: #1e293b;
-    --ring: #10b981;
+    /* الأسطح النظيفة الصلبة */
+    --bg: #FFFFFF;
+    --surface: #FFFFFF;
+    --surface-alt: #F3F3F1;
+    --border: #DADAD6;
+    --border-strong: #0A0A0A;
+    
+    /* النصوص عالية التباين */
+    --ink: #0A0A0A;
+    --ink-2: #4A4A47;
+    --ink-3: #7C7C77;
+    --ink-inverse: #FFFFFF;
+    
+    /* الكتل السوداء الرياضية القوية */
+    --block: #0A0A0A;
+    --block-2: #1C1C1A;
+    
+    /* لون التمييز الوحيد: أحمر المضمار الجريء (Track Red) */
+    --accent: #E5321B;
+    --accent-hover: #C42A16;
+    --accent-soft: #FDECE9;
+    
+    /* الحالات الرياضية المعتمدة (مع نص وأيقونة دائماً) */
+    --success: #0E7A3E;
+    --warning: #B26A00;
+    --danger: #B3261E;
+    --info: #0B5CAD;
+    
+    /* الشكل: حواف حادة ورياضية صريحة */
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-xl: 6px;
+    
+    /* الظلال: بدون ظلال عائمة ناعمة أو ضبابية */
+    --shadow-1: none;
+    --shadow-2: 0 2px 0 rgba(10, 10, 10, 0.12);
+
+    /* شبكة مسافات 4px Spacing Grid */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    /* ربط المتغيرات الأساسية للتوافق الشامل والكامل */
+    --primary: var(--block);
+    --primary-hover: var(--block-2);
+    --primary-soft: var(--surface-alt);
+    --surface-2: var(--surface-alt);
+    --bg-from: var(--bg);
+    --bg-via: var(--surface-alt);
+    --bg-to: var(--surface);
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-2);
+    --glass-bg: var(--surface);
+    --glass-bg-strong: var(--surface);
+    --glass-border: var(--border);
+    --glass-blur: 0px;
+    --glass-shadow: var(--shadow-1);
+
+    --background: var(--bg);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --secondary: var(--surface-alt);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-alt);
+    --muted-foreground: var(--ink-2);
+    --input: var(--border);
+    --ring: var(--accent);
   }
 
-  /* الوضع الشمسي عالي التباين للحكام في الميدان وتحت أشعة الشمس المباشرة */
-  .sunlight {
-    --background: #ffffff;
-    --foreground: #000000;
-    --card: #f8fafc;
-    --card-foreground: #000000;
-    --popover: #ffffff;
-    --popover-foreground: #000000;
-    --primary: #c81e00;
-    --primary-foreground: #ffffff;
-    --secondary: #e2e8f0;
-    --secondary-foreground: #000000;
-    --muted: #f1f5f9;
-    --muted-foreground: #334155;
-    --accent: #e2e8f0;
-    --accent-foreground: #000000;
-    --destructive: #dc2626;
-    --border: #cbd5e1;
-    --input: #94a3b8;
-    --ring: #c81e00;
+  /* الثيم الداكن الرياضي (Dark Theme Option) بنفس أسماء الـ Tokens لتباين ليلي فائق */
+  .dark, [data-theme="dark"] {
+    --bg: #0A0A0A;
+    --surface: #141413;
+    --surface-alt: #1C1C1A;
+    --border: #2E2E2B;
+    --border-strong: #F5F5F2;
+    
+    --ink: #F5F5F2;
+    --ink-2: #B3B3AD;
+    --ink-3: #7C7C77;
+    --ink-inverse: #0A0A0A;
+    
+    --block: #141413;
+    --block-2: #1C1C1A;
+    
+    --accent: #FF4A33;
+    --accent-hover: #E5321B;
+    --accent-soft: rgba(229, 50, 27, 0.15);
+    
+    --success: #15803D;
+    --warning: #D97706;
+    --danger: #DC2626;
+    --info: #0284C7;
+    
+    --shadow-1: none;
+    --shadow-2: 0 2px 0 rgba(0, 0, 0, 0.4);
+
+    --primary: #F5F5F2;
+    --primary-hover: #E5E5DF;
+    --primary-soft: #1C1C1A;
+    --surface-2: var(--surface-alt);
+    --bg-from: var(--bg);
+    --bg-via: var(--surface-alt);
+    --bg-to: var(--surface);
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-2);
+    --glass-bg: var(--surface);
+    --glass-bg-strong: var(--surface);
+    --glass-border: var(--border);
+    --glass-blur: 0px;
+    --glass-shadow: var(--shadow-1);
+
+    --background: var(--bg);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --secondary: var(--surface-alt);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-alt);
+    --muted-foreground: var(--ink-2);
+    --input: var(--border);
+    --ring: var(--accent);
   }
 
-  /* الوضع النهاري الأنيق */
-  .light {
-    --background: #faf7f2;
-    --foreground: #1a1d23;
-    --card: #ffffff;
-    --card-foreground: #1a1d23;
-    --popover: #ffffff;
-    --popover-foreground: #1a1d23;
-    --primary: #e63917;
-    --primary-foreground: #ffffff;
-    --secondary: #0b1b3a;
-    --secondary-foreground: #ffffff;
-    --muted: #f1ece3;
-    --muted-foreground: #6b6660;
-    --accent: #fdeae4;
-    --accent-foreground: #b32710;
-    --destructive: #d41717;
-    --border: #e8e1d5;
-    --input: #e8e1d5;
-    --ring: #e63917;
+  /* خط مضمار المحلي Self-Hosted دون الحاجة لأي CDN خارجي */
+  @font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: local('IBM Plex Sans Arabic'), local('Cairo'), local('Segoe UI'), system-ui, sans-serif;
   }
 
   html {
-    /* منع أي تمرير/تجاوز أفقي على مستوى الصفحة كاملة (clip لا يكسر position: sticky) */
     overflow-x: clip;
+    color-scheme: light dark;
   }
 
   body {
-    font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+    font-family: 'IBM Plex Sans Arabic', 'Cairo', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
     max-width: 100vw;
+    margin: 0;
+    padding: 0;
+    transition: background-color 150ms ease, color 150ms ease;
   }
+
+  /* احترام تفضيل تقليل الحركة prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* خط الأرقام الرياضية الرقمية والجداول */
+  .font-mono, .tnum, .font-tabular, table td, table th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-athletic {
+    font-family: 'Barlow Condensed', 'Cairo', 'IBM Plex Sans Arabic', sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* نمط حارات المضمار المائل للترويسة والبطاقات البارزة (Athletic 45° Track Hatch) */
+  .track-hatch {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.03) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+  }
+
+  .track-border-accent {
+    border-bottom: 3px solid var(--accent);
+  }
+}
+
+/* تخصيص أشرطة التمرير لمظهر فخم ونظيف */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   مكونات "مضمار" Track Pro الصلبة عالية التباين (بدون أسلوب زجاجي)
+   ═════════════════════════════════════════════════════════════════ */
+
+/* 1. البطاقات الصلبة (Cards) */
+.glass-card {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-1) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--ink);
+  transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.glass-card-strong {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-2) !important;
+  border-radius: var(--radius-lg) !important;
+  color: var(--ink);
+}
+
+.glass-card-interactive {
+  cursor: pointer;
+}
+.glass-card-interactive:hover {
+  border-color: var(--primary) !important;
+  box-shadow: var(--shadow-2) !important;
+  transform: translateY(-2px);
+}
+
+/* 2. المدخلات الصلبة (Inputs) */
+.glass-input {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.glass-input:focus {
+  outline: none;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-soft) !important;
+}
+.glass-input::placeholder {
+  color: var(--ink-3) !important;
+}
+
+/* 3. الجداول عالية الكثافة (High-Density Athletic Table) */
+.glass-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: var(--surface);
+}
+.glass-table th {
+  background-color: var(--surface-2) !important;
+  color: var(--ink-2) !important;
+  font-size: 12px;
+  font-weight: 700;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.glass-table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.glass-table tbody tr:hover {
+  background-color: var(--primary-soft) !important;
+}
+
+/* تحرير الخلايا المباشر مع حد وأيقونة */
+.inline-edit-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px dashed transparent;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 150ms ease;
+  cursor: pointer;
+}
+.inline-edit-cell:hover {
+  border-color: var(--primary);
+  background-color: var(--surface);
+}
+
+/* واجهة الحكام على الهاتف — أزرار لمس كبيرة ≥48px */
+.judge-touch-button {
+  min-height: 48px;
+  min-width: 48px;
+  font-size: 16px;
+  font-weight: 800;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* إلغاء التدرجات والكرات الضبابية الزجاجية */
+.mesh-gradient-bg {
+  background-color: var(--bg) !important;
+  background-image: none !important;
+  min-height: 100vh;
+}
 
   /* الوسائط لا تتمدد أبداً أبعد من حاويتها */
   img, video, canvas {
@@ -91,7 +344,6 @@
     font-family: 'Chakra Petch', monospace, sans-serif;
     font-variant-numeric: tabular-nums;
   }
-}
 
 /* تخصيص أشرطة التمرير لمظهر فخم */
 ::-webkit-scrollbar {
@@ -103,13 +355,25 @@
   background: #020617;
 }
 
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
 ::-webkit-scrollbar-thumb {
   background: #1e293b;
   border-radius: 9999px;
 }
 
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* تأثير التوهج للعلامات */
@@ -161,4 +425,340 @@
 .animate-scanline { animation: scanline 3.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .animate-scanline { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ═══ معايير التباين الإلزامي للوضع النهاري الأنيق (Light Mode) ═══
+   ═══════════════════════════════════════════════════════════════ */
+html.light {
+  background-color: #faf7f2;
+  color: #0f172a;
+}
+
+html.light body,
+html.light .min-h-screen {
+  background-color: #faf7f2 !important;
+  color: #0f172a !important;
+}
+
+/* تحويل البطاقات والحاويات الداكنة إلى بيضاء نظيفة بحدود وظلال لطيفة */
+html.light [class*="bg-slate-950"],
+html.light [class*="bg-slate-900"],
+html.light [class*="bg-slate-850"] {
+  background-color: #ffffff !important;
+}
+
+html.light [class*="bg-slate-950/"],
+html.light [class*="bg-slate-900/"] {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light [class*="bg-slate-800"] {
+  background-color: #f8fafc !important;
+}
+
+html.light [class*="border-slate-800"],
+html.light [class*="border-slate-700"],
+html.light [class*="border-emerald-950"],
+html.light [class*="border-emerald-900"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* رأس الصفحة والتنقل */
+html.light header,
+html.light nav,
+html.light .nav-shell {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* العناوين والنصوص العادية */
+html.light h1:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.light h2:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.light h3:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.light h4:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.light h5:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.light h6:not(.dark-athletic-card *):not(.dark-chrono-deck *) {
+  color: #0f172a !important;
+}
+
+html.light p:not(.dark-athletic-card *):not(.dark-chrono-deck *) {
+  color: #334155 !important;
+}
+
+
+html.light [class*="text-slate-100"],
+html.light [class*="text-slate-200"] {
+  color: #0f172a !important;
+}
+
+html.light [class*="text-slate-300"] {
+  color: #1e293b !important;
+}
+
+html.light [class*="text-slate-400"] {
+  color: #475569 !important;
+}
+
+html.light [class*="text-slate-500"] {
+  color: #64748b !important;
+}
+
+/* حقول الإدخال والقوائم المنسدلة */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* خلفيات النوافذ المنبثقة صلبة معتمة */
+html.light [class*="fixed"][class*="inset-0"][class*="bg-slate-950"],
+html.light [class*="fixed"][class*="inset-0"][class*="bg-black"] {
+  background-color: rgba(10, 10, 10, 0.75) !important;
+}
+
+/* ═══ حماية نصوص الأزرار والشارات الملونة في الوضع النهاري ═══ */
+/* يجب ألا تتحول نصوص الأزرار الخضراء والحمراء والزرقاء والبنفسجية إلى داكنة */
+html.light button[class*="bg-emerald-"],
+html.light button[class*="bg-teal-"],
+html.light button[class*="bg-blue-"],
+html.light button[class*="bg-sky-"],
+html.light button[class*="bg-indigo-"],
+html.light button[class*="bg-purple-"],
+html.light button[class*="bg-violet-"],
+html.light button[class*="bg-red-"],
+html.light button[class*="bg-rose-"],
+html.light button[class*="bg-orange-"],
+html.light button[class*="from-emerald-"],
+html.light button[class*="from-teal-"],
+html.light button[class*="from-blue-"],
+html.light button[class*="from-red-"],
+html.light button[class*="bg-emerald-"] *,
+html.light button[class*="bg-teal-"] *,
+html.light button[class*="bg-blue-"] *,
+html.light button[class*="bg-red-"] *,
+html.light button[class*="bg-rose-"] *,
+html.light button[class*="from-emerald-"] *,
+html.light a[class*="bg-emerald-"],
+html.light a[class*="bg-emerald-"] *,
+html.light .btn-primary,
+html.light .btn-primary * {
+  color: #ffffff !important;
+}
+
+/* الأزرار الذهبية والصفراء تحافظ على نص أسود شديد الوضوح */
+html.light button[class*="bg-amber-"],
+html.light button[class*="from-amber-"],
+html.light button[class*="bg-amber-"] * {
+  color: #0f172a !important;
+}
+
+/* الحفاظ على لوحة التوقيت اليدوي وشريط المسح الضوئي داكنين لأنظمة البصريات والكاميرا */
+html.light .dark-chrono-deck,
+html.light .dark-chrono-deck * {
+  background-color: inherit;
+}
+
+/* تحسينات بصرية إضافية للوضع النهاري الأنيق */
+html.light .brand-gradient-text {
+  background: linear-gradient(135deg, #047857, #0f766e, #b45309) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+html.light .hero-title-gradient {
+  background: linear-gradient(135deg, #047857, #0f766e, #b45309) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+html.light .hero-chrono-box {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .hero-chrono-box span {
+  color: #f8fafc !important;
+}
+
+html.light .hero-chrono-box span.text-emerald-400 {
+  color: #34d399 !important;
+}
+
+html.light .hero-btn-explore {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+html.light .hero-btn-explore:hover {
+  background-color: #f8fafc !important;
+}
+
+html.light .hero-btn-league {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+  border-color: #a7f3d0 !important;
+}
+html.light .hero-btn-league:hover {
+  background-color: #d1fae5 !important;
+}
+
+html.light .hero-btn-coach {
+  background-color: #fffbeb !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+html.light .hero-btn-coach:hover {
+  background-color: #fef3c7 !important;
+}
+
+
+html.light .dark-athletic-card p {
+  color: #cbd5e1 !important;
+}
+html.light .dark-athletic-card p.text-amber-300 {
+  color: #fcd34d !important;
+}
+html.light .dark-athletic-card [class*="text-slate-300"] {
+  color: #e2e8f0 !important;
+}
+html.light .dark-athletic-card [class*="text-slate-400"] {
+  color: #94a3b8 !important;
+}
+html.light .dark-athletic-card [class*="bg-slate-950"],
+html.light .dark-athletic-card [class*="bg-slate-900"] {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+}
+
+/* الحفاظ على تباين بطاقة استعراض التخصصات الأولمبية الداكنة */
+html.light .dark-athletic-card {
+  background-color: #090d16 !important;
+  border-color: #064e3b !important;
+}
+html.light .dark-athletic-card h1,
+html.light .dark-athletic-card h2,
+html.light .dark-athletic-card h3,
+html.light .dark-athletic-card h4,
+html.light .dark-athletic-card .text-white {
+  color: #ffffff !important;
+}
+html.light .dark-athletic-card p {
+  color: #e2e8f0 !important;
+}
+html.light .dark-athletic-card p.text-amber-300 {
+  color: #fcd34d !important;
+}
+html.light .dark-athletic-card [class*="text-slate-300"] {
+  color: #cbd5e1 !important;
+}
+html.light .dark-athletic-card [class*="text-slate-400"] {
+  color: #94a3b8 !important;
+}
+html.light .dark-athletic-card [class*="bg-slate-900"] {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Admin Dashboard V2 & Glass Design System Utilities
+   ═════════════════════════════════════════════════════════════════ */
+
+/* 1. خلفية داكنة فخمة متناسقة لمضمار ألعاب القوى */
+.mesh-gradient-bg {
+  background-color: #020617;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(15, 23, 42, 0.9) 0%, transparent 50%),
+    linear-gradient(180deg, #020617 0%, #090d16 100%);
+  min-height: 100vh;
+}
+
+[data-theme="light"] .mesh-gradient-bg,
+.light .mesh-gradient-bg {
+  background-color: #faf7f2;
+  background-image: none;
+  min-height: 100vh;
+}
+
+/* 2. بطاقات وألواح صلبة (Solid Panel & Cards) */
+.glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+  border-radius: var(--radius-md);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-strong {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card-interactive {
+  cursor: pointer;
+}
+.glass-card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-2);
+}
+
+/* 3. مدخلات وحقول صلبة (Solid Inputs) */
+.glass-input {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+.glass-input:focus {
+  outline: none;
+  border-color: var(--block);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.glass-input::placeholder {
+  color: var(--ink-3);
+}
+
+/* 4. جداول صلبة عالية الكثافة (Solid Track Table) */
+.glass-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.glass-table th {
+  background: var(--block);
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.glass-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+.glass-table tbody tr:hover {
+  background: var(--surface-alt);
+}
+
+/* 5. احترام تفضيل تقليل الحركة Prefers Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .glass-card-interactive:hover {
+    transform: none !important;
+  }
 }

@@ -25,11 +25,11 @@ export class LeagueExecutiveService {
   public async getLeagueMetrics(leagueId: string): Promise<LeagueMetrics> {
     if (!isSupabaseConfigured()) {
       return {
-        totalClubs: 18,
-        totalAthletes: 420,
-        totalCompetitions: 12,
-        activeLicenses: 24,
-        certifiedResults: 156
+        totalClubs: 0,
+        totalAthletes: 0,
+        totalCompetitions: 0,
+        activeLicenses: 0,
+        certifiedResults: 0
       };
     }
 
@@ -43,19 +43,19 @@ export class LeagueExecutiveService {
       ]);
 
       return {
-        totalClubs: clubs.count || 18,
-        totalAthletes: athletes.count || 420,
-        totalCompetitions: comps.count || 12,
-        activeLicenses: licenses.count || 24,
-        certifiedResults: results.count || 156
+        totalClubs: clubs.count ?? 0,
+        totalAthletes: athletes.count ?? 0,
+        totalCompetitions: comps.count ?? 0,
+        activeLicenses: licenses.count ?? 0,
+        certifiedResults: results.count ?? 0
       };
     } catch {
       return {
-        totalClubs: 18,
-        totalAthletes: 420,
-        totalCompetitions: 12,
-        activeLicenses: 24,
-        certifiedResults: 156
+        totalClubs: 0,
+        totalAthletes: 0,
+        totalCompetitions: 0,
+        activeLicenses: 0,
+        certifiedResults: 0
       };
     }
   }

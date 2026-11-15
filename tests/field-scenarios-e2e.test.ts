@@ -369,7 +369,22 @@ describe('Comprehensive Athletics Field Scenarios E2E (Stage C8)', () => {
   // السيناريو 4: حزم الباركود المؤمنة ومارشالينج نقاط المراقبة
   // ══════════════════════════════════════════════════════════════
   describe('Scenario 4: Secured Offline QR Token Marshalling', () => {
-    it('generates HMAC-SHA256 secured QR tokens and verifies authenticity offline', async () => {
+    it('generates server-signed Ed25519 QR tokens and verifies authenticity offline', async () => {
+      // محاكاة نقطة النهاية الخادمية /api/checkpoint/sign
+      const { signCheckpointQr, getPublicKeyBase64 } = await import('../server/security.js');
+      const { setTrustedPublicKeyBase64 } = await import('../src/services/securityService');
+      setTrustedPublicKeyBase64(getPublicKeyBase64());
+      const serverSignFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+        if (typeof url === 'string' && url.includes('/api/checkpoint/sign')) {
+          const body = JSON.parse(String(init?.body || '{}'));
+          const signature = signCheckpointQr(body);
+          return new Response(JSON.stringify({ ok: true, signature }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ ok: false, error: 'Not found' }), { status: 404 });
+      };
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = serverSignFetch as typeof fetch;
+      try {
       const mockCheckpoint = {
         id: 'cp-tizi-15',
         competitionId: 'trail-ultra-2026',
@@ -388,7 +403,7 @@ describe('Comprehensive Athletics Field Scenarios E2E (Stage C8)', () => {
       expect(qrPack.id).toBeDefined();
       expect(qrPack.checkpointId).toBe('cp-tizi-15');
       expect(qrPack.checkpointCode).toBe('TIK-15');
-      expect(qrPack.signature.length).toBeGreaterThanOrEqual(8);
+      expect(qrPack.signature.length).toBeGreaterThanOrEqual(80);
       expect(qrPack.token).toContain('PFP_CP:TIK-15:');
 
       // التحقق من صحة التوقيع الأمني دون اتصال بالإنترنت
@@ -399,7 +414,15 @@ describe('Comprehensive Athletics Field Scenarios E2E (Stage C8)', () => {
       // محاولة تلاعب بمحتوى التوكن (مسابقة غير متطابقة)
       const wrongCompResult = await courseDesignerService.verifySecuredQrToken(qrPack.token, 'wrong-comp-id');
       expect(wrongCompResult.valid).toBe(false);
-      expect(wrongCompResult.error).toContain('رمز النقطة يتبع لمسابقة أخرى مختلفة');
+      expect(wrongCompResult.error).toContain('أخرى');
+
+      // رمز غير صادر من النظام يُرفض (ثغرة القبول الأعمى مغلقة)
+      const unknownResult = await courseDesignerService.verifySecuredQrToken('PFP_CP:FAKE:cp-fake:ABCD1234', 'trail-ultra-2026');
+      expect(unknownResult.valid).toBe(false);
+      expect(unknownResult.error).toContain('غير معروف');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 

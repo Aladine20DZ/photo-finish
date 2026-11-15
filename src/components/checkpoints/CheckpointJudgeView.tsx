@@ -450,7 +450,7 @@ export const CheckpointJudgeView: React.FC<CheckpointJudgeViewProps> = ({
 
       {/* نافذة منبثقة لطلب تصحيح الصدرية (Audit Trail Correction) */}
       {correctingEvent && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
             <div className="flex items-center gap-2 text-amber-400 border-b border-slate-800 pb-3">
               <RotateCcw className="w-5 h-5" />

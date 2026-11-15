@@ -1,35 +1,71 @@
-# Logs
-logs
+# ══════════════════════════════════════════════════════════════
+# PHOTO FINISH PRO — Enterprise Git Ignore Specification
+# ══════════════════════════════════════════════════════════════
+
+# 1. Dependencies & Package Managers
+node_modules/
+.pnp
+.pnp.js
+bun.lock
+
+# 2. Production & Build Outputs
+dist/
+dist-ssr/
+build/
+coverage/
+*.local
+
+# 3. Environment & Secret Credentials (STRICT NEVER COMMIT)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env.staging
+*.env
+
+# Keep clean, safe, non-secret environment template
+!.env.example
+
+# 4. Local Cryptographic Keys, Databases & Data Storage (CRITICAL SECURITY)
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.key
+*.pem
+*.pfx
+*.pkcs8
+service-account*.json
+firebase-admin*.json
+package_clean.ps1
+
+# 5. Logs & Diagnostic Traces
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# 6. IDE, System & Editor Files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-Thumbs.db
 
-# environment
-.env
-.env.local
-bun.lock
-
-# archives
+# 7. Archives & Compressed Packages
 *.rar
 *.zip
-
+*.tar.gz
+*.7z

@@ -153,7 +153,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 text-white" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 text-white" dir="rtl">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
         {/* رأس النافذة */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">

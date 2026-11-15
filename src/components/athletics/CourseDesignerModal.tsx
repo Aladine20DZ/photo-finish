@@ -1,4 +1,56 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icons for Vite
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+const MapClickHandler: React.FC<{ onMapClick: (lat: number, lng: number) => void }> = ({ onMapClick }) => {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+};
+
+const RecenterMap: React.FC<{ center: [number, number] }> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+};
+
+const InvalidateMapSize: React.FC = () => {
+  const map = useMap();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [map]);
+  return null;
+};
+
+const createMarkerIcon = (type?: string) => {
+  const color = type === 'start' ? '#10B981' : type === 'finish' ? '#EF4444' : type === 'checkpoint' ? '#06B6D4' : '#64748B';
+  const label = type === 'start' ? '🟢' : type === 'finish' ? '🏁' : type === 'checkpoint' ? '⏱️' : '📍';
+  return L.divIcon({
+    className: 'custom-map-pin',
+    html: `<div style="background-color: ${color}; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px ${color}; border: 2px solid white; font-size: 13px; color: white;">${label}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -28],
+  });
+};
+
 import { 
   X, Route, Download, Upload, Plus, Trash2, 
   RefreshCw, QrCode, Flag, CheckCircle2,
@@ -24,6 +76,8 @@ export const CourseDesignerModal: React.FC<CourseDesignerModalProps> = ({
   const [courses, setCourses] = useState<Course[]>([]);
   const [activeCourse, setActiveCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'editor' | 'elevation' | 'qr_packs' | 'presets'>('editor');
+  const [designerEngine, setDesignerEngine] = useState<'leaflet' | 'svg'>('leaflet');
+  const [mapLayer, setMapLayer] = useState<'osm' | 'sat'>('osm');
   const [qrPacks, setQrPacks] = useState<SecuredQrPack[]>([]);
   const [_isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<string>('');
@@ -383,7 +437,7 @@ export const CourseDesignerModal: React.FC<CourseDesignerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 sm:p-5 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-5 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-slate-100">
         
         {/* شريط العنوان العلوي */}
@@ -396,7 +450,7 @@ export const CourseDesignerModal: React.FC<CourseDesignerModalProps> = ({
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-black text-white">مصمم المسارات والخرائط المحلية</h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                  Offline Engine 🗺️
+                  خريطة تفاعلية حية • GPS & OpenStreetMap 🗺️
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -546,86 +600,190 @@ export const CourseDesignerModal: React.FC<CourseDesignerModalProps> = ({
           {/* ══════════ تبويب المسار التفاعلي 2D ══════════ */}
           {activeTab === 'editor' && (
             <div className="space-y-4">
-              {/* لوحة رسم المسار بالـ SVG المستقل محلياً */}
-              <div className="bg-slate-950 rounded-2xl border border-slate-800 p-2 overflow-hidden relative shadow-inner">
-                <div className="absolute top-3 right-3 z-10 bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-2">
-                  <span className="flex items-center gap-1 text-emerald-400">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> البداية
-                  </span>
-                  <span className="flex items-center gap-1 text-red-400">
-                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span> الوصول
-                  </span>
-                  <span className="flex items-center gap-1 text-cyan-400">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span> نقطة مراقبة
-                  </span>
+              {/* شريط أدوات الخريطة الحية والمحرك */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/80 border border-slate-800 p-3 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300">نمط العرض:</span>
+                  <button
+                    type="button"
+                    onClick={() => setDesignerEngine('leaflet')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      designerEngine === 'leaflet' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-850 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🗺️ الخريطة الحية (GPS & Leaflet)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDesignerEngine('svg')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      designerEngine === 'svg' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-850 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>📐 المخطط المتجهي (SVG)</span>
+                  </button>
                 </div>
 
-                {svgPathData ? (
-                  <svg
-                    viewBox={`0 0 ${svgPathData.width} ${svgPathData.height}`}
-                    className="w-full h-64 sm:h-80 select-none"
-                  >
-                    {/* شبكة خلفية خفيفة */}
-                    <defs>
-                      <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-                        <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1e293b" strokeWidth="0.5" />
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-
-                    {/* خط المسار */}
-                    <path
-                      d={svgPathData.pathD}
-                      fill="none"
-                      stroke="#06b6d4"
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="filter drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-                    />
-
-                    {/* نقاط المسار */}
-                    {svgPathData.points.map((p, idx) => {
-                      const isStart = p.waypoint.type === 'start';
-                      const isFinish = p.waypoint.type === 'finish';
-                      const isCp = p.waypoint.checkpointId || p.waypoint.type === 'checkpoint';
-
-                      const fillColor = isStart ? '#10b981' : isFinish ? '#ef4444' : isCp ? '#38bdf8' : '#94a3b8';
-                      const radius = isStart || isFinish || isCp ? 6.5 : 3.5;
-
-                      return (
-                        <g key={p.waypoint.id} className="cursor-pointer">
-                          <circle
-                            cx={p.x}
-                            cy={p.y}
-                            r={radius}
-                            fill={fillColor}
-                            stroke="#0f172a"
-                            strokeWidth="2"
-                          />
-                          {(isStart || isFinish || isCp) && (
-                            <text
-                              x={p.x}
-                              y={p.y - 10}
-                              fill="#f8fafc"
-                              fontSize="10"
-                              fontWeight="bold"
-                              textAnchor="middle"
-                              className="pointer-events-none"
-                            >
-                              {p.waypoint.name || `#${idx + 1}`}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    })}
-                  </svg>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
-                    لا توجد نقاط كافية لرسم المسار. أضف نقطتين على الأقل.
+                {designerEngine === 'leaflet' && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMapLayer(mapLayer === 'osm' ? 'sat' : 'osm')}
+                      className="px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>{mapLayer === 'osm' ? '🛰️ قمر صناعي' : '🗺️ خريطة شوارع'}</span>
+                    </button>
+                    <span className="text-[11px] text-cyan-400 font-medium hidden sm:inline">
+                      💡 انقر مباشرة على الخريطة لتحديد أي نقطة مسار فوراً
+                    </span>
                   </div>
                 )}
               </div>
+
+              {/* لوحة عرض الخريطة الحية التفاعلية */}
+              {designerEngine === 'leaflet' ? (
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden relative shadow-2xl" style={{ height: '460px' }}>
+                  {activeCourse && activeCourse.waypoints.length > 0 ? (
+                    <MapContainer
+                      center={[activeCourse.waypoints[0].lat, activeCourse.waypoints[0].lng]}
+                      zoom={14}
+                      style={{ height: '100%', width: '100%' }}
+                      className="rounded-2xl z-0"
+                    >
+                      <RecenterMap center={[activeCourse.waypoints[0].lat, activeCourse.waypoints[0].lng]} />
+                      <InvalidateMapSize />
+                      <TileLayer
+                        attribution={mapLayer === 'osm' ? '&copy; OpenStreetMap' : '&copy; Esri WorldImagery'}
+                        url={mapLayer === 'osm' 
+                          ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                          : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                        }
+                      />
+                      <MapClickHandler onMapClick={(lat, lng) => {
+                        setNewLat(lat.toFixed(6));
+                        setNewLng(lng.toFixed(6));
+                        showNotification(`📍 تم التقاط الموقع: ${lat.toFixed(5)}, ${lng.toFixed(5)} — أضف النقطة بالنموذج`);
+                      }} />
+
+                      {/* رسم مسار السباق باللون الفيروزي البراق */}
+                      {activeCourse.waypoints.length > 1 && (
+                        <Polyline
+                          positions={activeCourse.waypoints.map(w => [w.lat, w.lng] as [number, number])}
+                          pathOptions={{ color: '#06B6D4', weight: 4, opacity: 0.95 }}
+                        />
+                      )}
+
+                      {/* علامات نقاط المسار التفاعلية */}
+                      {activeCourse.waypoints.map((wp, idx) => (
+                        <Marker 
+                          key={wp.id || idx} 
+                          position={[wp.lat, wp.lng]}
+                          icon={createMarkerIcon(wp.type)}
+                        >
+                          <Popup>
+                            <div dir="rtl" className="text-right p-1 font-sans space-y-1">
+                              <div className="font-bold text-sm text-slate-900 border-b pb-1">
+                                {wp.name || `نقطة المسار #${idx + 1}`}
+                              </div>
+                              <div className="text-xs text-slate-700">
+                                {wp.type === 'start' && '🟢 خط البداية الرسمي'}
+                                {wp.type === 'finish' && '🏁 خط النهاية الرسمي'}
+                                {wp.type === 'checkpoint' && '⏱️ نقطة مراقبة وتوقيت'}
+                                {wp.type === 'track_point' && '📍 نقطة مسار'}
+                              </div>
+                              <div className="text-xs text-slate-600">
+                                <strong>المسافة:</strong> {((wp.distanceFromStartMeters || 0) / 1000).toFixed(2)} كم ({wp.distanceFromStartMeters || 0}م)
+                              </div>
+                              {wp.elevation !== undefined && (
+                                <div className="text-xs text-slate-600">
+                                  <strong>الارتفاع:</strong> {wp.elevation}م
+                                </div>
+                              )}
+                              <div className="text-[10px] text-slate-500 font-mono">
+                                {wp.lat.toFixed(5)}, {wp.lng.toFixed(5)}
+                              </div>
+                              <div className="pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteWaypoint(idx)}
+                                  className="w-full text-center py-1 px-2 rounded bg-red-100 hover:bg-red-200 text-red-700 font-bold text-[11px] transition cursor-pointer"
+                                >
+                                  🗑️ حذف هذه النقطة
+                                </button>
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      ))}
+                    </MapContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-2">
+                      <div className="text-4xl">🗺️</div>
+                      <p className="font-bold text-sm">لا توجد نقاط كافية لرسم الخريطة</p>
+                      <p className="text-xs text-slate-500">اختر نموذجاً جاهزاً أو أدخل إحداثيات النقطة الأولى</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* لوحة رسم المسار بالـ SVG المستقل محلياً */
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 p-2 overflow-hidden relative shadow-inner">
+                  <div className="absolute top-3 right-3 z-10 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-emerald-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> البداية
+                    </span>
+                    <span className="flex items-center gap-1 text-red-400">
+                      <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span> الوصول
+                    </span>
+                    <span className="flex items-center gap-1 text-cyan-400">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span> نقطة مراقبة
+                    </span>
+                  </div>
+
+                  {svgPathData ? (
+                    <svg
+                      viewBox={`0 0 ${svgPathData.width} ${svgPathData.height}`}
+                      className="w-full h-64 sm:h-80 select-none"
+                    >
+                      <defs>
+                        <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                          <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1e293b" strokeWidth="0.5" />
+                        </pattern>
+                      </defs>
+                      <rect width="100%" height="100%" fill="url(#grid)" />
+                      <path
+                        d={svgPathData.pathD}
+                        fill="none"
+                        stroke="#06b6d4"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="filter drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                      />
+                      {svgPathData.points.map((p, idx) => {
+                        const isStart = p.waypoint.type === 'start';
+                        const isFinish = p.waypoint.type === 'finish';
+                        const isCp = p.waypoint.checkpointId || p.waypoint.type === 'checkpoint';
+                        const fillColor = isStart ? '#10b981' : isFinish ? '#ef4444' : isCp ? '#38bdf8' : '#94a3b8';
+                        const radius = isStart || isFinish || isCp ? 6.5 : 3.5;
+                        return (
+                          <g key={p.waypoint.id} className="cursor-pointer">
+                            <circle cx={p.x} cy={p.y} r={radius} fill={fillColor} stroke="#0f172a" strokeWidth="2" />
+                            {(isStart || isFinish || isCp) && (
+                              <text x={p.x} y={p.y - 10} fill="#f8fafc" fontSize="10" fontWeight="bold" textAnchor="middle" className="pointer-events-none">
+                                {p.waypoint.name || `#${idx + 1}`}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
+                      لا توجد نقاط كافية لرسم المسار. أضف نقطتين على الأقل.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* نموذج إضافة نقطة مسار يدوياً */}
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-3">

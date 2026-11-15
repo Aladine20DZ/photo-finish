@@ -1,5 +1,6 @@
 import { NetworkPeerMessage, RaceSettings, Runner, Heat, PhoneRole } from '../../types/race';
 import { athleticsNetwork } from '../networkService';
+import { licenseManager } from '../licenseManager';
 
 export interface SettingsSyncHandlerCallbacks {
   setSettings: (settings: RaceSettings | ((prev: RaceSettings) => RaceSettings)) => void;
@@ -55,6 +56,18 @@ export function handleSettingsSyncMessage(msg: NetworkPeerMessage, ctx: Settings
           fromRole: ctx.role,
         },
       });
+      // إذا كان لدى هذا الهاتف ترخيص شبكي 1*4 نشط، بثه فوراً للهاتف المنضم حديثاً للغرفة
+      if (ctx.role) {
+        const pool = licenseManager.createPoolShareMessage(ctx.role);
+        if (pool) {
+          athleticsNetwork.sendMessage({
+            type: 'LICENSE_SHARE_POOL',
+            timestamp: Date.now(),
+            senderTime: Date.now(),
+            payload: pool
+          });
+        }
+      }
       return true;
 
     case 'RESPONSE_STATE_SYNC':

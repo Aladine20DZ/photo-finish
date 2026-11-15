@@ -1,30 +1,59 @@
-name: CI
+name: CI / Enterprise Cloud Verification
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
     branches: [main]
 
 jobs:
-  build:
+  verify:
+    name: Typecheck, Test, Secret Scan & Build
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Node 22
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Pre-Flight Repository Secret Scan
+        run: |
+          echo "🔍 Scanning tracked repository files for prohibited secrets..."
+          # Verify that sensitive files are NOT tracked in git
+          if git ls-files | grep -E '(^|\/)(data\/|\.env$|\.env\.local|\.sqlite|\.pem$|\.key$|license-keys\.json)'; then
+            echo "❌ CRITICAL SECURITY ERROR: Prohibited secret or database file found in git index!"
+            exit 1
+          fi
+          echo "✅ Repository git index is clean of private keys and local databases."
 
-      - name: Type-check & build
+      - name: Install Dependencies
+        run: npm ci || npm install --no-audit
+
+      - name: TypeScript Type-Check
+        run: npx tsc --noEmit
+
+      - name: Run Vitest Automated Test Suite
+        run: npx vitest run
+
+      - name: Production Bundle Build (Vite SingleFile)
         run: npm run build
 
-      - name: Verify dist output
+      - name: Verify Distribution Artifact
         run: |
           test -f dist/index.html
-          echo "✅ Build output verified: dist/index.html exists"
+          echo "✅ Build artifact verified: dist/index.html exists and is ready for Vercel."
+
+      - name: Post-Build Secret Leakage Check
+        run: |
+          echo "🔍 Verifying built bundle does not contain leaked private keys..."
+          # Scans bundle for private key keywords or signing secrets
+          if grep -E 'ydyqLd\+QflMzl6NTdma1ZUq6BidICTTaxpunjhoLRkA|BEGIN PRIVATE KEY' dist/index.html; then
+            echo "❌ SECURITY FAILURE: Private signing key leaked into frontend bundle!"
+            exit 1
+          fi
+          echo "✅ Production bundle passed zero-secret verification."

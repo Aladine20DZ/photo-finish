@@ -134,7 +134,7 @@ export const DutyCodeCheckIn: React.FC<DutyCodeCheckInProps> = ({ onUnlockTask, 
   return (
     <div className="w-full max-w-xl mx-auto">
       {!task ? (
-        <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+        <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-5">
             <span className="grid place-items-center w-12 h-12 rounded-2xl bg-emerald-950 border border-emerald-500/50 text-emerald-400 shadow-md">
               <ScanLine className="w-6 h-6" />

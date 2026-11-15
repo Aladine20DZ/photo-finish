@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { Runner } from '../types/race';
 import { Athlete, Club, AthleteDuplicateMatch } from '../types/athletics';
 import { athleteClubStorage, INITIAL_CLUBS, INITIAL_ATHLETES } from '../services/athleteClubStorage';
@@ -45,8 +45,8 @@ export interface AthleteState {
 
 export const useAthleteStore = create<AthleteState>((set, get) => ({
   runners: DEFAULT_RUNNERS,
-  athletes: INITIAL_ATHLETES,
-  clubs: INITIAL_CLUBS,
+  athletes: [],
+  clubs: [],
   selectedAthlete: null,
   duplicateMatches: [],
   searchFilter: '',

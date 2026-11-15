@@ -1,6 +1,7 @@
 /**
  * PHOTO FINISH PRO AI — Dedicated Coach & Club Portal Gate
- * Allows Club Coaches to authenticate before registering athletes or generating certificates.
+ * Allows Club Coaches to authenticate or open the unified registration hub.
+ * Integrated with Single Active Session Architecture to prevent multi-account collisions.
  */
 
 import React, { useState } from 'react';
@@ -9,31 +10,50 @@ import {
   User, 
   Key, 
   Sparkles, 
-  AlertCircle
+  AlertCircle,
+  PlusCircle,
+  LogIn,
+  UserCheck
 } from 'lucide-react';
-import { portalAuthService, PortalSession } from '../../services/portalAuthService';
+import { portalAuthService, PortalSession, PortalType } from '../../services/portalAuthService';
+import { useAthleteStore } from '../../stores/athleteStore';
 
 interface CoachGateProps {
   onAuthenticated: (session: PortalSession) => void;
   onBackToPublic?: () => void;
+  onOpenAuthModal?: (targetPortal: PortalType, mode?: 'login' | 'register') => void;
 }
 
 export const CoachGate: React.FC<CoachGateProps> = ({
   onAuthenticated,
-  onBackToPublic
+  onBackToPublic,
+  onOpenAuthModal
 }) => {
-  const [username, setUsername] = useState('coach_mca');
-  const [password, setPassword] = useState('Coach@2026');
-  const [selectedClubId, setSelectedClubId] = useState<string>('club_mca');
+  const clubs = useAthleteStore((state) => state.clubs);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [selectedClubId, setSelectedClubId] = useState<string>(() => clubs[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const activeSession = portalAuthService.getActiveSession();
+
+  const selectedClub = clubs.find(c => c.id === selectedClubId) || {
+    id: selectedClubId,
+    name: selectedClubId === 'club_mca' ? 'مولودية الجزائر (MCA)' : 'النادي الرياضي المعتمد'
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const res = await portalAuthService.loginCoach(username, password, selectedClubId);
+    const res = await portalAuthService.loginCoach(
+      username, 
+      password, 
+      selectedClubId,
+      selectedClub?.name
+    );
     setLoading(false);
 
     if (!res.success || !res.session) {
@@ -45,7 +65,7 @@ export const CoachGate: React.FC<CoachGateProps> = ({
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-950">
+    <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-950" dir="rtl">
       <div className="w-full max-w-xl space-y-6">
         
         {/* Header */}
@@ -62,6 +82,45 @@ export const CoachGate: React.FC<CoachGateProps> = ({
           </p>
         </div>
 
+        {/* جلسة نشطة بالفعل إن وجدت لمنع تضارب الحسابات */}
+        {activeSession && (
+          <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-600/60 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <UserCheck className="w-5 h-5 text-amber-400 shrink-0" />
+              <div>
+                <div className="text-xs font-black text-amber-200">
+                  جلسة نشطة حالياً: {activeSession.fullName || activeSession.clubName || activeSession.username} ({activeSession.portal === 'coach' ? 'مدرب' : activeSession.portal === 'league' ? 'رابطة' : activeSession.portal === 'judge' ? 'حكم' : 'مدير'})
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  تفادياً لازدواجية الدخول، يمكنك المتابعة أو تسجيل الخروج.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {activeSession.portal === 'coach' ? (
+                <button
+                  type="button"
+                  onClick={() => onAuthenticated(activeSession)}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow"
+                >
+                  المتابعة ←
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    portalAuthService.logoutAll();
+                    window.location.reload();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                >
+                  تبديل الحساب
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Card */}
         <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-emerald-900/60 shadow-2xl space-y-6">
           
@@ -75,18 +134,40 @@ export const CoachGate: React.FC<CoachGateProps> = ({
           <form onSubmit={handleLogin} className="space-y-4">
             
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">النادي الرياضي التابع له:</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-300">
+                  النادي الرياضي التابع له:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenAuthModal) onOpenAuthModal('coach', 'register');
+                  }}
+                  className="text-xs font-black text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>تسجيل مدرب ونادٍ جديد +</span>
+                </button>
+              </div>
+
               <select
                 value={selectedClubId}
                 onChange={(e) => setSelectedClubId(e.target.value)}
-                className="w-full p-3 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl text-xs font-bold text-white focus:outline-none"
+                className="w-full p-3 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl text-xs font-bold text-white focus:outline-none cursor-pointer"
               >
-                <option value="club_mca">مولودية الجزائر (MCA)</option>
-                <option value="club_crb">شباب بلوزداد لألعاب القوى (CRB)</option>
-                <option value="club_ess">وفاق سطيف (ESS)</option>
-                <option value="club_aso">أولمبي الشلف (ASO)</option>
-                <option value="club_csc">شباب قسنطينة (CSC)</option>
-                <option value="club_usma">اتحاد الجزائر (USMA)</option>
+                {clubs.length > 0 ? (
+                  clubs.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.code ? `(${c.code})` : ''} — {c.wilaya}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="club_mca">مولودية الجزائر (MCA)</option>
+                    <option value="club_crb">شباب بلوزداد لألعاب القوى (CRB)</option>
+                    <option value="club_saida_01">نادي ألعاب القوى سعيدة (MCS)</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -120,32 +201,34 @@ export const CoachGate: React.FC<CoachGateProps> = ({
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>{loading ? 'جارٍ التحقق...' : 'دخول معالج تسجيل الرياضيين ←'}</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>{loading ? 'جارٍ التحقق...' : 'دخول معالج تسجيل الرياضيين ←'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenAuthModal) onOpenAuthModal('coach', 'login');
+                }}
+                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                title="فتح نافذة الدخول والتسجيل الموحدة الشاملة"
+              >
+                <LogIn className="w-4 h-4 text-cyan-400" />
+                <span>النافذة الموحدة 🔲</span>
+              </button>
+            </div>
 
           </form>
 
-          {/* Quick Demo */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                setUsername('coach_mca');
-                setPassword('Coach@2026');
-                setSelectedClubId('club_mca');
-              }}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-emerald-500 text-slate-300 hover:text-emerald-400 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              🟢 حساب تجريبي: مدرب مولودية الجزائر (MCA)
-            </button>
-
-            {onBackToPublic && (
+          {/* Return to Public Portal */}
+          {onBackToPublic && (
+            <div className="pt-2 border-t border-slate-800/80 text-center">
               <button
                 type="button"
                 onClick={onBackToPublic}
@@ -153,8 +236,8 @@ export const CoachGate: React.FC<CoachGateProps> = ({
               >
                 العودة للبوابة العامة ←
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
         </div>
 

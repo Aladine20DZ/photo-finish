@@ -129,7 +129,7 @@ export const RegistrationApprovalModal: React.FC<RegistrationApprovalModalProps>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 md:p-4 text-white overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 md:p-4 text-white overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
@@ -377,7 +377,7 @@ export const RegistrationApprovalModal: React.FC<RegistrationApprovalModalProps>
       {/* نافذة تحديد سبب الرفض */}
       {/* ═══════════════════════════════════════════════════ */}
       {rejectingReg && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl p-6 text-right">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-2 font-bold text-white text-base">
@@ -442,7 +442,7 @@ export const RegistrationApprovalModal: React.FC<RegistrationApprovalModalProps>
       {/* نافذة سجل تدقيق الإجراءات */}
       {/* ═══════════════════════════════════════════════════ */}
       {viewingAuditRegId && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 text-right max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-2 font-bold text-white text-base">

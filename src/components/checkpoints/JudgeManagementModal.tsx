@@ -101,7 +101,7 @@ export const JudgeManagementModal: React.FC<JudgeManagementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-6 shadow-2xl space-y-6 my-auto text-slate-100">
         {/* رأس النافذة */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -229,7 +229,7 @@ export const JudgeManagementModal: React.FC<JudgeManagementModalProps> = ({
 
         {/* نافذة عرض رمز الـ QR للحكم لتسهيل توزيعه في الميدان */}
         {selectedJudgeForQr && (
-          <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-60 bg-black/90 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
               <h3 className="font-bold text-base text-slate-100">رمز الدخول السريع للحكم</h3>
               <p className="text-xs text-emerald-400 font-bold">{selectedJudgeForQr.name}</p>

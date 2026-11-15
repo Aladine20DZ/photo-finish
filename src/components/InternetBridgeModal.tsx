@@ -120,7 +120,7 @@ export const InternetBridgeModal: React.FC<InternetBridgeModalProps> = ({
   const isChambreOnline = roomStatus?.hasChambre || athleticsNetwork.hasChambrePhone || role === 'chambre_dappel';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl animate-scaleUp my-auto">
         {/* رأس النافذة */}
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 p-4 border-b border-slate-800 flex items-center justify-between">

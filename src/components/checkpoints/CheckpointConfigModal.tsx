@@ -101,7 +101,7 @@ export const CheckpointConfigModal: React.FC<CheckpointConfigModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-6 shadow-2xl space-y-6 my-auto text-slate-100">
         {/* الرأس */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">

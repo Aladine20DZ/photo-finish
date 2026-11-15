@@ -122,7 +122,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     : '';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-2 sm:p-4 overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-scaleUp my-auto">
         
         {/* ترويسة لوحة المدير */}

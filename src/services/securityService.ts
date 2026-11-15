@@ -15,14 +15,50 @@
 
 import { PhoneRole } from '../types/race';
 
-// المفتاح العام Ed25519 (الافتراضي أو من متغير البيئة)
-export const ED25519_PUBLIC_KEY_BASE64 = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || 
-  'hbH1fBBC+kL3K6u7pWufQqHoKRjM0iS/+GA5L+j0nMg=';
+// ═══ المفتاح العام Ed25519 (Zero Hardcoded Keys) ═══
+// لا يوجد أي مفتاح مضمّن في الشفرة (كل مفتاح ظهر سابقاً في مستودع عام مفسوح).
+// ترتيب الحل على العميل:
+//   1) متغير البيئة VITE_LICENSE_PUBLIC_KEY عند البناء (موصى به للإنتاج)
+//   2) مفتاح موثوق محقون وقت التشغيل (setTrustedPublicKeyBase64) أو مخزّن سابقاً من الخادم
+//   3) جلب من الخادم /api/public-key (Trust-On-First-Use) وحفظه محلياً
+export const ED25519_PUBLIC_KEY_BASE64: string =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || '';
 
-export const ED25519_PRIVATE_KEY_BASE64 = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || 
-  'gW5tU3jF63FHmofys6AdKy9340A34SErmp+7OfTHy4Q=';
+const PREF_TRUSTED_PUBKEY = 'pf_trusted_pubkey_v1';
+
+/** حقن مفتاح عام موثوق وقت التشغيل (يستخدمه الاختبار والتهيئة من الخادم) */
+export function setTrustedPublicKeyBase64(b64: string): void {
+  cachedPublicKey = null;
+  cachedKeyBase64 = String(b64 || '').trim();
+}
+
+let cachedKeyBase64: string = '';
+
+async function resolvePublicKeyBase64(): Promise<string> {
+  if (cachedKeyBase64) return cachedKeyBase64;
+  if (ED25519_PUBLIC_KEY_BASE64) {
+    cachedKeyBase64 = ED25519_PUBLIC_KEY_BASE64;
+    return cachedKeyBase64;
+  }
+  try {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(PREF_TRUSTED_PUBKEY) : null;
+    if (saved) {
+      cachedKeyBase64 = saved;
+      return cachedKeyBase64;
+    }
+  } catch { /* تخزين غير متاح */ }
+  // Trust-On-First-Use: جلب المفتاح العام من الخادم وحفظه (للإنتاج: ثبّته عبر متغير البيئة)
+  try {
+    const resp = await fetch('/api/public-key');
+    const data = await resp.json();
+    if (data?.publicKeyBase64) {
+      cachedKeyBase64 = data.publicKeyBase64;
+      try { localStorage.setItem(PREF_TRUSTED_PUBKEY, cachedKeyBase64); } catch { /* ignore */ }
+      return cachedKeyBase64;
+    }
+  } catch { /* لا خادم — التحقق سيُفشل برسالة واضحة */ }
+  return '';
+}
 
 // ═══ 1. مصفوفة صلاحيات الأدوار الميدانية (Role Permission Matrix) ═══
 // يحدد لكل دور ما هي أنواع الرسائل المسموح له قانونياً بإرسالها
@@ -105,6 +141,8 @@ export const ROLE_PERMITTED_MESSAGES: Record<string, Set<string>> = {
     'ATHLETICS_CORRECTION',
     'ATHLETICS_JUDGE_HEARTBEAT',
     'ATHLETICS_VIOLATION',
+    'ATHLETICS_PURGE_COMMAND',
+    'ATHLETICS_PURGE_ACK',
     'CROSSING_RECORDED',
     'CROSSING_SYNC_BATCH',
     'SYNC_PING',
@@ -118,6 +156,8 @@ export const ROLE_PERMITTED_MESSAGES: Record<string, Set<string>> = {
     'ATHLETICS_COMPETITION_SYNC',
     'ATHLETICS_CORRECTION',
     'ATHLETICS_JUDGE_HEARTBEAT',
+    'ATHLETICS_PURGE_COMMAND',
+    'ATHLETICS_PURGE_ACK',
     'PASS_OVERRIDE',
     'RESULTS_LOCK_PUBLISH',
     'SYNC_PING',
@@ -165,8 +205,14 @@ async function getOrImportPublicKey(): Promise<CryptoKey | null> {
   const subtle = getSubtleCrypto();
   if (!subtle) return null;
 
+  const keyB64 = await resolvePublicKeyBase64();
+  if (!keyB64) {
+    console.warn('[Security] لا يوجد مفتاح عام Ed25519 موثوق — شغّل الخادم أو ثبّت VITE_LICENSE_PUBLIC_KEY');
+    return null;
+  }
+
   try {
-    const rawKey = Uint8Array.from(atob(ED25519_PUBLIC_KEY_BASE64), c => c.charCodeAt(0));
+    const rawKey = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
     cachedPublicKey = await subtle.importKey(
       'raw',
       rawKey,
@@ -178,6 +224,34 @@ async function getOrImportPublicKey(): Promise<CryptoKey | null> {
   } catch (err) {
     console.warn('[Security] تعذر استيراد المفتاح العام Ed25519:', err);
     return null;
+  }
+}
+
+/**
+ * تحويل Base64Url إلى بايتات (نسخة إلى ArrayBuffer عادي لتوافق BufferSource)
+ */
+function base64UrlToBytes(b64Url: string): Uint8Array<ArrayBuffer> {
+  const base64 = b64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4));
+  const bin = atob(base64 + pad);
+  const bytes = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * التحقق العام من توقيع Ed25519 على نص قياسي (يستخدمه التراخيص ونقاط المراقبة)
+ */
+export async function verifyEd25519Signature(payloadString: string, sigBase64Url: string): Promise<boolean> {
+  const pubKey = await getOrImportPublicKey();
+  const subtle = getSubtleCrypto();
+  if (!pubKey || !subtle || !sigBase64Url) return false;
+  try {
+    const dataBytes = new TextEncoder().encode(payloadString);
+    const sigBytes = base64UrlToBytes(sigBase64Url);
+    return await subtle.verify({ name: 'Ed25519' }, pubKey, sigBytes, dataBytes);
+  } catch {
+    return false;
   }
 }
 
@@ -209,26 +283,13 @@ export async function verifyEd25519LicenseCode(code: string): Promise<{
   const pubKey = await getOrImportPublicKey();
   const subtle = getSubtleCrypto();
   if (!pubKey || !subtle) {
-    return { valid: false, error: 'محرك التحقق من التوقيع غير متاح في المتصفح' };
+    return { valid: false, error: 'محرك التحقق من التوقيع غير متاح (لا يوجد مفتاح عام موثوق)' };
   }
 
   try {
-    // إعادة بناء النص الأصلي الموقع
+    // إعادة بناء النص الأصلي الموقع والتحقق عبر المحرك العام الموحد
     const payload = `PFP2|${tier}|${expCode}|${devHash}`;
-    const enc = new TextEncoder();
-    const dataBytes = enc.encode(payload);
-
-    // تحويل Base64Url إلى مصفوفة بايتات
-    const base64 = sigBase64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4));
-    const sigBytes = Uint8Array.from(atob(base64 + pad), c => c.charCodeAt(0));
-
-    const isValid = await subtle.verify(
-      { name: 'Ed25519' },
-      pubKey,
-      sigBytes,
-      dataBytes
-    );
+    const isValid = await verifyEd25519Signature(payload, sigBase64Url);
 
     if (!isValid) {
       return { valid: false, error: 'توقيع الترخيص الرقمي غير صالح أو تم التلاعب به' };
@@ -245,8 +306,16 @@ export async function verifyEd25519LicenseCode(code: string): Promise<{
   }
 }
 
+let cachedPrivKeyBase64: string = '';
+
+/** حقن مفتاح خاص موثوق وقت التشغيل (لبيئات الاختبار) */
+export function setTrustedPrivateKeyBase64(b64: string): void {
+  cachedPrivKeyBase64 = String(b64 || '').trim();
+}
+
 /**
- * توليد كود ترخيص موقع رسمياً بـ Ed25519 عبر Web Crypto API المتوافق مع المتصفحات
+ * توليد كود ترخيص موقع رسمياً بـ Ed25519
+ * تحاول الاستعانة بنقطة النهاية الخادمية أولاً، وتلجأ للـ Web Crypto المحلي عند توفر مفتاح خاص
  */
 export async function generateEd25519LicenseCode(params: {
   tier: 'CLB8' | 'ENTX';
@@ -254,16 +323,41 @@ export async function generateEd25519LicenseCode(params: {
   devHash?: string;
 }): Promise<string> {
   const { tier, expiryCode, devHash = 'POOL' } = params;
-  const subtle = getSubtleCrypto();
-  if (!subtle) {
-    throw new Error('Web Crypto API غير متاح للتحقق والتوقيع');
+
+  // 1. محاولة طلب إصدار ترخيص رسمي من الخادم إذا كان متصلاً
+  try {
+    const adminToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pf_admin_token') : null;
+    const resp = await fetch('/api/admin/generate-license', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
+      },
+      body: JSON.stringify({ tier, expCode: expiryCode, devHash })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.licenseCode) return data.licenseCode;
+    }
+  } catch {
+    // الخادم غير متصل — الاستمرار عبر المولد المحلي
   }
 
-  // PKCS#8 header for Ed25519 (RFC 8410: OID 1.3.101.112)
+  // 2. المولد المحلي الاحتياطي عبر Web Crypto API (للعمل أوفلاين دون خادم)
+  const subtle = getSubtleCrypto();
+  if (!subtle) {
+    throw new Error('محرك التوقيع والتشفير غير متاح');
+  }
+
+  const privKeyBase64 = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || cachedPrivKeyBase64;
+  if (!privKeyBase64) {
+    throw new Error('لا يوجد مفتاح خاص Ed25519 متاح لتوليد التراخيص محلياً — شغّل الخادم أو اضبط VITE_LICENSE_PRIVATE_KEY');
+  }
+
   const pkcs8Header = new Uint8Array([
     0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20
   ]);
-  const privKeyRaw = Uint8Array.from(atob(ED25519_PRIVATE_KEY_BASE64), c => c.charCodeAt(0));
+  const privKeyRaw = Uint8Array.from(atob(privKeyBase64), c => c.charCodeAt(0));
   const pkcs8 = new Uint8Array(pkcs8Header.length + privKeyRaw.length);
   pkcs8.set(pkcs8Header, 0);
   pkcs8.set(privKeyRaw, pkcs8Header.length);
@@ -308,6 +402,126 @@ export async function computeMessageHmac(sessionToken: string, msgType: string, 
   } catch {
     return '';
   }
+}
+
+/**
+ * التحقق من توقيع HMAC لرسالة واردة (مقارنة ثابتة التوقيت).
+ * يفشل الآمن إذا غاب أي مدخل أو اختلف التوقيع.
+ */
+export async function verifyMessageHmac(
+  sessionToken: string,
+  msgType: string,
+  timestamp: number,
+  receivedSig: string
+): Promise<boolean> {
+  if (!sessionToken || !receivedSig) return false;
+  const expected = await computeMessageHmac(sessionToken, msgType, timestamp);
+  if (!expected || expected.length !== receivedSig.length) return false;
+  // مقارنة ثابتة التوقيت (Timing-Safe)
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ receivedSig.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+// ═══ 3-b. تشفير حمولات MQTT السحابية (AES-GCM مشتق من رمز الجلسة) ═══
+// الوسيط السحابي (broker.emqx.io) عام — أي حمولة نصية مكشوفة يمكن قراءتها أو
+// تزويرها من أي طرف يتصل بالوسيط نفسه. لذلك تُشفّر الحمولات بمفتاح AES-256-GCM
+// مشتق من رمز الجلسة (Session Token) الذي لا يعرفه إلا أجهزة الغرفة نفسها.
+
+let cachedAesKey: { token: string; key: CryptoKey } | null = null;
+
+async function deriveSessionAesKey(sessionToken: string): Promise<CryptoKey | null> {
+  if (!sessionToken) return null;
+  if (cachedAesKey && cachedAesKey.token === sessionToken) return cachedAesKey.key;
+  const subtle = getSubtleCrypto();
+  if (!subtle) return null;
+  try {
+    const enc = new TextEncoder();
+    const digest = await subtle.digest('SHA-256', enc.encode(`pfp-mqtt-v1|${sessionToken}`));
+    const key = await subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    cachedAesKey = { token: sessionToken, key };
+    return key;
+  } catch {
+    return null;
+  }
+}
+
+export interface EncryptedEnvelope {
+  _enc: 'A256GCM';
+  iv: string;   // ناقص التهيئة Base64
+  d: string;    // الحمولة المشفرة Base64
+}
+
+export async function encryptJsonPayload(sessionToken: string, payload: unknown): Promise<EncryptedEnvelope | null> {
+  const key = await deriveSessionAesKey(sessionToken);
+  const subtle = getSubtleCrypto();
+  if (!key || !subtle) return null;
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = new TextEncoder().encode(JSON.stringify(payload));
+    const cipher = await subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    const toB64 = (buf: ArrayBuffer | Uint8Array) => {
+      const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+      let s = '';
+      bytes.forEach(b => { s += String.fromCharCode(b); });
+      return btoa(s);
+    };
+    return { _enc: 'A256GCM', iv: toB64(iv), d: toB64(cipher) };
+  } catch {
+    return null;
+  }
+}
+
+export async function decryptJsonPayload<T = any>(sessionToken: string, envelope: EncryptedEnvelope): Promise<T | null> {
+  const key = await deriveSessionAesKey(sessionToken);
+  const subtle = getSubtleCrypto();
+  if (!key || !subtle) return null;
+  try {
+    const fromB64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const plain = await subtle.decrypt(
+      { name: 'AES-GCM', iv: fromB64(envelope.iv) },
+      key,
+      fromB64(envelope.d)
+    );
+    return JSON.parse(new TextDecoder().decode(plain)) as T;
+  } catch {
+    return null;
+  }
+}
+
+// ═══ 4-b. سجل تدقيق أمني مكتوم التكرار (Throttled Security Audit) ═══
+// يمنع إغراق قاعدة التدقيق عند هجوم عشوائي: إدخال واحد كحد أقصى لكل سبب
+// كل 5 ثوان، مع عدّاد للإدخالات المكتومة.
+
+const AUDIT_THROTTLE_MS = 5000;
+const auditThrottleMap = new Map<string, { lastAt: number; suppressed: number }>();
+
+export function throttledSecurityLog(
+  action: string,
+  detail: { actorRole?: PhoneRole; target?: string; reason: string; oldValue?: any; newValue?: any }
+): void {
+  const now = Date.now();
+  const entry = auditThrottleMap.get(action);
+  if (entry && now - entry.lastAt < AUDIT_THROTTLE_MS) {
+    entry.suppressed++;
+    return;
+  }
+  const suppressed = entry?.suppressed || 0;
+  auditThrottleMap.set(action, { lastAt: now, suppressed: 0 });
+
+  auditService
+    .log({
+      actorRole: detail.actorRole || ('viewer' as PhoneRole),
+      actorName: undefined,
+      action: suppressed > 0 ? `${action} (+${suppressed} مكتومة)` : action,
+      target: detail.target || '-',
+      oldValue: detail.oldValue ?? null,
+      newValue: detail.newValue ?? null,
+      reason: detail.reason
+    })
+    .catch(() => { /* التدقيق لا يعطل الشبكة أبداً */ });
 }
 
 // ═══ 4. سجل تدقيق التعديلات والنتائج (Audit Log) ═══

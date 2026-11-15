@@ -483,7 +483,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
 
         {/* نافذة تأكيد حذف قائمة في شاشة التحكيم */}
         {deleteConfirmId && onDeleteHeat && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-rose-500/50 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-center">
               <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center mx-auto">
                 <AlertCircle className="w-6 h-6" />
@@ -1318,7 +1318,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
 
       {/* نافذة تعديل نتيجة عداء يدوياً بواسطة الحكم العام */}
       {editingRunner && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 max-w-md w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-black text-sm text-white flex items-center gap-2">
@@ -1404,7 +1404,7 @@ export const JudgePhoneView: React.FC<JudgePhoneViewProps> = ({
 
       {/* نافذة تكبير لقطة وصول العداء الصادرة من كاميرا هاتف 2 */}
       {selectedPhoto && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3">
           <div className="max-w-2xl w-full bg-slate-950 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-2xl">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
               <span className="flex items-center gap-1.5 text-cyan-400">

@@ -19,6 +19,7 @@ import {
 } from '../types/athletics';
 import { checkpointStorage } from './checkpointStorage';
 import { NetworkPeerMessage } from '../types/race';
+import { devicePurgeArchiveService } from './devicePurgeArchiveService';
 
 export type SyncState = 'offline' | 'syncing' | 'synced' | 'has_pending';
 
@@ -196,6 +197,12 @@ class PassageSyncEngine {
       case 'ATHLETICS_JUDGE_HEARTBEAT':
         this.handleIncomingJudgeHeartbeat(msg.payload);
         break;
+      case 'ATHLETICS_PURGE_COMMAND':
+        this.handleIncomingPurgeCommand(msg);
+        break;
+      case 'ATHLETICS_PURGE_ACK':
+        devicePurgeArchiveService.handleIncomingPurgeAck(msg);
+        break;
       default:
         break;
     }
@@ -221,6 +228,25 @@ class PassageSyncEngine {
       await checkpointStorage.recordPassage(event);
       this.notifyPassage(event);
     }
+  }
+
+  /** معالجة أمر مسح وتطهير بيانات منافسة منتهية */
+  private async handleIncomingPurgeCommand(msg: NetworkPeerMessage) {
+    if (!msg || !msg.payload) return;
+    const { competitionId } = msg.payload as any;
+    if (!competitionId) return;
+
+    devicePurgeArchiveService.handleIncomingPurgeCommand(msg, this.currentDeviceId);
+    await this.triggerDevicePurgeIfEligible(competitionId);
+  }
+
+  public async triggerDevicePurgeIfEligible(competitionId: string) {
+    return devicePurgeArchiveService.checkAndExecuteDevicePurge(competitionId, {
+      deviceId: this.currentDeviceId,
+      judgeId: this.currentJudge ? this.currentJudge.id : undefined,
+      judgeRole: this.currentJudge ? this.currentJudge.role : undefined,
+      judgeName: this.currentJudge ? this.currentJudge.name : undefined
+    });
   }
 
   /** معالجة طلب أو اعتماد تصحيح */

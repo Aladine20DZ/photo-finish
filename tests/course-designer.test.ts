@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
 import { CourseDesignerService } from '../src/services/courseDesignerService';
+import { setTrustedPublicKeyBase64 } from '../src/services/securityService';
 import { Checkpoint } from '../src/types/athletics';
+import { signCheckpointQr, getPublicKeyBase64 } from '../server/security.js';
 
 describe('Stage C4: Course Designer, Offline Maps & Secured QR Packs', () => {
   let service: CourseDesignerService;
@@ -137,6 +139,29 @@ describe('Stage C4: Course Designer, Offline Maps & Secured QR Packs', () => {
   });
 
   describe('Secured Offline QR Packs', () => {
+    // محاكاة نقطة النهاية الخادمية /api/checkpoint/sign (توقيع Ed25519 على الخادم حصراً)
+    const serverSignFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+      if (typeof url === 'string' && url.includes('/api/checkpoint/sign')) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        const signature = signCheckpointQr(body);
+        return new Response(JSON.stringify({ ok: true, signature }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ ok: false, error: 'Not found' }), { status: 404 });
+    };
+
+    beforeAll(() => {
+      setTrustedPublicKeyBase64(getPublicKeyBase64());
+    });
+
+    let originalFetch: typeof globalThis.fetch;
+    beforeEach(() => {
+      originalFetch = globalThis.fetch;
+      globalThis.fetch = serverSignFetch as typeof fetch;
+    });
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
     const mockCheckpoint: Checkpoint = {
       id: 'cp_lake_turn',
       code: 'CP03',
@@ -155,7 +180,7 @@ describe('Stage C4: Course Designer, Offline Maps & Secured QR Packs', () => {
       expect(qrPack.id).toBeDefined();
       expect(qrPack.checkpointId).toBe(mockCheckpoint.id);
       expect(qrPack.checkpointCode).toBe('CP03');
-      expect(qrPack.signature.length).toBeGreaterThanOrEqual(8);
+      expect(qrPack.signature.length).toBeGreaterThanOrEqual(80); // توقيع Ed25519 كامل (64 بايت)
       expect(qrPack.token).toContain('PFP_CP:CP03:cp_lake_turn:');
       expect(qrPack.encryptedPayload).toBeDefined();
     });

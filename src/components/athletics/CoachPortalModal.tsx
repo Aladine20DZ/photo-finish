@@ -170,7 +170,7 @@ export const CoachPortalModal: React.FC<CoachPortalModalProps> = ({ isOpen, onCl
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 md:p-4 text-white overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 md:p-4 text-white overflow-y-auto" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
@@ -461,7 +461,7 @@ export const CoachPortalModal: React.FC<CoachPortalModalProps> = ({ isOpen, onCl
       {/* نافذة تسجيل عداء جديد في مسابقة */}
       {/* ═══════════════════════════════════════════════════ */}
       {isNewRegOpen && activeCoach && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 text-right max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-2 font-bold text-base text-white">

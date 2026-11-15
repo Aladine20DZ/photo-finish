@@ -512,7 +512,7 @@ export const PhotoFinishViewer: React.FC<PhotoFinishViewerProps> = ({
       {/* شريط أدوات عائم عند تفعيل وضع المساحة الكاملة (Immersive HUD) */}
       {isImmersive && (
         <div className="absolute top-2 left-2 right-2 z-30 flex items-center justify-between pointer-events-none">
-          <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center gap-2 pointer-events-auto">
+          <div className="bg-slate-900 px-3 py-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center gap-2 pointer-events-auto">
             <span className="text-[11px] font-bold text-amber-400 font-mono">
               {activeTab === 'burst' ? (currentBurstFrame?.formattedTime || '0.000s') : `${(inspectedTimeMs / 1000).toFixed(3)}s`}
             </span>
@@ -538,7 +538,7 @@ export const PhotoFinishViewer: React.FC<PhotoFinishViewerProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 pointer-events-auto bg-slate-900/90 backdrop-blur-md p-1 rounded-2xl border border-slate-700/80 shadow-2xl">
+          <div className="flex items-center gap-1.5 pointer-events-auto bg-slate-900 p-1 rounded-2xl border border-slate-700/80 shadow-2xl">
             <button
               onClick={toggleOrientation}
               className={`p-1.5 rounded-xl border ${

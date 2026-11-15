@@ -51,7 +51,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[80] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-3" dir="rtl">
+    <div className="fixed inset-0 z-[80] bg-slate-950/90 flex items-center justify-center p-3" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl">
         {/* رأس النافذة */}
         <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-800">

@@ -127,7 +127,9 @@ export function dispatchNetworkMessage(msg: NetworkPeerMessage, ctx: DispatcherC
     msg.type === 'ATHLETICS_CORRECTION' ||
     msg.type === 'ATHLETICS_JUDGE_HEARTBEAT' ||
     msg.type === 'ATHLETICS_COMPETITION_SYNC' ||
-    msg.type === 'ATHLETICS_VIOLATION'
+    msg.type === 'ATHLETICS_VIOLATION' ||
+    msg.type === 'ATHLETICS_PURGE_COMMAND' ||
+    msg.type === 'ATHLETICS_PURGE_ACK'
   ) {
     passageSyncEngine.handleIncomingMessage(msg);
     return true;

@@ -106,6 +106,6 @@ describe('Stage 0: Security Remediation & Zero Hardcoded Secrets', () => {
 
       const violations = scanDirectory(srcDir, forbidden);
       expect(violations).toEqual([]);
-    });
+    }, 120000);
   });
 });

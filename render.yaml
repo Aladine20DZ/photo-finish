@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: photo-finish-relay
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install
+    startCommand: node relay-server/index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080

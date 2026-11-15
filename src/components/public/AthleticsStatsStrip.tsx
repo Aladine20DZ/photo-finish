@@ -1,32 +1,24 @@
 /**
- * PHOTO FINISH PRO AI — Athletics Statistics Strip
- * Interactive animated stat counters with athletics-specific KPIs.
+ * PHOTO FINISH PRO AI — Athletics Statistics Strip (Stage 2)
+ * Cleaned public stats strip focusing strictly on pure athletics metrics:
+ * Registered Clubs, Licensed Athletes, Sanctioned Competitions, and Certified Participations.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Flag, Building2, Users, Trophy, Award } from 'lucide-react';
+import { Building2, Users, Trophy, Award } from 'lucide-react';
+import { platformStatsService } from '../../services/platformStatsService';
 
-export interface PlatformLiveStats {
-  leagues: number;
-  clubs: number;
-  athletes: number;
-  competitions: number;
-  registrations: number;
-}
-
-const DEFAULT_STATS: PlatformLiveStats = {
-  leagues: 48,
-  clubs: 142,
-  athletes: 3850,
-  competitions: 96,
-  registrations: 14200,
-};
-
-export const AthleticsStatsStrip: React.FC<{ stats?: Partial<PlatformLiveStats> }> = ({ stats: customStats }) => {
+export const AthleticsStatsStrip: React.FC = () => {
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
+  const [rawStats, setRawStats] = useState(() => platformStatsService.getStats());
 
-  const stats = { ...DEFAULT_STATS, ...customStats };
+  useEffect(() => {
+    const unsub = platformStatsService.subscribe(() => {
+      setRawStats(platformStatsService.getStats());
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -45,16 +37,15 @@ export const AthleticsStatsStrip: React.FC<{ stats?: Partial<PlatformLiveStats> 
   }, []);
 
   const items = [
-    { icon: Flag, value: stats.leagues, label: 'رابطة ولائية معتمدة', suffix: ' 🏛️' },
-    { icon: Building2, value: stats.clubs, label: 'نادٍ رياضي مسجل', suffix: ' 🛡️' },
-    { icon: Users, value: stats.athletes, label: 'عداء مسجل رسمياً', suffix: ' 🏃' },
-    { icon: Trophy, value: stats.competitions, label: 'تظاهرة مبرمجة', suffix: ' 🏆' },
-    { icon: Award, value: stats.registrations, label: 'مشاركة مؤكدة بالنتائج', suffix: ' ⏱️' },
+    { icon: Building2, value: rawStats.totalClubs,          label: 'نادٍ رياضي مسجل',           suffix: ' 🛡️' },
+    { icon: Users,    value: rawStats.totalAthletes,       label: 'عداء مسجل رسمياً',          suffix: ' 🏃' },
+    { icon: Trophy,   value: rawStats.totalCompetitions,   label: 'تظاهرة مبرمجة',             suffix: ' 🏆' },
+    { icon: Award,    value: rawStats.totalParticipations, label: 'مشاركة مؤكدة بالنتائج',    suffix: ' ⏱️' },
   ];
 
   return (
-    <div ref={ref} className="border-y border-emerald-950 bg-slate-900/80 backdrop-blur-md">
-      <div className="mx-auto max-w-6xl px-4 py-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+    <div ref={ref} className="border-y border-white/10 bg-slate-900">
+      <div className="mx-auto max-w-6xl px-4 py-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
         {items.map((it, i) => (
           <CounterItem
             key={i}
@@ -84,7 +75,7 @@ const CounterItem: React.FC<{
   useEffect(() => {
     if (!start) return;
     let raf = 0;
-    const dur = 1000;
+    const dur = 1200;
     let t0 = 0;
     const step = (now: number) => {
       if (!t0) t0 = now + delay;
@@ -99,15 +90,14 @@ const CounterItem: React.FC<{
 
   return (
     <div className="flex flex-col items-center gap-1.5 text-center">
-      <div className="w-10 h-10 rounded-xl bg-slate-950 border border-emerald-800/40 flex items-center justify-center text-emerald-400 mb-1 shadow-inner">
+      <div className="w-10 h-10 rounded-xl bg-slate-950 border border-cyan-800/40 flex items-center justify-center text-cyan-400 mb-1 shadow-inner">
         <Icon className="w-5 h-5" />
       </div>
       <div className="tnum text-2xl sm:text-3xl font-black text-slate-100 font-mono tracking-tight flex items-baseline gap-1">
         <span>{n.toLocaleString('ar-DZ')}</span>
-        <span className="text-xs text-emerald-400 font-bold">{suffix}</span>
+        <span className="text-xs text-cyan-400 font-bold">{suffix}</span>
       </div>
       <span className="text-xs text-slate-400 font-semibold">{label}</span>
     </div>
   );
 };
-

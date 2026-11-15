@@ -3,7 +3,9 @@
  * Integrated athletics federation guidance, workflow explanation, and rules compliance.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { portalAuthService, RegisteredLeague } from '../../services/portalAuthService';
+import { athleteClubStorage } from '../../services/athleteClubStorage';
 import { 
   GanttChartSquare, 
   ClipboardList, 
@@ -70,16 +72,15 @@ export const HowItWorksSection: React.FC = () => {
 };
 
 export const LeaguesDirectorySection: React.FC<{ onSelectLeague?: (leagueId: string) => void }> = ({ onSelectLeague }) => {
-  const leagues = [
-    { id: 'faa', name: 'الاتحاد الجزائري لألعاب القوى', short: 'FAA', wilaya: 'الجزائر العاصمة', clubs: 28, badge: '🇩🇿 الوطني' },
-    { id: 'lao', name: 'الرابطة الولائية لألعاب القوى - وهران', short: 'LAO', wilaya: 'وهران', clubs: 18, badge: 'الغرب' },
-    { id: 'laa', name: 'الرابطة الولائية لألعاب القوى - الجزائر', short: 'LAA', wilaya: 'الجزائر', clubs: 24, badge: 'الوسط' },
-    { id: 'lac', name: 'الرابطة الولائية لألعاب القوى - قسنطينة', short: 'LAC', wilaya: 'قسنطينة', clubs: 16, badge: 'الشرق' },
-    { id: 'las', name: 'الرابطة الولائية لألعاب القوى - سطيف', short: 'LAS', wilaya: 'سطيف', clubs: 14, badge: 'الهضاب' },
-    { id: 'lach', name: 'الرابطة الولائية لألعاب القوى - الشلف', short: 'LACh', wilaya: 'الشلف', clubs: 12, badge: 'حوض الشلف' },
-    { id: 'lbat', name: 'الرابطة الولائية لألعاب القوى - باتنة', short: 'LAB', wilaya: 'باتنة', clubs: 11, badge: 'الأوراس' },
-    { id: 'lrao', name: 'الرابطة الجهوية لألعاب القوى - ورقلة', short: 'LRAO', wilaya: 'ورقلة والجنوب', clubs: 15, badge: 'الجنوب' },
-  ];
+  const [leagues, setLeagues] = useState<RegisteredLeague[]>(() => portalAuthService.getAllLeagues());
+  const [clubsCount, setClubsCount] = useState<number>(0);
+
+  useEffect(() => {
+    setLeagues(portalAuthService.getAllLeagues());
+    athleteClubStorage.getAllClubs().then(clubs => {
+      setClubsCount(clubs.length);
+    }).catch(() => {});
+  }, []);
 
   return (
     <section className="py-20 border-t border-slate-800 bg-slate-950">
@@ -88,10 +89,10 @@ export const LeaguesDirectorySection: React.FC<{ onSelectLeague?: (leagueId: str
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
           <div>
             <span className="text-xs font-black text-amber-400 uppercase tracking-widest bg-amber-950/80 px-3 py-1 rounded-full border border-amber-800/60">
-              الدليل الرسمي
+              الدليل الرسمي المعتمد
             </span>
             <h2 className="text-2xl sm:text-3xl font-black text-white mt-2">
-              دليل الرابطات والاتحادات الولائية
+              دليل الرابطات والاتحادات الرياضية
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
               اختر الرابطة لعرض تظاهراتها وأنديتها وميزاتها الميدانية
@@ -99,32 +100,39 @@ export const LeaguesDirectorySection: React.FC<{ onSelectLeague?: (leagueId: str
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {leagues.map((l) => (
             <div
               key={l.id}
               onClick={() => onSelectLeague && onSelectLeague(l.id)}
-              className="p-5 rounded-2xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 hover:border-emerald-500/50 transition-all cursor-pointer flex flex-col justify-between gap-4 group"
+              className="p-6 rounded-2xl border border-slate-800 bg-slate-900/70 hover:bg-slate-900 hover:border-emerald-500/50 transition-all cursor-pointer flex flex-col justify-between gap-4 group shadow-lg"
             >
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono font-black text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                    {l.short}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-mono font-black text-emerald-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                    {l.shortName || l.id.toUpperCase()}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full">
-                    {l.badge}
+                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-800/40">
+                    {l.type === 'national' ? '🇩🇿 وطني' : l.type === 'regional' ? 'جهوي' : 'ولائي'}
                   </span>
                 </div>
-                <h4 className="font-black text-sm text-white group-hover:text-emerald-300 transition-colors">
+                <h4 className="font-black text-base text-white group-hover:text-emerald-300 transition-colors">
                   {l.name}
                 </h4>
-                <p className="text-xs text-slate-400 mt-1">{l.wilaya}</p>
+                <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5">
+                  <span>📍 {l.wilaya}</span>
+                  <span>•</span>
+                  <span className="font-mono text-[11px] text-slate-500">{l.accreditationNumber || 'LAAP-2026'}</span>
+                </p>
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 text-xs">
-                <span className="text-slate-400 font-bold">{l.clubs} نادٍ معتمد</span>
-                <span className="text-emerald-400 font-bold group-hover:translate-x-[-3px] transition-transform">
-                  استعراض ←
+                <span className="text-slate-300 font-bold">
+                  🏛️ {clubsCount > 0 ? `${clubsCount} نادٍ معتمد` : 'رابطة معتمدة'}
+                </span>
+                <span className="text-emerald-400 font-bold group-hover:translate-x-[-4px] transition-transform flex items-center gap-1">
+                  <span>استعراض</span>
+                  <span className="rtl:rotate-180">→</span>
                 </span>
               </div>
             </div>

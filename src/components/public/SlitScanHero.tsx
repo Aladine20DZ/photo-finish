@@ -5,19 +5,17 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Radio, ArrowDown, Timer, ShieldCheck, Trophy, ChevronRight, Zap } from 'lucide-react';
+import { Radio, ArrowDown, Timer, Trophy, ChevronRight, Zap } from 'lucide-react';
 
 interface SlitScanHeroProps {
   onEnterFieldMode: () => void;
   onExploreCompetitions?: () => void;
-  onOpenLeague?: () => void;
-  onOpenCoach?: () => void;
+    onOpenCoach?: () => void;
 }
 
 export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
   onEnterFieldMode,
   onExploreCompetitions,
-  onOpenLeague,
   onOpenCoach,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -202,7 +200,7 @@ export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
       <div className="relative mx-auto max-w-6xl px-4 pt-16 pb-16 sm:pt-24 sm:pb-24 flex flex-col items-center text-center gap-6 z-10">
         
         {/* الشارة العليا النابضة */}
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-950/60 backdrop-blur-md px-4 py-1.5 text-xs font-black text-emerald-300 shadow-xl shadow-emerald-950/60">
+        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-950 px-4 py-1.5 text-xs font-black text-emerald-300 shadow-xl shadow-emerald-950/60">
           <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
           <span>منظومة التوقيت الرقمي الأولمبي بالمسح الشريطي (Slit-Scan 60fps)</span>
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -212,7 +210,7 @@ export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
         {/* العنوان الرئيسي المبهر */}
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.18] tracking-tight max-w-4xl font-['Cairo',sans-serif]">
           كل خط نهاية{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-l from-emerald-400 via-teal-300 to-amber-300">
+          <span className="text-transparent bg-clip-text bg-gradient-to-l from-emerald-400 via-teal-300 to-amber-300 hero-title-gradient">
             يستحق حكماً رقمياً فائق الدقة
           </span>
         </h1>
@@ -224,7 +222,7 @@ export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
 
         {/* العداد الزمني المباشر عالي التباين */}
         <div 
-          className="tnum select-none text-4xl sm:text-6xl font-black text-slate-100 bg-slate-900/90 border-2 border-emerald-500/40 rounded-3xl px-8 py-4 backdrop-blur-xl shadow-2xl shadow-emerald-950 flex items-baseline gap-2 font-mono"
+          className="tnum select-none text-4xl sm:text-6xl font-black text-slate-100 bg-slate-900 border-2 border-emerald-500/40 rounded-3xl px-8 py-4 shadow-2xl shadow-emerald-950 flex items-baseline gap-2 font-mono hero-chrono-box"
           dir="ltr" 
           aria-label="live clock"
         >
@@ -250,27 +248,18 @@ export const SlitScanHero: React.FC<SlitScanHeroProps> = ({
           {onExploreCompetitions && (
             <button
               onClick={onExploreCompetitions}
-              className="h-13 px-6 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="h-13 px-6 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer hero-btn-explore"
             >
               <Trophy className="w-5 h-5 text-amber-400" />
               <span>استعراض التظاهرات والنتائج</span>
             </button>
           )}
 
-          {onOpenLeague && (
-            <button
-              onClick={onOpenLeague}
-              className="h-11 px-5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-emerald-900/60 text-emerald-300 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>جناح الرابطات والتراخيص</span>
-            </button>
-          )}
-
+          
           {onOpenCoach && (
             <button
               onClick={onOpenCoach}
-              className="h-11 px-5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-amber-900/60 text-amber-300 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="h-11 px-5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-amber-900/60 text-amber-300 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer hero-btn-coach"
             >
               <Zap className="w-4 h-4 text-amber-400" />
               <span>معالج تسجيل المدربين</span>

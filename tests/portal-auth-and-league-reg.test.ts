@@ -6,23 +6,22 @@ describe('Multi-Portal Authentication & League Registration Service', () => {
     portalAuthService.logoutAll();
   });
 
-  it('provides default official leagues list (FAA, LAA, LAO, LAC, LAS, etc.)', () => {
+  it('provides official leagues list containing Saïda league', () => {
     const leagues = portalAuthService.getAllLeagues();
-    expect(leagues.length).toBeGreaterThanOrEqual(7);
-    expect(leagues.some(l => l.shortName === 'FAA')).toBe(true);
-    expect(leagues.some(l => l.shortName === 'LAA')).toBe(true);
+    expect(leagues.length).toBeGreaterThanOrEqual(1);
+    expect(leagues.some(l => l.shortName === 'SAIDA' || l.id === 'lg_saida')).toBe(true);
   });
 
   it('authenticates league executive with valid credentials', async () => {
-    const res = await portalAuthService.loginLeague('laa_admin', 'League@2026', 'laa_algiers');
+    const res = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
     expect(res.success).toBe(true);
     expect(res.session).toBeDefined();
     expect(res.session?.role).toBe('league_admin');
-    expect(res.session?.leagueShort).toBe('LAA');
+    expect(res.session?.leagueShort).toBe('SAIDA');
   });
 
   it('rejects league login with invalid password', async () => {
-    const res = await portalAuthService.loginLeague('laa_admin', 'WrongPass123', 'laa_algiers');
+    const res = await portalAuthService.loginLeague('saida_admin', 'WrongPass123', 'lg_saida');
     expect(res.success).toBe(false);
     expect(res.error).toContain('كلمة المرور غير صحيحة');
   });
@@ -77,4 +76,23 @@ describe('Multi-Portal Authentication & League Registration Service', () => {
     expect(res.success).toBe(true);
     expect(res.session?.role).toBe('super_admin');
   });
+
+  it('automatically resolves league without needing targetLeagueId selector', async () => {
+    // 1. By admin username alone
+    const res1 = await portalAuthService.loginLeague('saida_admin', 'Saida@2026');
+    expect(res1.success).toBe(true);
+    expect(res1.session?.leagueShort).toBe('SAIDA');
+    expect(res1.session?.leagueId).toBe('lg_saida');
+
+    // 2. By short code alone
+    const res2 = await portalAuthService.loginLeague('saida', 'Saida@2026');
+    expect(res2.success).toBe(true);
+    expect(res2.session?.leagueShort).toBe('SAIDA');
+
+    // 3. By official email alone
+    const res3 = await portalAuthService.loginLeague('saida@athletic.dz', 'Saida@2026');
+    expect(res3.success).toBe(true);
+    expect(res3.session?.leagueShort).toBe('SAIDA');
+  });
 });
+

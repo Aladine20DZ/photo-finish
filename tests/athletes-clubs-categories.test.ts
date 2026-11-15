@@ -253,14 +253,12 @@ describe('Stage C1: Athlete & Club Storage and Zustand Store', () => {
     await athleteClubStorage.clearAll();
   });
 
-  it('provides initial seed data when storage is empty', async () => {
+  it('provides clean empty storage ready for real production registrations', async () => {
     const clubs = await athleteClubStorage.getAllClubs();
-    expect(clubs.length).toBeGreaterThanOrEqual(4);
-    expect(clubs.some((c) => c.code === 'MCA')).toBe(true);
+    expect(Array.isArray(clubs)).toBe(true);
 
     const athletes = await athleteClubStorage.getAllAthletes();
-    expect(athletes.length).toBeGreaterThanOrEqual(2);
-    expect(athletes.some((a) => a.licenseNumber === 'DZ-2026-10492')).toBe(true);
+    expect(Array.isArray(athletes)).toBe(true);
   });
 
   it('performs CRUD on athletes correctly', async () => {
@@ -322,6 +320,41 @@ describe('Stage C1: Athlete & Club Storage and Zustand Store', () => {
   });
 
   it('integrates seamlessly with useAthleteStore', async () => {
+    const seedAthlete: Athlete = {
+      id: 'ath_seed_test',
+      bibNumber: 101,
+      licenseNumber: 'DZ-2026-10492',
+      firstName: 'يوسف',
+      lastName: 'العبدلي',
+      birthDate: '2001-04-12',
+      gender: 'M',
+      nationality: 'الجزائر',
+      clubId: 'club_saida',
+      clubName: 'مولودية سعيدة',
+      primaryDiscipline: 'sprints',
+      eligibleEvents: ['100m'],
+      personalBests: [],
+      seasonBests: [],
+      medicalClearance: true,
+      status: 'active',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await athleteClubStorage.saveAthlete(seedAthlete);
+
+    const seedClub: Club = {
+      id: 'club_saida',
+      code: 'MCS',
+      name: 'نادي مولودية سعيدة لألعاب القوى',
+      shortName: 'مولودية سعيدة',
+      wilaya: 'سعيدة',
+      colors: ['#008000', '#FFFFFF'],
+      medalsTally: { gold: 0, silver: 0, bronze: 0, total: 0 },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await athleteClubStorage.saveClub(seedClub);
+
     const store = useAthleteStore.getState();
     await store.loadAthletesAndClubs();
 
@@ -330,7 +363,7 @@ describe('Stage C1: Athlete & Club Storage and Zustand Store', () => {
 
     // Test deduplication check via store
     const matches = store.checkDeduplication({
-      licenseNumber: 'DZ-2026-10492', // collides with seed athlete Youssef
+      licenseNumber: 'DZ-2026-10492',
       firstName: 'يوسف',
       lastName: 'العبدلي',
       birthDate: '2001-04-12',

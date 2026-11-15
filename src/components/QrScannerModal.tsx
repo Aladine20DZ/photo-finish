@@ -4,11 +4,13 @@ import jsQR from 'jsqr';
 import { PhoneRole } from '../types/race';
 
 interface QrScannerModalProps {
-  onSuccess: (data: { roomCode: string; role?: PhoneRole }) => void;
+  onSuccess: (data: { roomCode: string; role?: PhoneRole; rawData?: string }) => void;
   onClose: () => void;
+  title?: string;
+  subtitle?: string;
 }
 
-export const QrScannerModal: React.FC<QrScannerModalProps> = ({ onSuccess, onClose }) => {
+export const QrScannerModal: React.FC<QrScannerModalProps> = ({ onSuccess, onClose, title, subtitle }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -94,16 +96,16 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ onSuccess, onClo
 
         if (detectedRoom) {
           stopCamera();
-          onSuccess({ roomCode: detectedRoom, role: detectedRole });
+          onSuccess({ roomCode: detectedRoom, role: detectedRole, rawData });
           return;
         }
       } catch (e) {
         console.warn('QR parse notice:', e);
       }
 
-      // إذا لم يتطابق الرابط مباشرة، نعتبر النص كود الغرفة
+      // إذا لم يتطابق الرابط مباشرة، نعتبر النص كود الغرفة أو كود ترخيص مباشر
       stopCamera();
-      onSuccess({ roomCode: rawData.toUpperCase() });
+      onSuccess({ roomCode: rawData.toUpperCase(), rawData });
       return;
     }
 
@@ -150,7 +152,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ onSuccess, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-scaleUp text-slate-100 flex flex-col">
         {/* ترويسة النافذة */}
         <div className="p-3.5 bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border-b border-slate-800 flex items-center justify-between">
@@ -160,13 +162,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ onSuccess, onClo
             </div>
             <div>
               <h3 className="font-black text-sm text-white flex items-center gap-1.5">
-                <span>مسح باركود الهاتف المقابل (QR Scanner)</span>
+                <span>{title || 'مسح باركود الهاتف المقابل (QR Scanner)'}</span>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
                   تلقائي ⚡
                 </span>
               </h3>
               <p className="text-[10px] text-slate-400">
-                وجّه الكاميرا نحو باركود الهاتف الأول للاتصال الفوري
+                {subtitle || 'وجّه الكاميرا نحو باركود الهاتف الأول للاتصال الفوري'}
               </p>
             </div>
           </div>

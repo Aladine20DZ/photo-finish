@@ -1,12 +1,13 @@
 /**
  * PHOTO FINISH PRO – Complete Athletics Management System
- * Course Designer, Offline Maps & Secured QR Packs Service (Stage C4)
+ * Course Designer, Offline Maps & Secured QR Packs Service (Stage C4 — Ed25519 Edition)
  * 
  * Features:
  * 1. Haversine distance, cumulative path metrics, elevation gain/loss.
  * 2. GeoJSON parsing and exporting with zero external dependencies.
  * 3. Automatic checkpoint snapping and binding to waypoints.
- * 4. Cryptographic HMAC/SHA-256 offline QR token packs for physical checkpoints.
+ * 4. Server-signed Ed25519 QR token packs for physical checkpoints —
+ *    zero secrets in the frontend bundle; offline verification via public key.
  * 5. Full IndexedDB persistence with memory fallback.
  */
 
@@ -18,9 +19,17 @@ import {
   SecuredQrPack,
   AthleticsCompetitionType 
 } from '../types/athletics';
+import { verifyEd25519Signature } from './securityService';
 
 const COURSES_STORAGE_KEY = 'pf_athletics_courses_v1';
 const QR_PACKS_STORAGE_KEY = 'pf_athletics_qr_packs_v1';
+
+// ═══ توقيع رموز نقاط المراقبة (Server-Signed Ed25519) ═══
+// NOTE أمني: لا يوجد أي سر في الواجهة — الملح الثابت القديم لأكواد QR (متغير بيئة أُزيل نهائياً)
+// أُزيل نهائياً لأنه كان ظاهراً في حزمة البناء ويمكن لأي جهاز تزوير الرموز به.
+// الإصدار: الخادم يوقّع النص القياسي PFP_CP1|cid|cpid|code|km|iat|exp بـ Ed25519،
+// والعميل يتحقق أوفلاين بالمفتاح العام فقط عبر securityService.verifyEd25519Signature.
+// الحزم القديمة (توقيع HMAC قصير) تُرفض برسالة ترحيل واضحة لأن ملحها مُسرّب.
 
 export class CourseDesignerService {
   private inMemoryCourses: Map<string, Course> = new Map();
@@ -369,16 +378,36 @@ export class CourseDesignerService {
   }
 
   /**
-   * توليد ملح تشفيري ديناميكي للمنافسة لضمان عدم وجود أسرار ثابتة في الكود (Zero Hardcoded Secrets)
+   * بناء النص القياسي الموافق لخادم التوقيع (PFP_CP1|cid|cpid|code|km|iat|exp)
    */
-  private getCompetitionSalt(competitionId: string): string {
-    const envSecret = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_OFFLINE_SECRET) || '';
-    return `pfp_comp_${competitionId}_${envSecret}`;
+  private buildCanonical(cid: string, cpid: string, code: string, km: number, iat: number, exp: number): string {
+    return `PFP_CP1|${cid}|${cpid}|${code}|${km}|${iat}|${exp}`;
   }
 
   /**
-   * توليد حزمة باركود QR مؤمنة ومشفرة لنقطة مراقبة ميدانية
-   * تمكّن الحكام والعدائين من مسح الكود دون اتصال، مع حماية ضد التلاعب والتزييف
+   * طلب توقيع خادمي (Ed25519) لحمولة نقطة مراقبة
+   */
+  private async requestServerSignature(params: {
+    cid: string; cpid: string; code: string; km: number; iat: number; exp: number;
+  }): Promise<string> {
+    const resp = await fetch('/api/checkpoint/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data?.error || `فشل توقيع رمز نقطة المراقبة (${resp.status})`);
+    }
+    const data = await resp.json();
+    if (!data?.signature) throw new Error('استجابة توقيع غير صالحة من الخادم.');
+    return data.signature as string;
+  }
+
+  /**
+   * توليد حزمة باركود QR مؤمنة وموقعة خادمياً (Ed25519) لنقطة مراقبة ميدانية
+   * تتطلب تشغيل خادم التوقيع (npm run dev أو relay-server) مرة واحدة عند الإصدار،
+   * أما التحقق الميداني فيتم أوفلاين بالمفتاح العام.
    */
   public async generateSecuredQrPack(
     competitionId: string, 
@@ -387,12 +416,18 @@ export class CourseDesignerService {
   ): Promise<SecuredQrPack> {
     const issuedAt = Date.now();
     const expiresAt = issuedAt + validDurationMs;
-    const salt = `${competitionId}:${checkpoint.id}:${checkpoint.code}:${checkpoint.distanceKm}:${issuedAt}:${expiresAt}:${this.getCompetitionSalt(competitionId)}`;
-    
-    const signature = await this.computeHash(salt);
-    const shortSig = signature.substring(0, 16).toUpperCase();
 
-    // تشفير الـ Payload بصيغة موحدة وسريعة للقراءة بالكاميرا
+    // توقيع Ed25519 من الخادم — لا يوجد أي سر في الواجهة
+    const signature = await this.requestServerSignature({
+      cid: competitionId,
+      cpid: checkpoint.id,
+      code: checkpoint.code,
+      km: checkpoint.distanceKm,
+      iat: issuedAt,
+      exp: expiresAt
+    });
+
+    // الحمولة الموحدة: JSON + خوارزمية + التوقيع الكامل (يُقرأ بالكاميرا من الصورة المولدة)
     const payloadObj = {
       cid: competitionId,
       cpid: checkpoint.id,
@@ -401,11 +436,12 @@ export class CourseDesignerService {
       km: checkpoint.distanceKm,
       iat: issuedAt,
       exp: expiresAt,
-      sig: shortSig
+      alg: 'ed25519' as const,
+      sig: signature
     };
 
     const encryptedPayload = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
-    const token = `PFP_CP:${checkpoint.code}:${checkpoint.id}:${shortSig}`;
+    const token = `PFP_CP:${checkpoint.code}:${checkpoint.id}:${signature.substring(0, 8).toUpperCase()}`;
 
     const qrPack: SecuredQrPack = {
       id: `qr_${checkpoint.id}_${issuedAt}`,
@@ -417,7 +453,7 @@ export class CourseDesignerService {
       encryptedPayload,
       issuedAt,
       expiresAt,
-      signature: shortSig
+      signature
     };
 
     this.inMemoryQrPacks.set(qrPack.id, qrPack);
@@ -427,6 +463,7 @@ export class CourseDesignerService {
 
   /**
    * التحقق من صحة وصلاحية رمز QR الممسوح بنقطة المراقبة
+   * التحقق Ed25519 محلي وأوفلاين بالمفتاح العام — الحزم القديمة تُرفض.
    */
   public async verifySecuredQrToken(
     scannedData: string, 
@@ -442,7 +479,7 @@ export class CourseDesignerService {
     try {
       let payload: any = null;
 
-      // إذا كانت البيانات عبارة عن Base64 payload
+      // إذا كانت البيانات عبارة عن Base64 payload موقّع
       if (scannedData.startsWith('ey') || scannedData.length > 50) {
         try {
           const decoded = decodeURIComponent(escape(atob(scannedData)));
@@ -450,45 +487,30 @@ export class CourseDesignerService {
         } catch {}
       }
 
-      // إذا كانت الصيغة عبارة عن Token مباشر PFP_CP:CODE:ID:SIG
+      // صيغة Token المباشرة PFP_CP:CODE:ID:PREFIX — تُقبل فقط إذا طابقت حزمة
+      // موقعة مخزنة محلياً (كان يُقبل هنا أي رمز غير معروف — ثغرة أُغلقت)
       if (!payload && scannedData.startsWith('PFP_CP:')) {
         const parts = scannedData.split(':');
         if (parts.length >= 4) {
-          const code = parts[1];
           const cpid = parts[2];
-          const sig = parts[3];
 
-          // البحث في الحزم المحلية
-          const found = Array.from(this.inMemoryQrPacks.values()).find(
-            q => q.checkpointId === cpid && q.signature === sig
-          );
-
-          if (found) {
-            if (found.competitionId !== expectedCompetitionId) {
-              return { valid: false, error: 'رمز النقطة يتبع لمسابقة أخرى مختلفة.' };
-            }
-            if (Date.now() > found.expiresAt) {
-              return { valid: false, error: 'انتهت صلاحية رمز نقطة المراقبة.' };
-            }
-            return {
-              valid: true,
-              checkpointId: found.checkpointId,
-              checkpointCode: found.checkpointCode,
-              checkpointName: found.checkpointName
-            };
+          const found = Array.from(this.inMemoryQrPacks.values()).find(q => q.checkpointId === cpid);
+          if (!found) {
+            return { valid: false, error: 'رمز نقطة غير معروف — لم يصدر من نظام Photo Finish Pro.' };
           }
 
-          return {
-            valid: true,
-            checkpointId: cpid,
-            checkpointCode: code,
-            checkpointName: `نقطة ${code}`
-          };
+          // إعادة التحقق الكامل من الحمولة الموقعة للحزمة المخزنة
+          return await this.verifySecuredQrToken(found.encryptedPayload, expectedCompetitionId);
         }
       }
 
-      if (!payload) {
+      if (!payload || typeof payload !== 'object') {
         return { valid: false, error: 'صيغة رمز QR غير معتمدة لنظام Photo Finish Pro.' };
+      }
+
+      // رفض صريح لحزم HMAC القديمة (ملحها مُسرّب — إلزامية إعادة الإصدار)
+      if (payload.alg !== 'ed25519' || !payload.sig) {
+        return { valid: false, error: 'رمز بنسخة توقيع قديمة غير آمنة (HMAC). أعد إصدار حزمة QR من مصمم المسار.' };
       }
 
       if (payload.cid !== expectedCompetitionId) {
@@ -499,10 +521,10 @@ export class CourseDesignerService {
         return { valid: false, error: 'انتهت صلاحية رمز النقطة الزمني.' };
       }
 
-      const expectedSalt = `${payload.cid}:${payload.cpid}:${payload.code}:${payload.km}:${payload.iat}:${payload.exp}:${this.getCompetitionSalt(payload.cid)}`;
-      const calculatedSig = (await this.computeHash(expectedSalt)).substring(0, 16).toUpperCase();
-
-      if (calculatedSig !== payload.sig) {
+      // التحقق من توقيع Ed25519 بالمفتاح العام (أوفلاين بالكامل)
+      const canonical = this.buildCanonical(payload.cid, payload.cpid, payload.code, payload.km, payload.iat, payload.exp);
+      const signatureOk = await verifyEd25519Signature(canonical, payload.sig);
+      if (!signatureOk) {
         return { valid: false, error: 'فشل التحقق من التوقيع الرقمي لنقطة المراقبة (رمز مزور أو تم تعديله).' };
       }
 
@@ -516,27 +538,6 @@ export class CourseDesignerService {
     } catch (e: any) {
       return { valid: false, error: e?.message || 'خطأ أثناء قراءة رمز QR.' };
     }
-  }
-
-  /**
-   * حساب تجزئة SHA-256 للتوقيع الرقمي
-   */
-  private async computeHash(message: string): Promise<string> {
-    if (typeof crypto !== 'undefined' && crypto.subtle) {
-      const msgBuffer = new TextEncoder().encode(message);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    // بديل خفيف عند غياب Web Crypto في بيئة الاختبار القديمة
-    let hash = 0;
-    for (let i = 0; i < message.length; i++) {
-      const char = message.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash |= 0;
-    }
-    return Math.abs(hash).toString(16).padStart(32, '0');
   }
 
   public async getCourse(id: string): Promise<Course | null> {
