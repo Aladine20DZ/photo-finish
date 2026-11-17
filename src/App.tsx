@@ -48,6 +48,7 @@ import { ManualTimingConsole } from './components/athletics/ManualTimingConsole'
 import { DesignSystemShowcase, GlassLoginPage } from './components/design-system';
 import { CompetitionEntriesAndResults } from './components/competitions/CompetitionEntriesAndResults';
 import { JudgesManagementOffice } from './components/judges/JudgesManagementOffice';
+import { DigitalCompetitionSheetsWorkspace } from './components/sheets/DigitalCompetitionSheetsWorkspace';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -1144,7 +1145,14 @@ export const App: React.FC = () => {
           />
         )}
 
-                {!role && currentTab === 'entries' && (
+                {!role && currentTab === 'sheets' && (
+          <DigitalCompetitionSheetsWorkspace 
+            onBackToHome={() => setCurrentTab('public')}
+            onOpenFieldMode={() => setCurrentTab('competition')}
+          />
+        )}
+
+        {!role && currentTab === 'entries' && (
           <CompetitionEntriesAndResults 
             onBackToHome={() => setCurrentTab('public')}
             onOpenFieldMode={() => setCurrentTab('competition')}
@@ -1170,6 +1178,7 @@ export const App: React.FC = () => {
             onOpenCoachWizard={() => setCurrentTab('coach')}
             onOpenLeagueSuite={() => setCurrentTab('league')}
             onOpenEntriesList={() => setCurrentTab('entries')}
+            onOpenSheets={() => setCurrentTab('sheets')}
             onOpenCompetitionsPage={() => setCurrentTab('competitions')}
           />
         )}
@@ -1179,6 +1188,7 @@ export const App: React.FC = () => {
             <LeagueExecutiveSuite 
               initialSubTab={leagueSubTab}
               onOpenFieldMode={() => setCurrentTab('competition')} 
+              onOpenSheets={() => setCurrentTab('sheets')}
               onSwitchPortal={() => setLeagueSession(null)}
             />
           ) : (

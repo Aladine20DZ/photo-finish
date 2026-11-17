@@ -570,6 +570,15 @@ export class DisciplinesSeedService {
     return [...SEED_ATHLETICS_DISCIPLINES, ...this.customDisciplines];
   }
 
+  public getDisciplineByCode(code: string): AthleticsDiscipline | undefined {
+    const clean = code.trim().toUpperCase();
+    return this.getAllDisciplines().find(d => d.code.toUpperCase() === clean || d.id.toUpperCase() === clean);
+  }
+
+  public getDisciplineById(id: string): AthleticsDiscipline | undefined {
+    return this.getAllDisciplines().find(d => d.id === id);
+  }
+
   public getCourseDisciplines(): AthleticsDiscipline[] {
     return this.getAllDisciplines().filter(d => d.group === 'course' && !d.isRelay);
   }

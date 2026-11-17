@@ -35,6 +35,7 @@ export type NavTab =
   | 'competitions' 
   | 'competitions-bureau'
   | 'entries'
+  | 'sheets'
   | 'judges-office'
   | 'planning'
   | 'league' 
@@ -107,9 +108,10 @@ export const NavShell: React.FC<NavShellProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // عناصر شريط التنقل الرئيسي للواجهة العامة: الرئيسية، النتائج المعتمدة، المنافسات والرزنامة، النوادي والرياضيون، إدارة الرابطة
+  // عناصر شريط التنقل الرئيسي للواجهة العامة: الرئيسية، أوراق النتائج الرقمية، النتائج المعتمدة، المنافسات والرزنامة، النوادي والرياضيون، إدارة الرابطة
   const navItems: { id: NavTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'public', label: 'الرئيسية', icon: <Globe className="w-4 h-4" /> },
+    { id: 'sheets', label: 'أوراق النتائج الرقمية', icon: <FileSpreadsheet className="w-4 h-4 text-emerald-400" />, badge: 'FAA' },
     { id: 'results', label: 'النتائج المعتمدة', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
     { id: 'competitions', label: 'المنافسات والرزنامة', icon: <Calendar className="w-4 h-4 text-emerald-400" /> },
     { id: 'entries', label: 'النوادي والرياضيون', icon: <FileSpreadsheet className="w-4 h-4 text-cyan-400" /> },

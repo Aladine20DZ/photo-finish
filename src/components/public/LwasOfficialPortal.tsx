@@ -50,6 +50,7 @@ export interface LwasOfficialPortalProps {
   onOpenCoachWizard?: () => void;
   onOpenLeagueSuite?: () => void;
   onOpenEntriesList?: () => void;
+  onOpenSheets?: () => void;
   onOpenCompetitionsPage?: () => void;
 }
 
@@ -58,6 +59,7 @@ export const LwasOfficialPortal: React.FC<LwasOfficialPortalProps> = ({
   onOpenCoachWizard,
   onOpenLeagueSuite,
   onOpenEntriesList,
+  onOpenSheets,
   onOpenCompetitionsPage
 }) => {
   // State Management
@@ -434,6 +436,16 @@ export const LwasOfficialPortal: React.FC<LwasOfficialPortalProps> = ({
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
                   <span>كشف كل التخصصات</span>
+                </button>
+              )}
+
+              {onOpenSheets && (
+                <button
+                  onClick={onOpenSheets}
+                  className="py-2 px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>أوراق النتائج الرسمية (FAA)</span>
                 </button>
               )}
             </div>

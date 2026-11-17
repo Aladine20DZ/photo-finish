@@ -76,6 +76,7 @@ export interface LeagueExecutiveSuiteProps {
   leagueName?: string;
   initialSubTab?: LeagueSubTab;
   onOpenFieldMode?: () => void;
+  onOpenSheets?: () => void;
   onSwitchPortal?: () => void;
 }
 
@@ -152,6 +153,7 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
   leagueName: propLeagueName,
   initialSubTab,
   onOpenFieldMode,
+  onOpenSheets,
   onSwitchPortal
 }) => {
   // ── Active Session & League Resolution ────────────────────────────────────
@@ -1686,6 +1688,29 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
                 <p className="text-xs text-[var(--ink-2,#51607A)] mt-0.5">
                   تصدير فوري للمحاضر الرسمية لكل اختصاص وسجلات الأندية والرياضيين بالصيغ الثلاث المعتمدة (PDF، Word، Excel).
                 </p>
+              </div>
+
+              {/* Digital Competition Sheets Hero Card */}
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/40 flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-black">
+                    نظام معتمد • Liste Final COURSES & CONCOUR
+                  </div>
+                  <h4 className="text-base font-black text-white">نظام أوراق النتائج الرقمية الموحدة للحكام</h4>
+                  <p className="text-xs text-slate-300">
+                    إعداد قوائم المشاركين، تسجيل نتائج المحاولات الست ومسابقات المضمار، احتساب الترتيب وكسر التعادل، وتصدير المحاضر الرسمية.
+                  </p>
+                </div>
+                {onOpenSheets && (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={onOpenSheets}
+                    className="font-black text-xs shadow-lg shadow-emerald-950 shrink-0"
+                  >
+                    فتح ورشة أوراق النتائج الرقمية 📄
+                  </Button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
