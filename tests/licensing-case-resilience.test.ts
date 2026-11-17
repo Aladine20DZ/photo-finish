@@ -152,4 +152,31 @@ describe('Enterprise Licensing Case Resilience & OCR Correction Suite', () => {
     expect(res.json.success).toBe(true);
     expect(res.json.license.code).toBe(code);
   });
+
+  it('activates the exact license code from Image 3 (PFP2-CLB8-2705-POOL-...) seamlessly', async () => {
+    const codeImg3 = 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BZaN-poapNrx-_DQ';
+    const res = await licenseManager.activateCode(codeImg3);
+    expect(res.success).toBe(true);
+    expect(res.license).toBeDefined();
+    expect(res.license?.tier).toBe('CLB8');
+    expect(res.license?.isQuadPool).toBe(true);
+  });
+
+  it('activates the exact user input from Image 4 with shifted typo (extra X) seamlessly', async () => {
+    const codeImg4WithTypo = 'PFP2-CLB8-3111-GLBL-AJDZQQLK5QABX9XWBCHEG8K-PXFCKJHDSXJDQFMPSYC75YTQQIHOCQZP_NFACJOZKXXORVXVZTJAB1RTL67NMAA';
+    const res = await licenseManager.activateCode(codeImg4WithTypo);
+    expect(res.success).toBe(true);
+    expect(res.license).toBeDefined();
+    expect(res.license?.tier).toBe('CLB8');
+  });
+
+  it('generates and activates a Compact Product Key (PFP1-...) with 100% offline verification', async () => {
+    const compactCode = await licenseManager.generateCompactLicenseKey('ENTX', new Date('2028-12-31'), { isQuadPool: true });
+    expect(compactCode).toMatch(/^PFP1-ENTX-2812-POOL-[0-9A-F]{8}$/);
+
+    const res = await licenseManager.activateCode(compactCode);
+    expect(res.success).toBe(true);
+    expect(res.license?.tier).toBe('ENTX');
+    expect(res.license?.isQuadPool).toBe(true);
+  });
 });

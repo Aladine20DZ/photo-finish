@@ -47,8 +47,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [durationMonths, setDurationMonths] = useState<number>(12);
   const [deviceIdInput, setDeviceIdInput] = useState<string>('GLOBAL');
   const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [generatedCompactCode, setGeneratedCompactCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
+  const [copiedCompactCode, setCopiedCompactCode] = useState<boolean>(false);
   const [copiedMsg, setCopiedMsg] = useState<boolean>(false);
 
   // سجل التراخيص
@@ -81,7 +83,13 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       targetDeviceId: deviceIdInput,
       clientName
     });
+    const compactCode = await licenseManager.generateCompactLicenseKey(
+      tier,
+      expDate,
+      deviceIdInput.trim() || 'POOL'
+    );
     setGeneratedCode(code);
+    setGeneratedCompactCode(compactCode);
     setIsGenerating(false);
 
     // إضافة إلى السجل
@@ -105,8 +113,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     setTimeout(() => setCopiedCode(false), 2500);
   };
 
-  const copyWhatsAppMessage = (lic: { code: string; client: string; exp: string; tierName: string }) => {
-    const text = `🏆 *منظومة PHOTO FINISH PRO لألعاب القوى* 🏆\n\nأهلاً بك كابتن *${lic.client}*،\nتم تفعيل اشتراككم بنجاح في:\n⭐ *${lic.tierName}*\n\n🔑 كود التفعيل المخصص لجهازكم:\n👉 \`${lic.code}\` 👈\n\n📅 صالح لغاية: ${lic.exp}\n\n*طريقة التفعيل:* افتح تطبيق الهاتف > اضغط على أيقونة الترقية 👑 أعلى الشاشة > ألصق الكود واضغط تفعيل.\nنتمنى لكم مواسم رياضية وبطولات ناجحة! 🏁`;
+  const copyWhatsAppMessage = (lic: { code: string; compactCode?: string; client: string; exp: string; tierName: string }) => {
+    const text = `🏆 *منظومة PHOTO FINISH PRO لألعاب القوى* 🏆\n\nأهلاً بك كابتن *${lic.client}*،\nتم تفعيل اشتراككم بنجاح في:\n⭐ *${lic.tierName}*\n\n🔑 كود الترخيص المعتمد (Ed25519):\n👉 \`${lic.code}\` 👈\n` +
+      (lic.compactCode ? `\n⚡ كود التفعيل السريع (سهل الكتابة باليد):\n👉 \`${lic.compactCode}\` 👈\n` : '') +
+      `\n📅 صالح لغاية: ${lic.exp}\n\n*طريقة التفعيل:* افتح تطبيق الهاتف > اضغط على أيقونة الترقية 👑 أعلى الشاشة > اضغط "لصق الكود 📋" أو أدخل الكود واضغط تفعيل.\nنتمنى لكم مواسم رياضية وبطولات ناجحة! 🏁`;
     navigator.clipboard.writeText(text);
     setCopiedMsg(true);
     setTimeout(() => setCopiedMsg(false), 2500);
@@ -340,11 +350,46 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     </div>
 
                     {/* عرض الكود بخط عريض */}
-                    <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-3.5 shadow-inner">
-                      <p className="text-[10px] text-slate-400 mb-1">كود الترخيص الرياضي المعتمد:</p>
-                      <p className="text-base sm:text-lg font-black font-mono text-amber-300 tracking-wider select-all">
-                        {generatedCode}
-                      </p>
+                    <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-3.5 shadow-inner space-y-2 text-right">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] text-amber-300 font-bold">1. كود الترخيص المعتمد (Ed25519 - للباركود والنسخ):</p>
+                          <button
+                            type="button"
+                            onClick={() => copyCodeOnly(generatedCode)}
+                            className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer font-bold"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>{copiedCode ? 'تم النسخ!' : 'نسخ'}</span>
+                          </button>
+                        </div>
+                        <p className="text-xs sm:text-sm font-black font-mono text-amber-300 tracking-wider break-all select-all bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          {generatedCode}
+                        </p>
+                      </div>
+
+                      {generatedCompactCode && (
+                        <div className="pt-2 border-t border-slate-800">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[10px] text-emerald-400 font-bold">2. كود المنتج السريع (PFP1 - سهل الكتابة باليد - 27 حرفاً):</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(generatedCompactCode);
+                                setCopiedCompactCode(true);
+                                setTimeout(() => setCopiedCompactCode(false), 2500);
+                              }}
+                              className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer font-bold"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{copiedCompactCode ? 'تم النسخ!' : 'نسخ'}</span>
+                            </button>
+                          </div>
+                          <p className="text-sm font-black font-mono text-emerald-300 tracking-widest select-all bg-slate-900 p-2 rounded-lg border border-emerald-900/50 text-center">
+                            {generatedCompactCode}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* باركود QR للمسح من كاميرا الهاتف */}
@@ -378,6 +423,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                         type="button"
                         onClick={() => copyWhatsAppMessage({
                           code: generatedCode,
+                          compactCode: generatedCompactCode,
                           client: clientName,
                           exp: new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                           tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)'

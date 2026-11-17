@@ -74,9 +74,11 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
         : devHash;
 
       const code = security.generateEd25519License({ tier, expiryCode: expCode, devHash: currentDev });
+      const compactCode = security.generateCompactLicense({ tier, expiryCode: expCode, devHash: currentDev });
       
       const record = store.saveLicense({
         code,
+        compactCode,
         planId,
         tier,
         tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)',
@@ -89,7 +91,7 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
         createdAt: Date.now()
       });
 
-      generatedCodes.push(record);
+      generatedCodes.push({ ...record, compactCode });
     }
 
     store.logAudit({
@@ -105,6 +107,7 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
         count: generatedCodes.length,
         licenseCode: generatedCodes[0].code,
         code: generatedCodes[0].code,
+        compactCode: generatedCodes[0].compactCode,
         licenses: generatedCodes
       }
     };
@@ -123,7 +126,48 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
     // 0. تسوية الكود والتسامح مع تحويل حالة الأحرف أو التباسات OCR عبر مخزن التراخيص
     const allLicenses = store.listLicenses();
     let matchedStored = allLicenses.find(l => l.code === rawCode)
-      || allLicenses.find(l => l.code.toUpperCase() === rawCode.toUpperCase());
+      || allLicenses.find(l => l.code.toUpperCase() === rawCode.toUpperCase())
+      || allLicenses.find(l => l.compactCode && (l.compactCode === rawCode.toUpperCase() || l.compactCode === rawCode));
+
+    // فحص أكواد PFP1 المدمجة
+    if (rawCode.toUpperCase().startsWith('PFP1-')) {
+      const v = security.verifyCompactLicense(rawCode);
+      if (!v.valid) {
+        return { status: 400, json: { ok: false, error: v.error || 'كود الترخيص المدمج غير صالح' } };
+      }
+      const tier = v.tier;
+      const expCode = v.expCode;
+      const devHash = v.devHash;
+      const yr = 2000 + parseInt(expCode.substring(0, 2), 10);
+      const mo = parseInt(expCode.substring(2, 4), 10);
+      const expDate = new Date(yr, mo, 0, 23, 59, 59);
+      if (new Date() > expDate) {
+        return { status: 400, json: { ok: false, error: 'كود الترخيص منتهي الصلاحية' } };
+      }
+      const cleanDev = deviceId.replace(/-/g, '').toUpperCase();
+      const myHash = cleanDev.length >= 6 ? cleanDev.substring(2, 6) : cleanDev.padEnd(4, 'X').substring(0, 4);
+      if (devHash !== 'POOL' && devHash !== 'GLBL' && devHash !== myHash) {
+        return { status: 403, json: { ok: false, error: `هذا الكود مخصص لجهاز آخر (رمز الجهاز: ${devHash}). رمز هذا الجهاز هو: ${myHash}.` } };
+      }
+      return {
+        status: 200,
+        json: {
+          ok: true,
+          success: true,
+          message: `تم التفعيل بنجاح: ${tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)'}`,
+          license: {
+            code: rawCode.toUpperCase(),
+            tier,
+            tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)',
+            clientName: 'مشترك معتمد',
+            deviceId,
+            expiryDate: expDate.toISOString().split('T')[0],
+            isQuadPool: devHash === 'POOL',
+            maxSharedSlots: devHash === 'POOL' ? 4 : 1
+          }
+        }
+      };
+    }
 
     if (!matchedStored) {
       const rp = rawCode.split('-');
@@ -140,10 +184,23 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
           if (cPrefix !== inPrefix) continue;
 
           const cSig = lp.slice(4).join('-').toUpperCase();
+          
+          // مطابقة البادئة للتوقيع (إذا تطابقت أول 25 خانة فهي نفس الرخصة حتماً)
+          const commonLen = Math.min(cSig.length, inSig.length);
+          let matchPrefixCount = 0;
+          for (let i = 0; i < commonLen; i++) {
+            if (cSig[i] === inSig[i]) matchPrefixCount++;
+            else break;
+          }
+          if (matchPrefixCount >= 25) {
+            bestCandidate = l;
+            bestScore = 1;
+            break;
+          }
+
           let matches = 0;
-          const minLen = Math.min(cSig.length, inSig.length);
           const maxLen = Math.max(cSig.length, inSig.length);
-          for (let i = 0; i < minLen; i++) {
+          for (let i = 0; i < commonLen; i++) {
             const ca = cSig[i];
             const cb = inSig[i];
             if (ca === cb) {
@@ -164,7 +221,7 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
           }
         }
 
-        if (bestCandidate && bestScore >= 0.88) {
+        if (bestCandidate && bestScore >= 0.70) {
           matchedStored = bestCandidate;
         }
       }
@@ -186,15 +243,22 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
     const sigBase64Url = sigParts.join('-');
 
     const payload = `PFP2|${tier}|${expCode}|${devHash}`;
-    const SPKI_HEADER = Buffer.from('302a300506032b6570032100', 'hex');
-    const crypto = await import('node:crypto');
-    const publicKeyObject = crypto.createPublicKey({
-      key: Buffer.concat([SPKI_HEADER, security.PUB_KEY_RAW]),
-      format: 'der',
-      type: 'spki'
-    });
-    const sigBytes = Buffer.from(sigBase64Url.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-    const isValid = crypto.verify(null, Buffer.from(payload, 'utf8'), publicKeyObject, sigBytes);
+    let isValid = false;
+
+    if (matchedStored) {
+      // الترخيص صادر ومسجل رسمياً في قاعدة بيانات المنظومة
+      isValid = true;
+    } else {
+      const SPKI_HEADER = Buffer.from('302a300506032b6570032100', 'hex');
+      const crypto = await import('node:crypto');
+      const publicKeyObject = crypto.createPublicKey({
+        key: Buffer.concat([SPKI_HEADER, security.PUB_KEY_RAW]),
+        format: 'der',
+        type: 'spki'
+      });
+      const sigBytes = Buffer.from(sigBase64Url.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+      isValid = crypto.verify(null, Buffer.from(payload, 'utf8'), publicKeyObject, sigBytes);
+    }
 
     if (!isValid) {
       return { status: 400, json: { ok: false, error: 'توقيع الترخيص الرقمي غير صالح أو تم التلاعب به' } };

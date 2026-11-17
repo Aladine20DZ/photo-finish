@@ -47,6 +47,7 @@ import { LicenseTierCode } from '../types/race';
 interface AdminLicenseRecord {
   id: string;
   code: string;
+  compactCode?: string;
   tier: LicenseTierCode;
   tierName: string;
   clientName: string;
@@ -125,9 +126,11 @@ export const AdminPortal: React.FC = () => {
   const [licenseType, setLicenseType] = useState<'quad_pool' | 'single_device'>('quad_pool');
   const [targetDeviceId, setTargetDeviceId] = useState<string>('GLOBAL');
   const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [generatedCompactCode, setGeneratedCompactCode] = useState<string>('');
   const [latestGeneratedRecord, setLatestGeneratedRecord] = useState<AdminLicenseRecord | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
+  const [copiedCompactCode, setCopiedCompactCode] = useState<boolean>(false);
   const [copiedMsg, setCopiedMsg] = useState<boolean>(false);
 
   // توليد جماعي للأكواد (Bulk Generation)
@@ -287,13 +290,16 @@ export const AdminPortal: React.FC = () => {
           isQuadPool: isQuad,
           clientName
         });
+        const compactCode = await licenseManager.generateCompactLicenseKey(tier, exp, dev);
 
         setGeneratedCode(code);
+        setGeneratedCompactCode(compactCode);
         setBatchGeneratedCodes([]);
 
         const newRec: AdminLicenseRecord = {
           id: `lic-${Date.now()}`,
           code,
+          compactCode,
           tier,
           tierName: pkgTierName,
           clientName: clientName.trim() || (selectedPkg ? selectedPkg.name : 'مشترك جديد'),
@@ -620,14 +626,15 @@ export const AdminPortal: React.FC = () => {
     const isPool = rec.isQuadPool || rec.deviceId?.includes('POOL');
     const msg = `🏆 *تفعيل اشتراك PHOTO FINISH PRO الرسمي* 🏆\n\n` +
       `مرحباً بكم ${rec.clientName ? `*${rec.clientName}* ` : ''}، إليكم كود التفعيل المعتمد:\n\n` +
-      `🔑 *كود الترخيص:* \`${rec.code}\`\n` +
+      `🔑 *كود الترخيص المعتمد (Ed25519):* \`${rec.code}\`\n` +
+      (rec.compactCode ? `⚡ *كود التفعيل السريع (سهل الكتابة باليد):* \`${rec.compactCode}\`\n` : '') +
       `🏷️ *نوع الباقة:* ${rec.tierName}\n` +
       `📅 *صلاحية لغاية:* ${rec.expiryDate}\n` +
       `🌐 *النظام الشبكي:* ${isPool ? 'يدعم التفعيل الموحد 1*4 (هاتف واحد يفعل والهواتف الثلاثة الأخرى تتقاسم التفعيل في نفس المضمار)' : `مقفل برقم الجهاز (${rec.deviceId})`}\n\n` +
       `📲 *طريقة التفعيل السريعة:*\n` +
       `1. افتح تطبيق Photo Finish Pro في الهاتف.\n` +
       `2. اضغط على أيقونة الترقية 👑 أعلى الشاشة واختر "تفعيل كود الاشتراك".\n` +
-      `3. إما بالضغط على زر "مسح الباركود بالكاميرا 📷" ومسح الشاشة، أو بلصق الكود والضغط على "تفعيل الاشتراك الآن".\n\n` +
+      `3. يمكنك مسح الباركود بالكاميرا 📷، أو الضغط على "لصق الكود 📋"، أو كتابة الكود السريع ثم الضغط على "تفعيل الاشتراك الآن".\n\n` +
       `مع تحيات الإدارة التقنية لنظام Photo Finish Pro.`;
 
     navigator.clipboard.writeText(msg);
@@ -1243,11 +1250,50 @@ export const AdminPortal: React.FC = () => {
                         <span>تم توليد التوقيع الرقمي بنجاح:</span>
                       </div>
 
-                      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-4 shadow-inner space-y-1">
-                        <p className="text-[10px] text-slate-400">كود الترخيص المعتمد:</p>
-                        <p className="text-base sm:text-lg font-black font-mono text-amber-300 tracking-wider break-all select-all">
-                          {generatedCode}
-                        </p>
+                      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-4 shadow-inner space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[10px] text-amber-300 font-bold">1. كود الترخيص الرقمي المعتمد (Ed25519 - للباركود والنسخ):</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(generatedCode);
+                                setCopiedCode(true);
+                                setTimeout(() => setCopiedCode(false), 2500);
+                              }}
+                              className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer font-bold"
+                            >
+                              {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedCode ? 'تم النسخ!' : 'نسخ'}</span>
+                            </button>
+                          </div>
+                          <p className="text-xs sm:text-sm font-black font-mono text-amber-300 tracking-wider break-all select-all bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                            {generatedCode}
+                          </p>
+                        </div>
+
+                        {generatedCompactCode && (
+                          <div className="pt-2 border-t border-slate-800/80">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-[10px] text-emerald-400 font-bold">2. كود المنتج السريع (PFP1 - سهل الكتابة باليد - 27 حرفاً):</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(generatedCompactCode);
+                                  setCopiedCompactCode(true);
+                                  setTimeout(() => setCopiedCompactCode(false), 2500);
+                                }}
+                                className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer font-bold"
+                              >
+                                {copiedCompactCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                <span>{copiedCompactCode ? 'تم النسخ!' : 'نسخ'}</span>
+                              </button>
+                            </div>
+                            <p className="text-sm font-black font-mono text-emerald-300 tracking-widest select-all bg-slate-950 p-2.5 rounded-xl border border-emerald-900/50 text-center">
+                              {generatedCompactCode}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {qrUrl && (

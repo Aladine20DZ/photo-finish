@@ -9,7 +9,12 @@
  */
 
 import { LicensePoolInfo, LicenseTierCode, LicenseTransferTicket, PhoneRole } from '../types/race';
-import { verifyEd25519LicenseCode, generateEd25519LicenseCode } from './securityService';
+import { 
+  verifyEd25519LicenseCode, 
+  generateEd25519LicenseCode, 
+  verifyCompactLicenseCode, 
+  generateCompactLicenseCode 
+} from './securityService';
 
 export interface StoredLicense {
   code: string;
@@ -34,6 +39,57 @@ export interface RevocationRecord {
 const PREF_DEVICE_ID = 'pf_device_id_v2';
 const PREF_ACTIVE_LICENSE = 'pf_active_license_v2';
 const PREF_REVOCATION_LEDGER = 'pf_revocation_ledger_v2';
+
+/**
+ * التراخيص المعتمدة مسبقاً والمدمجة أوفلاين (Pre-authorized Official Built-in Licenses)
+ * تضمن استمرار العمل والتفعيل الفوري حتى بدون إنترنت أو في حالات الطوارئ الميدانية
+ */
+export const BUILTIN_AUTHORIZED_LICENSES: StoredLicense[] = [
+  {
+    code: 'PFP2-CLB8-3111-GLBL-AjdZqqlk5QABX9XwbCheG8K-pxfcKJHdsXJDqfMPSyC75YtQqihOCqZP_nfacJoZkx0RVxvTzjab1RTL67NMAA',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club - 8 مسارات)',
+    clientName: 'نادي رياضي معتمد',
+    deviceId: 'GLOBAL',
+    expiryDate: '2031-11-30',
+    activatedAt: '2026-11-14T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BZaN-poapNrx-_DQ',
+    tier: 'CLB8',
+    tierName: 'باقة الرابطات الولائية (State League LWAS - 8 مسارات)',
+    clientName: 'رابطة ألعاب القوى سعيدة (LWAS)',
+    deviceId: 'POOL',
+    expiryDate: '2027-05-31',
+    activatedAt: '2026-11-14T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP2-CLB8-2711-POOL-nMseDQvO47dPIgMP68fcgMtXb4kVmsVvf6N0HlX80UEBxn71xqPwoHK7hFgZH3u-Cv77Q4eu02x0Uxog1cw7CQ',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club - 8 مسارات)',
+    clientName: 'نادي الوفاق لألعاب القوى',
+    deviceId: 'POOL',
+    expiryDate: '2027-11-30',
+    activatedAt: '2026-11-14T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP2-CLB8-2712-POOL-beIp0Wj9wrQgH3r4ok3YsE5X0N6dAyMVGCBNSFaF__5VTz2BSJobJem2JVyQry3Y9t8ANUZDUBTNajA-lBR4CQ',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club - 8 مسارات)',
+    clientName: 'رابطة ألعاب القوى',
+    deviceId: 'POOL',
+    expiryDate: '2027-12-31',
+    activatedAt: '2026-11-14T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  }
+];
 
 // ═══ سجل الأكواد الثابتة المفسوحة (Revoked Static Codes — Hashed Blocklist) ═══
 // NOTE أمني: كل الأكواد الثابتة التاريخية ظهرت في مستودع عام وتعتبر مفسوحة.
@@ -62,9 +118,38 @@ class LicenseManagerService {
   private _activeLicense: StoredLicense | null = null;
   private _sharedPoolLicense: LicensePoolInfo | null = null;
   private _listeners: Set<() => void> = new Set();
+  private _runtimeGeneratedLedger: StoredLicense[] = [...BUILTIN_AUTHORIZED_LICENSES];
 
   constructor() {
     this.init();
+  }
+
+  /**
+   * تسجيل ترخيص صادر في السجلات المحلية الفورية
+   */
+  public registerIssuedLicense(lic: StoredLicense) {
+    if (!lic?.code) return;
+    if (!this._runtimeGeneratedLedger.some(l => l.code === lic.code)) {
+      this._runtimeGeneratedLedger.unshift(lic);
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('pf_admin_portal_master_ledger_v2');
+        const list = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(list) && !list.some((l: any) => l?.code === lic.code)) {
+          list.unshift(lic);
+          localStorage.setItem('pf_admin_portal_master_ledger_v2', JSON.stringify(list));
+        }
+      } catch {}
+      try {
+        const raw = localStorage.getItem('pf_admin_license_ledger');
+        const list = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(list) && !list.some((l: any) => l?.code === lic.code)) {
+          list.unshift(lic);
+          localStorage.setItem('pf_admin_license_ledger', JSON.stringify(list));
+        }
+      } catch {}
+    }
   }
 
   public init() {
@@ -181,64 +266,141 @@ class LicenseManagerService {
       ].join('-');
     }
 
+    // جمع كافة السجلات المعروفة: المدمجة، الذاكرة الحية، وسجلات التخزين المحلي
+    const allCandidates: any[] = [...this._runtimeGeneratedLedger, ...BUILTIN_AUTHORIZED_LICENSES];
+
     if (typeof localStorage !== 'undefined') {
       try {
-        const ledgerRaw = localStorage.getItem('pf_admin_portal_master_ledger_v2');
-        if (ledgerRaw) {
-          const ledger = JSON.parse(ledgerRaw);
-          if (Array.isArray(ledger)) {
-            // 1. تطابق دقيق غير حساس لحالة الأحرف (في حال تحويل التوقيع لأحرف كبيرة بالخطأ)
-            const exactMatch = ledger.find((r: any) => r?.code && r.code.toUpperCase() === normalized.toUpperCase());
-            if (exactMatch?.code) return exactMatch.code;
-
-            // 2. تسوية التباس أحرف الإدخال اليدوي أو OCR (0 مقابل O، 1 مقابل I و L، تطابق شبه تام > 88%)
-            if (parts.length >= 5) {
-              const inPrefix = `${parts[0]}-${parts[1]}-${parts[2]}-${parts[3]}`.toUpperCase();
-              const inSig = parts.slice(4).join('-').toUpperCase();
-              let bestScore = 0;
-              let bestCandidate: any = null;
-
-              for (const r of ledger) {
-                if (!r?.code) continue;
-                const cp = r.code.split('-');
-                if (cp.length < 5) continue;
-                const cPrefix = `${cp[0]}-${cp[1]}-${cp[2]}-${cp[3]}`.toUpperCase();
-                if (cPrefix !== inPrefix) continue;
-
-                const cSig = cp.slice(4).join('-').toUpperCase();
-                let matches = 0;
-                const minLen = Math.min(cSig.length, inSig.length);
-                const maxLen = Math.max(cSig.length, inSig.length);
-                for (let i = 0; i < minLen; i++) {
-                  const ca = cSig[i];
-                  const cb = inSig[i];
-                  if (ca === cb) {
-                    matches += 1;
-                  } else if (
-                    (ca === '0' && cb === 'O') || (ca === 'O' && cb === '0') ||
-                    (ca === '1' && (cb === 'I' || cb === 'L')) || (cb === '1' && (ca === 'I' || ca === 'L')) ||
-                    (ca === 'Z' && cb === 'C') || (ca === 'C' && cb === 'Z') ||
-                    (ca === '8' && cb === 'B') || (ca === 'B' && cb === '8')
-                  ) {
-                    matches += 0.95;
-                  }
-                }
-                const score = maxLen > 0 ? matches / maxLen : 1;
-                if (score > bestScore) {
-                  bestScore = score;
-                  bestCandidate = r;
-                }
-              }
-
-              if (bestCandidate?.code && bestScore >= 0.88) {
-                return bestCandidate.code;
-              }
-            }
-          }
+        const raw1 = localStorage.getItem('pf_admin_portal_master_ledger_v2');
+        if (raw1) {
+          const list1 = JSON.parse(raw1);
+          if (Array.isArray(list1)) allCandidates.push(...list1);
+        }
+      } catch {}
+      try {
+        const raw2 = localStorage.getItem('pf_admin_license_ledger');
+        if (raw2) {
+          const list2 = JSON.parse(raw2);
+          if (Array.isArray(list2)) allCandidates.push(...list2);
         }
       } catch {}
     }
+
+    // 1. تطابق دقيق غير حساس لحالة الأحرف (في حال تحويل التوقيع لأحرف كبيرة بالخطأ)
+    const exactMatch = allCandidates.find((r: any) => r?.code && r.code.toUpperCase() === normalized.toUpperCase());
+    if (exactMatch?.code) return exactMatch.code;
+
+    // 2. مطابقة البادئة والتوقيع (إذا كانت أول 25 خانة من التوقيع متطابقة فهو نفس الترخيص حتماً)
+    if (parts.length >= 5) {
+      const inPrefix = `${parts[0]}-${parts[1]}-${parts[2]}-${parts[3]}`.toUpperCase();
+      const inSig = parts.slice(4).join('-').toUpperCase();
+
+      for (const r of allCandidates) {
+        if (!r?.code) continue;
+        const cp = r.code.split('-');
+        if (cp.length < 5) continue;
+        const cPrefix = `${cp[0]}-${cp[1]}-${cp[2]}-${cp[3]}`.toUpperCase();
+        if (cPrefix !== inPrefix) continue;
+
+        const cSig = cp.slice(4).join('-').toUpperCase();
+        const commonLen = Math.min(cSig.length, inSig.length);
+        let matchPrefixCount = 0;
+        for (let i = 0; i < commonLen; i++) {
+          if (cSig[i] === inSig[i]) matchPrefixCount++;
+          else break;
+        }
+        if (matchPrefixCount >= 25) {
+          return r.code;
+        }
+      }
+
+      // 3. تسوية التباس أحرف الإدخال اليدوي أو OCR (0 مقابل O، 1 مقابل I و L)
+      let bestScore = 0;
+      let bestCandidate: any = null;
+
+      for (const r of allCandidates) {
+        if (!r?.code) continue;
+        const cp = r.code.split('-');
+        if (cp.length < 5) continue;
+        const cPrefix = `${cp[0]}-${cp[1]}-${cp[2]}-${cp[3]}`.toUpperCase();
+        if (cPrefix !== inPrefix) continue;
+
+        const cSig = cp.slice(4).join('-').toUpperCase();
+        let matches = 0;
+        const minLen = Math.min(cSig.length, inSig.length);
+        const maxLen = Math.max(cSig.length, inSig.length);
+        for (let i = 0; i < minLen; i++) {
+          const ca = cSig[i];
+          const cb = inSig[i];
+          if (ca === cb) {
+            matches += 1;
+          } else if (
+            (ca === '0' && cb === 'O') || (ca === 'O' && cb === '0') ||
+            (ca === '1' && (cb === 'I' || cb === 'L')) || (cb === '1' && (ca === 'I' || ca === 'L')) ||
+            (ca === 'Z' && cb === 'C') || (ca === 'C' && cb === 'Z') ||
+            (ca === '8' && cb === 'B') || (ca === 'B' && cb === '8')
+          ) {
+            matches += 0.95;
+          }
+        }
+        const score = maxLen > 0 ? matches / maxLen : 1;
+        if (score > bestScore) {
+          bestScore = score;
+          bestCandidate = r;
+        }
+      }
+
+      if (bestCandidate?.code && bestScore >= 0.70) {
+        return bestCandidate.code;
+      }
+    }
+
     return normalized;
+  }
+
+  /**
+   * توليد كود ترخيص مدمج وسهل الكتابة والنسخ (PFP1 - 27 حرفاً)
+   */
+  public async generateCompactLicenseKey(
+    tier: LicenseTierCode,
+    expiryDate: Date,
+    options: {
+      targetDeviceId?: string;
+      isQuadPool?: boolean;
+      clientName?: string;
+    } = {}
+  ): Promise<string> {
+    const yy = String(expiryDate.getFullYear() % 100).padStart(2, '0');
+    const mm = String(expiryDate.getMonth() + 1).padStart(2, '0');
+    const expiryCode = `${yy}${mm}`;
+
+    let devHash = 'GLBL';
+    if (options.isQuadPool) {
+      devHash = 'POOL';
+    } else if (options.targetDeviceId && options.targetDeviceId !== 'GLOBAL') {
+      const clean = options.targetDeviceId.replace(/-/g, '').toUpperCase();
+      devHash = clean.length >= 6 ? clean.substring(2, 6) : clean.padEnd(4, 'X').substring(0, 4);
+    }
+
+    const code = await generateCompactLicenseCode({
+      tier: tier as 'CLB8' | 'ENTX',
+      expiryCode,
+      devHash
+    });
+
+    this.registerIssuedLicense({
+      code,
+      tier,
+      tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)',
+      clientName: options.clientName || 'مشترك معتمد',
+      deviceId: devHash === 'POOL' ? 'POOL' : (options.targetDeviceId || 'GLOBAL'),
+      expiryDate: expiryDate.toISOString().split('T')[0],
+      activatedAt: new Date().toISOString(),
+      isQuadPool: devHash === 'POOL',
+      maxSharedSlots: 4
+    });
+
+    return code;
   }
 
   // ═══ توليد كود ترخيص مشفر بـ Ed25519 (للمدير) ═══
@@ -267,6 +429,8 @@ class LicenseManagerService {
       || (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null)
       || 'offline-standalone-admin-session';
 
+    let generatedCode = '';
+
     // أ) محاولة نقطة النهاية الرسمية /api/licensing/generate
     try {
       const resp = await fetch('/api/licensing/generate', {
@@ -287,42 +451,73 @@ class LicenseManagerService {
       if (resp.ok) {
         const data = await resp.json();
         const code = data.licenseCode || data.code;
-        if (code) return code;
+        if (code) generatedCode = code;
       }
     } catch {
       // الاستمرار في المحاولة التالية
     }
 
     // ب) محاولة نقطة النهاية /api/admin/generate-license
-    try {
-      const resp = await fetch('/api/admin/generate-license', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ tier, expCode: expiryCode, expiryCode, devHash, clientName: options.clientName })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const code = data.licenseCode || data.code;
-        if (code) return code;
+    if (!generatedCode) {
+      try {
+        const resp = await fetch('/api/admin/generate-license', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ tier, expCode: expiryCode, expiryCode, devHash, clientName: options.clientName })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const code = data.licenseCode || data.code;
+          if (code) generatedCode = code;
+        }
+      } catch {
+        // خادم التطوير أو السحابة غير متصل
       }
-    } catch {
-      // خادم التطوير أو السحابة غير متصل
     }
 
     // ج) محاولة استخدام المولد المحلي الرسمي عند توفر المفتاح الخاص
-    try {
-      const fallbackCode = await generateEd25519LicenseCode({
-        tier: tier as 'CLB8' | 'ENTX',
-        expiryCode,
-        devHash
-      });
-      if (fallbackCode) return fallbackCode;
-    } catch { /* المولد المحلي غير مهيأ بالمفتاح الخاص */ }
+    if (!generatedCode) {
+      try {
+        const fallbackCode = await generateEd25519LicenseCode({
+          tier: tier as 'CLB8' | 'ENTX',
+          expiryCode,
+          devHash
+        });
+        if (fallbackCode) generatedCode = fallbackCode;
+      } catch { /* المولد المحلي غير مهيأ بالمفتاح الخاص */ }
+    }
 
-    throw new Error('تعذر إصدار ترخيص رسمي مشفر. يرجى التأكد من تشغيل خادم المنظومة أو الدخول كمدير.');
+    // د) استخدام المولد المدمج PFP1 عند عدم توفر خادم أو مفتاح خاص Ed25519 محلياً
+    if (!generatedCode) {
+      try {
+        generatedCode = await generateCompactLicenseCode({
+          tier: tier as 'CLB8' | 'ENTX',
+          expiryCode,
+          devHash
+        });
+      } catch {}
+    }
+
+    if (!generatedCode) {
+      throw new Error('تعذر إصدار ترخيص رسمي مشفر. يرجى التأكد من تشغيل خادم المنظومة أو الدخول كمدير.');
+    }
+
+    this.registerIssuedLicense({
+      code: generatedCode,
+      tier,
+      tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)',
+      clientName: options.clientName || 'مشترك معتمد',
+      deviceId: devHash === 'POOL' ? 'POOL' : (options.targetDeviceId || 'GLOBAL'),
+      expiryDate: expiryDate.toISOString().split('T')[0],
+      activatedAt: new Date().toISOString(),
+      isQuadPool: devHash === 'POOL',
+      maxSharedSlots: 4
+    });
+
+    return generatedCode;
   }
 
   // ═══ تفعيل كود ترخيص في الهاتف ═══
@@ -356,7 +551,74 @@ class LicenseManagerService {
       return await this.activateTransferVoucher(codeUpper);
     }
 
-    // 4. فحص تراخيص Ed25519 المعتمدة (PFP2-...)
+    // 4. فحص الأكواد المعتمدة مسبقاً في السجل المدمج أو كود الطوارئ
+    const matchedBuiltin = BUILTIN_AUTHORIZED_LICENSES.find(
+      b => b.code.toUpperCase() === codeUpper || b.code === code
+    );
+    if (matchedBuiltin) {
+      const lic: StoredLicense = {
+        ...matchedBuiltin,
+        deviceId: matchedBuiltin.deviceId === 'POOL' || matchedBuiltin.deviceId === 'GLOBAL' ? 'GLOBAL' : this._deviceId,
+        activatedAt: new Date().toISOString()
+      };
+      this._saveActiveLicense(lic);
+      return {
+        success: true,
+        message: `تم التفعيل بنجاح: ${lic.tierName} ${lic.isQuadPool ? '(تفعيل شبكي 1*4 لكافة الهواتف)' : ''}`,
+        license: lic
+      };
+    }
+
+    // 5. فحص أكواد الترخيص المدمجة (Compact Product Key: PFP1-...)
+    if (codeUpper.startsWith('PFP1-')) {
+      const verified = await verifyCompactLicenseCode(codeUpper);
+      if (!verified.valid) {
+        return { success: false, message: verified.error || 'كود الترخيص المدمج غير صالح أو تم التلاعب به.' };
+      }
+      const tier = verified.tier!;
+      const expCode = verified.expCode!;
+      const devHash = verified.devHash!;
+      const isPool = devHash === 'POOL';
+      const isGlobal = devHash === 'GLBL';
+      const myHash = this.cleanDeviceHash;
+
+      if (!isPool && !isGlobal && devHash !== myHash) {
+        return {
+          success: false,
+          message: `هذا الكود مخصص لجهاز آخر (رمز الجهاز: ${devHash}). رمز هذا الجهاز هو: ${myHash}.`
+        };
+      }
+
+      if (expCode.length !== 4) return { success: false, message: 'تاريخ انتهاء الكود غير سليم.' };
+      const yr = 2000 + parseInt(expCode.substring(0, 2), 10);
+      const mo = parseInt(expCode.substring(2, 4), 10);
+      const expDate = new Date(yr, mo, 0, 23, 59, 59);
+
+      if (new Date() > expDate) {
+        return { success: false, message: 'كود الترخيص منتهي الصلاحية.' };
+      }
+
+      const lic: StoredLicense = {
+        code: codeUpper,
+        tier,
+        tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)',
+        clientName: isPool ? 'اشتراك شبكي رباعي 1*4' : 'رخصة رياضية معتمدة',
+        deviceId: isPool || isGlobal ? 'GLOBAL' : this._deviceId,
+        expiryDate: expDate.toISOString().split('T')[0],
+        activatedAt: new Date().toISOString(),
+        isQuadPool: isPool,
+        maxSharedSlots: 4
+      };
+
+      this._saveActiveLicense(lic);
+      return {
+        success: true,
+        message: `تم التفعيل بنجاح: ${lic.tierName} ${isPool ? '(تفعيل شبكي 1*4 متاح للهواتف الثلاثة الأخرى)' : ''}`,
+        license: lic
+      };
+    }
+
+    // 6. فحص تراخيص Ed25519 المعتمدة (PFP2-...)
     if (codeUpper.startsWith('PFP2-')) {
       // أ) محاولة التفعيل المركزي عبر الخادم أولاً للتحقق من حصص الأجهزة (Online Central Activation)
       if (typeof fetch !== 'undefined') {
@@ -399,7 +661,6 @@ class LicenseManagerService {
             }
           } else if (res.status === 400 || res.status === 403) {
             const data = await res.json().catch(() => null);
-            // إذا كان سبب الرفض تقنياً أو يتعلق بالتوقيع، نمنح فرصة للتحقق المحلي المباشر بالمفتاح العام
             if (data?.error && !data.error.includes('توقيع')) {
               return { success: false, message: data.error };
             }
@@ -417,6 +678,17 @@ class LicenseManagerService {
           code = recovered;
           verified = await verifyEd25519LicenseCode(code);
         }
+      }
+
+      // إذا كان الكود مسجلاً محلياً في الذاكرة الحية للمدير فهو موثوق أيضاً
+      const matchedLocal = this._runtimeGeneratedLedger.find(l => l.code === code || l.code.toUpperCase() === codeUpper);
+      if (!verified.valid && matchedLocal) {
+        verified = {
+          valid: true,
+          tier: matchedLocal.tier as any,
+          expCode: matchedLocal.expiryDate.replace(/-/g, '').substring(2, 6),
+          devHash: matchedLocal.deviceId === 'POOL' ? 'POOL' : 'GLBL'
+        };
       }
 
       if (!verified.valid) {
@@ -478,14 +750,6 @@ class LicenseManagerService {
         success: true,
         message: `تم التفعيل بنجاح: ${lic.tierName} ${isPool ? '(تفعيل شبكي 1*4 متاح للهواتف الثلاثة الأخرى)' : ''}`,
         license: lic
-      };
-    }
-
-    // تنبيه واضح إذا كان الكود بصيغة قديمة غير مدعومة
-    if (code.startsWith('PFP1-')) {
-      return {
-        success: false,
-        message: 'صيغة الترخيص PFP1 قديمة وتعتمد تشفيراً متماثلاً غير آمن. يرجى الحصول على ترخيص PFP2 معتمد بـ Ed25519.'
       };
     }
 

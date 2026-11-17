@@ -265,10 +265,44 @@ export function verifyCheckpointQrSignature({ cid, cpid, code, km, iat, exp }, s
   return crypto.verify(null, Buffer.from(canonical, 'utf8'), publicKeyObject, sigBytes);
 }
 
+/**
+ * توليد كود ترخيص مدمج وسهل الكتابة والنسخ (Compact Key - 27 حرفاً)
+ * تنسيق: PFP1-TIER-YYMM-DEVICE-CHECKSUM
+ */
+export function generateCompactLicense({ tier = 'CLB8', expiryCode, devHash = 'POOL' }) {
+  const pubKeyB64 = getPublicKeyBase64();
+  const payload = `PFP1|${tier}|${expiryCode}|${devHash}|${pubKeyB64}`;
+  const checksum = crypto.createHash('sha256').update(payload, 'utf8').digest('hex').substring(0, 8).toUpperCase();
+  return `PFP1-${tier}-${expiryCode}-${devHash}-${checksum}`;
+}
+
+/**
+ * التحقق من كود ترخيص مدمج PFP1
+ */
+export function verifyCompactLicense(code) {
+  const parts = String(code || '').trim().toUpperCase().split('-');
+  if (parts.length !== 5 || parts[0] !== 'PFP1') {
+    return { valid: false, error: 'صيغة كود الترخيص المدمج غير مطابقة للإصدار V1' };
+  }
+  const [, tier, expCode, devHash, checksum] = parts;
+  if (tier !== 'CLB8' && tier !== 'ENTX') {
+    return { valid: false, error: 'فئة ترخيص غير معروفة' };
+  }
+  const pubKeyB64 = getPublicKeyBase64();
+  const payload = `PFP1|${tier}|${expCode}|${devHash}|${pubKeyB64}`;
+  const expected = crypto.createHash('sha256').update(payload, 'utf8').digest('hex').substring(0, 8).toUpperCase();
+  if (checksum !== expected) {
+    return { valid: false, error: 'توقيع كود الترخيص المدمج غير صالح' };
+  }
+  return { valid: true, tier, expCode, devHash };
+}
+
 export default {
   verifyAdminLogin,
   verifyAdminToken,
   generateEd25519License,
+  generateCompactLicense,
+  verifyCompactLicense,
   verifyEd25519Signature,
   getPublicKeyBase64,
   signCheckpointQr,

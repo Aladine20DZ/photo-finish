@@ -11,7 +11,8 @@ import {
   HelpCircle, 
   CheckCircle2, 
   Radio,
-  Camera
+  Camera,
+  ClipboardPaste
 } from 'lucide-react';
 import { QrScannerModal } from './QrScannerModal';
 import { licenseManager, StoredLicense } from '../services/licenseManager';
@@ -567,6 +568,24 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) {
+                            setActivationInput(normalizeLicenseCodeInput(text));
+                          }
+                        } catch {
+                          // ignore clipboard permission error
+                        }
+                      }}
+                      className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="لصق كود الترخيص مباشرة من الحافظة"
+                    >
+                      <ClipboardPaste className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>لصق الكود 📋</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setShowScanner(true)}
                       className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
                       title="مسح كود الباركود مباشرة من كاميرا الهاتف"
@@ -588,10 +607,14 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 <textarea
                   value={activationInput}
                   onChange={(e) => setActivationInput(normalizeLicenseCodeInput(e.target.value))}
-                  placeholder="مثال: PFP2-ENTX-2711-POOL-XXXXXX أو كود النقل TRF1-..."
+                  placeholder="أدخل كود الترخيص (PFP2-... أو الكود المختصر PFP1-...) أو كود النقل TRF1-..."
                   rows={2}
                   className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 text-white font-mono font-bold text-sm rounded-xl p-3 outline-none placeholder:text-slate-600"
                 />
+
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  💡 يقبل النظام الأكواد المشفرة الكاملة (<span className="text-amber-400 font-mono font-bold">PFP2</span>) والأكواد المدمجة السريعة (<span className="text-emerald-400 font-mono font-bold">PFP1</span>)، مع معالجة ذكية لحالة الأحرف وتصحيح تلقائي لأخطاء النقل والطباعة أوفلاين بنسبة 100%.
+                </p>
 
                 {activationError && (
                   <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold">

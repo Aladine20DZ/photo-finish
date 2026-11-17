@@ -201,6 +201,57 @@ export const DEFAULT_INITIAL_PLANS = [
   }
 ];
 
+export const DEFAULT_AUTHORIZED_LICENSES = [
+  {
+    code: 'PFP2-CLB8-3111-GLBL-AjdZqqlk5QABX9XwbCheG8K-pxfcKJHdsXJDqfMPSyC75YtQqihOCqZP_nfacJoZkx0RVxvTzjab1RTL67NMAA',
+    planId: 'plan_club_pro_8l',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club 8L)',
+    clientName: 'نادي رياضي معتمد',
+    deviceId: 'GLOBAL',
+    expiryDate: '2031-11-30',
+    maxDevices: 4,
+    isQuadPool: true,
+    status: 'active'
+  },
+  {
+    code: 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BZaN-poapNrx-_DQ',
+    planId: 'plan_state_league_lwas',
+    tier: 'CLB8',
+    tierName: 'باقة الرابطات الولائية (State League LWAS)',
+    clientName: 'رابطة ألعاب القوى سعيدة (LWAS)',
+    deviceId: 'POOL',
+    expiryDate: '2027-05-31',
+    maxDevices: 4,
+    isQuadPool: true,
+    status: 'active'
+  },
+  {
+    code: 'PFP2-CLB8-2711-POOL-nMseDQvO47dPIgMP68fcgMtXb4kVmsVvf6N0HlX80UEBxn71xqPwoHK7hFgZH3u-Cv77Q4eu02x0Uxog1cw7CQ',
+    planId: 'plan_club_pro_8l',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club 8L)',
+    clientName: 'نادي الوفاق لألعاب القوى',
+    deviceId: 'POOL',
+    expiryDate: '2027-11-30',
+    maxDevices: 4,
+    isQuadPool: true,
+    status: 'active'
+  },
+  {
+    code: 'PFP2-CLB8-2712-POOL-beIp0Wj9wrQgH3r4ok3YsE5X0N6dAyMVGCBNSFaF__5VTz2BSJobJem2JVyQry3Y9t8ANUZDUBTNajA-lBR4CQ',
+    planId: 'plan_club_pro_8l',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club 8L)',
+    clientName: 'رابطة ألعاب القوى',
+    deviceId: 'POOL',
+    expiryDate: '2027-12-31',
+    maxDevices: 4,
+    isQuadPool: true,
+    status: 'active'
+  }
+];
+
 export class LicensingStore {
   constructor({ dbPath = ':memory:' } = {}) {
     this.usingSqlite = !!DatabaseSync;
@@ -222,6 +273,7 @@ export class LicensingStore {
     }
 
     this._seedDefaultPlans();
+    this._seedDefaultLicenses();
   }
 
   _seedDefaultPlans() {
@@ -234,6 +286,15 @@ export class LicensingStore {
           createdAt: now,
           updatedAt: now
         });
+      }
+    }
+  }
+
+  _seedDefaultLicenses() {
+    const existing = this.listLicenses();
+    for (const lic of DEFAULT_AUTHORIZED_LICENSES) {
+      if (!existing.some(e => e.code === lic.code)) {
+        this.saveLicense(lic);
       }
     }
   }

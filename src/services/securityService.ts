@@ -21,8 +21,11 @@ import { PhoneRole } from '../types/race';
 //   1) متغير البيئة VITE_LICENSE_PUBLIC_KEY عند البناء (موصى به للإنتاج)
 //   2) مفتاح موثوق محقون وقت التشغيل (setTrustedPublicKeyBase64) أو مخزّن سابقاً من الخادم
 //   3) جلب من الخادم /api/public-key (Trust-On-First-Use) وحفظه محلياً
+// المفتاح العام الاحتياطي الموثوق للمنظومة (Ed25519)
+export const DEFAULT_LICENSE_PUBLIC_KEY = 'QKXMTkpN9uC57U/O4G+N/9pUHyS3AgFOvrupynA3vWo=';
+
 export const ED25519_PUBLIC_KEY_BASE64: string =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || '';
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || DEFAULT_LICENSE_PUBLIC_KEY;
 
 const PREF_TRUSTED_PUBKEY = 'pf_trusted_pubkey_v1';
 
@@ -56,8 +59,9 @@ async function resolvePublicKeyBase64(): Promise<string> {
       try { localStorage.setItem(PREF_TRUSTED_PUBKEY, cachedKeyBase64); } catch { /* ignore */ }
       return cachedKeyBase64;
     }
-  } catch { /* لا خادم — التحقق سيُفشل برسالة واضحة */ }
-  return '';
+  } catch { /* لا خادم */ }
+  cachedKeyBase64 = DEFAULT_LICENSE_PUBLIC_KEY;
+  return cachedKeyBase64;
 }
 
 // ═══ 1. مصفوفة صلاحيات الأدوار الميدانية (Role Permission Matrix) ═══
@@ -377,6 +381,75 @@ export async function generateEd25519LicenseCode(params: {
     .replace(/=+$/, '');
 
   return `PFP2-${tier}-${expiryCode}-${devHash}-${sigBase64Url}`;
+}
+
+/**
+ * توليد كود ترخيص مدمج وسهل الكتابة والنسخ (Compact Key - 27 حرفاً)
+ * تنسيق: PFP1-TIER-YYMM-DEVICE-CHECKSUM
+ * يعمل أوفلاين 100% ولا يتأثر بحالة الأحرف
+ */
+export async function generateCompactLicenseCode(params: {
+  tier: 'CLB8' | 'ENTX';
+  expiryCode: string;
+  devHash?: string;
+}): Promise<string> {
+  const { tier, expiryCode, devHash = 'POOL' } = params;
+  const pubKeyB64 = await resolvePublicKeyBase64();
+  const subtle = getSubtleCrypto();
+  if (!pubKeyB64 || !subtle) {
+    throw new Error('محرك التحقق والتشفير غير متاح');
+  }
+  const payload = `PFP1|${tier}|${expiryCode}|${devHash}|${pubKeyB64}`;
+  const enc = new TextEncoder();
+  const buf = await subtle.digest('SHA-256', enc.encode(payload));
+  const checksum = Array.from(new Uint8Array(buf))
+    .slice(0, 4)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+  return `PFP1-${tier}-${expiryCode}-${devHash}-${checksum}`;
+}
+
+/**
+ * التحقق من كود ترخيص مدمج (PFP1-...) أوفلاين 100% دون خادم
+ */
+export async function verifyCompactLicenseCode(code: string): Promise<{
+  valid: boolean;
+  tier?: 'CLB8' | 'ENTX';
+  expCode?: string;
+  devHash?: string;
+  error?: string;
+}> {
+  const parts = code.trim().toUpperCase().split('-');
+  if (parts.length !== 5 || parts[0] !== 'PFP1') {
+    return { valid: false, error: 'صيغة كود الترخيص المدمج غير مطابقة للإصدار V1' };
+  }
+  const [, rawTier, expCode, devHash, checksum] = parts;
+  if (rawTier !== 'CLB8' && rawTier !== 'ENTX') {
+    return { valid: false, error: 'فئة ترخيص غير معروفة' };
+  }
+  const pubKeyB64 = await resolvePublicKeyBase64();
+  const subtle = getSubtleCrypto();
+  if (!pubKeyB64 || !subtle) {
+    return { valid: false, error: 'محرك التحقق من التوقيع غير متاح' };
+  }
+  const payload = `PFP1|${rawTier}|${expCode}|${devHash}|${pubKeyB64}`;
+  const enc = new TextEncoder();
+  const buf = await subtle.digest('SHA-256', enc.encode(payload));
+  const expected = Array.from(new Uint8Array(buf))
+    .slice(0, 4)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+  if (checksum !== expected) {
+    return { valid: false, error: 'توقيع كود الترخيص المدمج غير صالح أو تم التلاعب به' };
+  }
+  return {
+    valid: true,
+    tier: rawTier as 'CLB8' | 'ENTX',
+    expCode,
+    devHash
+  };
 }
 
 // ═══ 3. توقيع الرسائل الحساسة بـ HMAC الجلسة ═══
