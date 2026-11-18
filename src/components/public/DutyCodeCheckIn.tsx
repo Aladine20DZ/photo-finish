@@ -100,6 +100,17 @@ export const DutyCodeCheckIn: React.FC<DutyCodeCheckInProps> = ({ onUnlockTask, 
   const [error, setError] = useState<string | null>(null);
   const [task, setTask] = useState<TaskAssignment | null>(null);
 
+  React.useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const urlCode = p.get('code') || p.get('duty') || p.get('dutyCode');
+      if (urlCode) {
+        setCode(urlCode.toUpperCase());
+        redeem(urlCode);
+      }
+    } catch {}
+  }, []);
+
   const redeem = (codeToTest?: string) => {
     const raw = (codeToTest || code).trim().toUpperCase();
     if (!raw) return;

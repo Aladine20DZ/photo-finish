@@ -187,6 +187,15 @@ export const App: React.FC = () => {
         if (tab === 'planning' || tab === 'competitions-bureau') {
           return 'league';
         }
+        if (tab === 'judges-office' || tab === 'judges' || tab === 'assignments') {
+          return 'judges-office';
+        }
+        if (tab === 'sheets') {
+          return 'sheets';
+        }
+        if (tab === 'entries') {
+          return 'entries';
+        }
         if (tab === 'league' || tab === 'coach' || tab === 'competition' || tab === 'analytics' || tab === 'admin' || tab === 'design-system' || tab === 'login' || tab === 'competitions' || tab === 'results') {
           return tab;
         }
