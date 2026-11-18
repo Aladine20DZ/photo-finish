@@ -148,7 +148,7 @@ export const LeagueGate: React.FC<LeagueGateProps> = ({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="saida_admin"
+                  placeholder="lwassaida20@gmail.com"
                   className="w-full pr-10 pl-3 py-3 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl text-xs font-semibold text-white focus:outline-none"
                 />
               </div>

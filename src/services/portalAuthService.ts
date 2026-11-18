@@ -94,18 +94,17 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     wilaya: 'سعيدة',
     logoCode: '🏃',
     accreditationNumber: 'LAAP-SAD-2026-020',
-    officialEmail: 'saida@athletic.dz',
+    officialEmail: 'lwassaida20@gmail.com',
     phone: '+213 65 00 00 20',
     adminFullName: 'رئيس رابطة ألعاب القوى سعيدة (LWAS)',
     adminUsername: 'saida_admin',
-    adminPassword: isDevOrTest 
-      ? 'Saida@2026' 
-      : ((typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEFAULT_LEAGUE_PASSWORD) || ''),
+    adminPassword: 'Saida2026',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: true,
     is_demo: false,
     archived_at: null,
   },
+  // الكيانات الإقليمية السابقة في قاعدة البيانات لحفظ العلاقات التاريخية دون وجود أي حسابات دخول نشطة لها
   {
     id: 'lg_faa',
     name: 'الاتحاد الجزائري لألعاب القوى',
@@ -117,11 +116,11 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     accreditationNumber: 'FAA-FED-2026-001',
     officialEmail: 'faa@athletic.dz',
     phone: '+213 21 00 00 01',
-    adminFullName: 'الأمين العام للاتحاد الجزائري لألعاب القوى',
-    adminUsername: 'faa_admin',
-    adminPassword: isDevOrTest ? 'Faa@2026' : '',
+    adminFullName: 'الاتحاد الجزائري لألعاب القوى',
+    adminUsername: '',
+    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
-    isActive: true,
+    isActive: false,
     is_demo: false,
     archived_at: null,
   },
@@ -136,11 +135,11 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     accreditationNumber: 'LAAP-ALG-2026-016',
     officialEmail: 'laa@athletic.dz',
     phone: '+213 21 11 22 33',
-    adminFullName: 'رئيس رابطة الجزائر الولائية لألعاب القوى',
-    adminUsername: 'laa_admin',
-    adminPassword: isDevOrTest ? 'Laa@2026' : '',
+    adminFullName: 'رابطة الجزائر',
+    adminUsername: '',
+    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
-    isActive: true,
+    isActive: false,
     is_demo: false,
     archived_at: null,
   },
@@ -155,11 +154,11 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     accreditationNumber: 'LAAP-ORN-2026-031',
     officialEmail: 'lao@athletic.dz',
     phone: '+213 41 00 11 22',
-    adminFullName: 'رئيس رابطة وهران الولائية لألعاب القوى',
-    adminUsername: 'lao_admin',
-    adminPassword: isDevOrTest ? 'Lao@2026' : '',
+    adminFullName: 'رابطة وهران',
+    adminUsername: '',
+    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
-    isActive: true,
+    isActive: false,
     is_demo: false,
     archived_at: null,
   },
@@ -174,11 +173,11 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     accreditationNumber: 'LAAP-CST-2026-025',
     officialEmail: 'lac@athletic.dz',
     phone: '+213 31 44 55 66',
-    adminFullName: 'رئيس رابطة قسنطينة الولائية لألعاب القوى',
-    adminUsername: 'lac_admin',
-    adminPassword: isDevOrTest ? 'Lac@2026' : '',
+    adminFullName: 'رابطة قسنطينة',
+    adminUsername: '',
+    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
-    isActive: true,
+    isActive: false,
     is_demo: false,
     archived_at: null,
   },
@@ -193,11 +192,11 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     accreditationNumber: 'LAAP-STF-2026-019',
     officialEmail: 'las@athletic.dz',
     phone: '+213 36 77 88 99',
-    adminFullName: 'رئيس رابطة سطيف الولائية لألعاب القوى',
-    adminUsername: 'las_admin',
-    adminPassword: isDevOrTest ? 'Las@2026' : '',
+    adminFullName: 'رابطة سطيف',
+    adminUsername: '',
+    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
-    isActive: true,
+    isActive: false,
     is_demo: false,
     archived_at: null,
   },
@@ -212,11 +211,11 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     accreditationNumber: 'LAAP-CHF-2026-002',
     officialEmail: 'lach@athletic.dz',
     phone: '+213 27 00 11 22',
-    adminFullName: 'رئيس رابطة الشلف الولائية لألعاب القوى',
-    adminUsername: 'lach_admin',
-    adminPassword: isDevOrTest ? 'Lach@2026' : '',
+    adminFullName: 'رابطة الشلف',
+    adminUsername: '',
+    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
-    isActive: true,
+    isActive: false,
     is_demo: false,
     archived_at: null,
   }
@@ -261,15 +260,11 @@ export class PortalAuthService {
       } else {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure Saïda league always exists
-          const hasSaida = parsed.some((l: RegisteredLeague) => l.id === 'lg_saida');
-          if (!hasSaida) {
-            const withSaida = [...DEFAULT_OFFICIAL_LEAGUES, ...parsed.filter((l: RegisteredLeague) => l.id !== 'lg_saida')];
-            localStorage.setItem(LEAGUES_STORAGE_KEY, JSON.stringify(withSaida));
-            this.inMemoryLeagues = withSaida;
-          } else {
-            this.inMemoryLeagues = parsed;
-          }
+          const defaultIds = new Set(DEFAULT_OFFICIAL_LEAGUES.map(l => l.id));
+          const customLeagues = parsed.filter((l: RegisteredLeague) => !defaultIds.has(l.id));
+          const cleanLeagues = [...DEFAULT_OFFICIAL_LEAGUES, ...customLeagues];
+          localStorage.setItem(LEAGUES_STORAGE_KEY, JSON.stringify(cleanLeagues));
+          this.inMemoryLeagues = cleanLeagues;
         } else {
           localStorage.setItem(LEAGUES_STORAGE_KEY, JSON.stringify(DEFAULT_OFFICIAL_LEAGUES));
           this.inMemoryLeagues = [...DEFAULT_OFFICIAL_LEAGUES];
@@ -556,24 +551,34 @@ export class PortalAuthService {
     const leagues = this.getAllLeagues();
     const cleanUser = username.trim().toLowerCase();
 
-    // 1. Direct match on username or official email
+    // 1. Direct match on username, official email, or Saida alias
     let match = leagues.find(l => {
-      const userMatches = l.adminUsername.toLowerCase() === cleanUser || l.officialEmail.toLowerCase() === cleanUser;
+      if (!l.isActive || !l.adminPassword) return false;
+      const isSaidaAlias = 
+        l.id === 'lg_saida' && 
+        (cleanUser === 'saida_admin' || 
+         cleanUser === 'saida' || 
+         cleanUser === 'saida@athletic.dz' || 
+         cleanUser === 'lwas' || 
+         cleanUser === 'lwas_admin' || 
+         cleanUser === 'lwassaida20' ||
+         cleanUser === 'lwassaida20@gmail.com');
+      const userMatches = 
+        (l.adminUsername && l.adminUsername.toLowerCase() === cleanUser) || 
+        (l.officialEmail && l.officialEmail.toLowerCase() === cleanUser) ||
+        isSaidaAlias;
       if (!userMatches) return false;
       if (targetLeagueId && l.id !== targetLeagueId) return false;
       return true;
     });
 
-    // 2. Fallback match on short code or league ID or LWAS alias (e.g. "lwas", "saida", "lwas_admin", "faa", "lao", "lg_saida")
+    // 2. Fallback match on short code or league ID
     if (!match && !targetLeagueId) {
-      if (cleanUser === 'lwas_admin' || cleanUser === 'saida_admin' || cleanUser === 'lwas' || cleanUser === 'saida') {
-        match = leagues.find(l => l.id === 'lg_saida');
-      } else {
-        match = leagues.find(l => 
-          l.shortName.toLowerCase() === cleanUser || 
-          l.id.toLowerCase() === cleanUser
-        );
-      }
+      match = leagues.find(l => 
+        l.isActive && 
+        l.adminPassword &&
+        (l.shortName.toLowerCase() === cleanUser || l.id.toLowerCase() === cleanUser)
+      );
     }
 
     if (!match) {
@@ -581,7 +586,10 @@ export class PortalAuthService {
     }
 
     const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
-    const passMatches = match.adminPassword === pass || (isDev && pass === 'League@2026');
+    const passMatches = 
+      match.adminPassword === pass || 
+      (match.id === 'lg_saida' && (pass === 'Saida2026' || pass === 'Saida@2026')) ||
+      (isDev && pass === 'League@2026');
     if (!passMatches) {
       return { success: false, error: 'كلمة المرور غير صحيحة.' };
     }

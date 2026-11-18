@@ -94,7 +94,7 @@ export const LWAS_IDENTITY = {
   headquarters: 'المركب الرياضي 13 أفريل 1958، ولاية سعيدة - الجزائر',
   stadium: 'مضمار ألعاب القوى 13 أفريل سعيدة',
   crossCountryVenue: 'مضمار غابة العشية، سعيدة',
-  email: 'saida@athletic.dz',
+  email: 'lwassaida20@gmail.com',
   phone: '+213 48 47 00 20',
   mobile: '+213 65 00 00 20',
   president: 'أحمد بن علي',

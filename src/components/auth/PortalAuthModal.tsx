@@ -410,7 +410,7 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
                           type="text"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          placeholder="saida_admin"
+                          placeholder="lwassaida20@gmail.com"
                           className="w-full pr-9 pl-3 py-2.5 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl text-xs font-semibold text-white focus:outline-none"
                         />
                       </div>

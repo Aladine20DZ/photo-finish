@@ -93,6 +93,29 @@ describe('Multi-Portal Authentication & League Registration Service', () => {
     const res3 = await portalAuthService.loginLeague('saida@athletic.dz', 'Saida@2026');
     expect(res3.success).toBe(true);
     expect(res3.session?.leagueShort).toBe('SAIDA');
+
+    // 4. By new official LWAS email and password
+    const res4 = await portalAuthService.loginLeague('lwassaida20@gmail.com', 'Saida2026');
+    expect(res4.success).toBe(true);
+    expect(res4.session?.leagueShort).toBe('SAIDA');
+    expect(res4.session?.email).toBe('lwassaida20@gmail.com');
+  });
+
+  it('ensures all other default league accounts are deleted and only Saïda has an active login account', async () => {
+    // Only Saida has an active login account
+    const activeLeaguesWithAccounts = portalAuthService.getAllLeagues().filter(l => 
+      ['lg_saida', 'lg_faa', 'lg_oran', 'lg_algiers', 'lg_constantine', 'lg_setif', 'lg_chlef'].includes(l.id) && l.isActive
+    );
+    expect(activeLeaguesWithAccounts.length).toBe(1);
+    expect(activeLeaguesWithAccounts[0].id).toBe('lg_saida');
+    expect(activeLeaguesWithAccounts[0].officialEmail).toBe('lwassaida20@gmail.com');
+
+    // Attempting login with deleted league accounts fails
+    const resFaa = await portalAuthService.loginLeague('faa_admin', 'Faa@2026');
+    expect(resFaa.success).toBe(false);
+
+    const resOran = await portalAuthService.loginLeague('lao_admin', 'Lao@2026');
+    expect(resOran.success).toBe(false);
   });
 });
 
