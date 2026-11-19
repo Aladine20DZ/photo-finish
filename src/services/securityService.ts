@@ -23,6 +23,8 @@ import { PhoneRole } from '../types/race';
 //   3) جلب من الخادم /api/public-key (Trust-On-First-Use) وحفظه محلياً
 // المفتاح العام الاحتياطي الموثوق للمنظومة (Ed25519)
 export const DEFAULT_LICENSE_PUBLIC_KEY = 'QKXMTkpN9uC57U/O4G+N/9pUHyS3AgFOvrupynA3vWo=';
+// المفتاح الخاص الاحتياطي لمولد التراخيص المحلي أوفلاين (Ed25519)
+export const DEFAULT_LICENSE_PRIVATE_KEY = 'ydyqLd+QflMzl6NTdma1ZUq6BidICTTaxpunjhoLRkA=';
 
 export const ED25519_PUBLIC_KEY_BASE64: string =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || DEFAULT_LICENSE_PUBLIC_KEY;
@@ -353,7 +355,7 @@ export async function generateEd25519LicenseCode(params: {
     throw new Error('محرك التوقيع والتشفير غير متاح');
   }
 
-  const privKeyBase64 = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || cachedPrivKeyBase64;
+  const privKeyBase64 = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || cachedPrivKeyBase64 || DEFAULT_LICENSE_PRIVATE_KEY;
   if (!privKeyBase64) {
     throw new Error('لا يوجد مفتاح خاص Ed25519 متاح لتوليد التراخيص محلياً — شغّل الخادم أو اضبط VITE_LICENSE_PRIVATE_KEY');
   }

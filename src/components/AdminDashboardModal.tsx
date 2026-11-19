@@ -335,7 +335,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-98 transition-all cursor-pointer"
                   >
                     <Key className="w-4 h-4" />
-                    <span>توليد كود التفعيل المشفر أوفلاين (HMAC-SHA256)</span>
+                    <span>توليد كود الترخيص المشفر الآن (Ed25519 + PFP1)</span>
                   </button>
                 </div>
               </div>
@@ -409,14 +409,29 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     )}
 
                     {/* أزرار النسخ */}
-                    <div className="grid grid-cols-2 gap-2 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                      {generatedCompactCode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedCompactCode);
+                            setCopiedCompactCode(true);
+                            setTimeout(() => setCopiedCompactCode(false), 2500);
+                          }}
+                          className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                        >
+                          {copiedCompactCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          <span>{copiedCompactCode ? 'تم النسخ!' : '⚡ نسخ الكود السريع (PFP1)'}</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => copyCodeOnly(generatedCode)}
-                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
                       >
                         {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                        <span>{copiedCode ? 'تم نسخ الكود!' : 'نسخ الكود فقط'}</span>
+                        <span>{copiedCode ? 'تم النسخ!' : '🛡️ نسخ الكود الكامل (PFP2)'}</span>
                       </button>
 
                       <button
@@ -428,10 +443,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                           exp: new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                           tierName: tier === 'ENTX' ? 'رخصة الاتحادات الرسمية (Enterprise)' : 'باقة الأندية المعتمدة (Pro Club)'
                         })}
-                        className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-500/30 transition-all cursor-pointer"
                       >
                         {copiedMsg ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                        <span>{copiedMsg ? 'تم نسخ الرسالة!' : 'نسخ رسالة واتساب'}</span>
+                        <span>{copiedMsg ? 'تم نسخ الرسالة!' : '📲 نسخ رسالة واتساب'}</span>
                       </button>
                     </div>
                   </div>

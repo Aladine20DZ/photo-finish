@@ -1307,7 +1307,22 @@ export const AdminPortal: React.FC = () => {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-2 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                        {generatedCompactCode && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(generatedCompactCode);
+                              setCopiedCompactCode(true);
+                              setTimeout(() => setCopiedCompactCode(false), 2500);
+                            }}
+                            className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
+                          >
+                            {copiedCompactCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                            <span>{copiedCompactCode ? 'تم النسخ!' : '⚡ نسخ الكود السريع (PFP1)'}</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => {
@@ -1315,19 +1330,19 @@ export const AdminPortal: React.FC = () => {
                             setCopiedCode(true);
                             setTimeout(() => setCopiedCode(false), 2500);
                           }}
-                          className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
+                          className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer transition-all"
                         >
                           {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                          <span>{copiedCode ? 'تم النسخ!' : 'نسخ الكود'}</span>
+                          <span>{copiedCode ? 'تم النسخ!' : '🛡️ نسخ الكود الكامل (PFP2)'}</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => copyWhatsApp(latestGeneratedRecord || ledger[0])}
-                          className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+                          className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer transition-all"
                         >
                           {copiedMsg ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                          <span>{copiedMsg ? 'تم نسخ الرسالة!' : 'نسخ رسالة واتساب'}</span>
+                          <span>{copiedMsg ? 'تم نسخ الرسالة!' : '📲 نسخ رسالة واتساب'}</span>
                         </button>
                       </div>
                     </div>

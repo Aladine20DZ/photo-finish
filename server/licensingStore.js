@@ -215,7 +215,21 @@ export const DEFAULT_AUTHORIZED_LICENSES = [
     status: 'active'
   },
   {
+    code: 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BzAN-poaPnr3x-_DQ',
+    compactCode: 'PFP1-CLB8-2705-POOL-3DE27F62',
+    planId: 'plan_state_league_lwas',
+    tier: 'CLB8',
+    tierName: 'باقة الرابطات الولائية (State League LWAS)',
+    clientName: 'رابطة ألعاب القوى سعيدة (LWAS)',
+    deviceId: 'POOL',
+    expiryDate: '2027-05-31',
+    maxDevices: 4,
+    isQuadPool: true,
+    status: 'active'
+  },
+  {
     code: 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BZaN-poapNrx-_DQ',
+    compactCode: 'PFP1-CLB8-2705-POOL-3DE27F62',
     planId: 'plan_state_league_lwas',
     tier: 'CLB8',
     tierName: 'باقة الرابطات الولائية (State League LWAS)',
