@@ -7,6 +7,7 @@
 import { portalAuthService } from './portalAuthService';
 import { unifiedExportService, UnifiedExportPayload, ExportDisciplineSection, ExportColumnDef } from './unifiedExportService';
 import { competitionsService, NationalCompetition } from './competitionsService';
+import { recycleBinService } from './recycleBinService';
 
 export interface AuditTrailEntry {
   id: string;
@@ -263,6 +264,111 @@ class CompetitionsBureauService {
     this.persistAuditTrail();
 
     return { success: true, updatedOperation: op };
+  }
+
+  /**
+   * Retrieves a discipline with its operations, ensuring in-memory group is available
+   */
+  async getDisciplineWithOps(competitionId: string, disciplineId: string): Promise<BureauDisciplineWithOps> {
+    const all = await this.getCompetitionDisciplinesWithOperations(competitionId);
+    const found = all.find(d => d.id === disciplineId);
+    if (found) return found;
+
+    if (!this.inMemoryOperations.has(competitionId)) {
+      this.inMemoryOperations.set(competitionId, new Map());
+    }
+    const compMap = this.inMemoryOperations.get(competitionId)!;
+    if (!compMap.has(disciplineId)) {
+      compMap.set(disciplineId, []);
+    }
+    const ops = compMap.get(disciplineId)!;
+    return this.wrapDisciplineGroup(competitionId, ops.length > 0 ? ops : [{ disciplineId } as any]);
+  }
+
+
+  /**
+   * Soft deletes a result operation with strict protection of certified official marks
+   */
+  async softDeleteOperation(
+    competitionId: string,
+    disciplineId: string,
+    operationId: string,
+    options?: { reason?: string; deletedBy?: string; officialOverride?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
+    const disc = await this.getDisciplineWithOps(competitionId, disciplineId);
+    const opIndex = disc.operations.findIndex(o => o.id === operationId);
+    if (opIndex === -1) return { success: false, error: 'النتيجة غير موجودة' };
+
+    const op = disc.operations[opIndex];
+
+    // Protection of certified results: requires explicit official override & recorded reason
+    if (op.lifecycleStatus === 'certified' && !options?.officialOverride) {
+      return {
+        success: false,
+        error: 'النتيجة معتمدة رسمياً. يتطلب حذفها تصريحاً رسمياً خاصاً وتوثيق سبب الحذف أو الإلغاء.'
+      };
+    }
+
+    const session = portalAuthService.getActiveSession();
+    const performer = options?.deletedBy || session?.fullName || 'رئيس غرفة الحكام';
+    const reason = options?.reason || 'حذف النتيجة ونقلها إلى سلة المحذوفات';
+
+    // Log in audit trail
+    const auditEntry: AuditTrailEntry = {
+      id: `adt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      operationId,
+      disciplineId,
+      competitionId,
+      modifiedBy: performer,
+      modifiedByRole: session?.role || 'chief_judge',
+      modifiedAt: new Date().toISOString(),
+      fieldName: 'status',
+      oldValue: op.status,
+      newValue: 'DELETED_TO_RECYCLE_BIN',
+      reason
+    };
+    this.inMemoryAudit.unshift(auditEntry);
+
+    // Move snapshot to Centralized Recycle Bin
+    try {
+      await recycleBinService.moveToRecycleBin({
+        leagueId: session?.leagueId || 'lg_saida',
+        entityType: 'result',
+        entityId: op.id,
+        entityName: `${op.athleteName} • ${op.mark} (${disc.disciplineNameAr})`,
+        sourceModule: 'results',
+        payload: { ...op, competitionId, disciplineId },
+        deletedBy: performer,
+        reason
+      });
+    } catch (err) {
+      console.warn('[CompetitionsBureauService] Recycle bin note:', err);
+    }
+
+    // Remove from active operations list
+    disc.operations.splice(opIndex, 1);
+    this.persistCompetitionOps(competitionId);
+    this.persistAuditTrail();
+
+    return { success: true };
+  }
+
+  /**
+   * Restores a deleted result operation back to its discipline
+   */
+  async restoreOperation(op: BureauJudgeOperation): Promise<BureauJudgeOperation> {
+    const disc = await this.getDisciplineWithOps(op.competitionId, op.disciplineId);
+    const existingIdx = disc.operations.findIndex(o => o.id === op.id);
+    if (existingIdx >= 0) {
+      disc.operations[existingIdx] = { ...op };
+    } else {
+      disc.operations.push({ ...op });
+      disc.operations.sort((a, b) => a.rank - b.rank);
+    }
+
+    this.persistCompetitionOps(op.competitionId);
+    this.persistAuditTrail();
+    return op;
   }
 
   /**

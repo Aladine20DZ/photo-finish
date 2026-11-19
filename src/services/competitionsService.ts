@@ -11,6 +11,7 @@
 
 import { portalAuthService, RegisteredLeague } from './portalAuthService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { recycleBinService } from './recycleBinService';
 
 export type CompetitionStatus = 'upcoming' | 'live' | 'completed';
 export type CompetitionCategory = 'track_and_field' | 'cross_country' | 'road_race' | 'combined';
@@ -265,10 +266,15 @@ const DEFAULT_NATIONAL_COMPETITIONS: NationalCompetition[] = [
 
 const STORAGE_KEY = 'pfp_national_competitions_v2';
 const ACTIVE_COMPETITION_KEY = 'pfp_active_competition_id_v2';
+const ACTIVE_COMP_BY_LEAGUE_KEY = 'pfp_active_competition_by_league_v1';
 
 export class CompetitionsService {
   private inMemoryList: NationalCompetition[] = [];
   private activeCompId: string = 'comp_lwas_01';
+  private activeCompByLeague: Record<string, string> = {
+    lg_saida: 'comp_lwas_01',
+    lg_faa: 'comp_faa_01'
+  };
   private activeListeners: ((comp: NationalCompetition | null) => void)[] = [];
   private compListeners: ((comps: NationalCompetition[]) => void)[] = [];
 
@@ -286,31 +292,123 @@ export class CompetitionsService {
         } else {
           localStorage.setItem(ACTIVE_COMPETITION_KEY, this.activeCompId);
         }
+        const storedByLeague = localStorage.getItem(ACTIVE_COMP_BY_LEAGUE_KEY);
+        if (storedByLeague) {
+          this.activeCompByLeague = { ...this.activeCompByLeague, ...JSON.parse(storedByLeague) };
+        }
       } catch {}
     }
   }
 
-  public getActiveCompetitionId(): string {
+  public getActiveCompetitionId(leagueId?: string): string {
+    if (leagueId && this.activeCompByLeague[leagueId]) {
+      return this.activeCompByLeague[leagueId];
+    }
     return this.activeCompId;
   }
 
-  public async getActiveCompetition(): Promise<NationalCompetition | null> {
-    const list = await this.getCompetitions();
-    const found = list.find(c => c.id === this.activeCompId);
+  public async getActiveCompetition(leagueId?: string): Promise<NationalCompetition | null> {
+    const list = await this.getCompetitions(leagueId);
+    const targetCompId = (leagueId && this.activeCompByLeague[leagueId]) || this.activeCompId;
+    const found = list.find(c => c.id === targetCompId);
     if (found) return found;
     return list[0] || null;
   }
 
-  public setActiveCompetitionId(id: string): boolean {
+  public setActiveCompetitionId(id: string, leagueId?: string): boolean {
     const exists = this.inMemoryList.some(c => c.id === id);
+    const matchedComp = this.inMemoryList.find(c => c.id === id);
+    const targetLeagueId = leagueId || matchedComp?.leagueId || 'lg_saida';
+
     this.activeCompId = id;
+    this.activeCompByLeague[targetLeagueId] = id;
+
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(ACTIVE_COMPETITION_KEY, id);
+        localStorage.setItem(ACTIVE_COMP_BY_LEAGUE_KEY, JSON.stringify(this.activeCompByLeague));
       } catch {}
     }
-    this.notifyActiveChanged();
+
+    if (isSupabaseConfigured()) {
+      (supabase.from('active_competitions') as any).upsert({
+        league_id: targetLeagueId,
+        competition_id: id,
+        updated_at: new Date().toISOString()
+      }).catch(() => {});
+    }
+
+    this.notifyActiveChanged(targetLeagueId);
     return exists;
+  }
+
+  public async setActiveCompetition(leagueId: string, competitionId: string): Promise<boolean> {
+    return this.setActiveCompetitionId(competitionId, leagueId);
+  }
+
+  public async getCompetitionById(competitionId: string): Promise<NationalCompetition | null> {
+    const list = await this.getCompetitions();
+    return list.find(c => c.id === competitionId) || null;
+  }
+
+  public async updateCompetition(id: string, data: Partial<NationalCompetition>): Promise<NationalCompetition | null> {
+    const comp = await this.getCompetitionById(id);
+    if (!comp) return null;
+    const updated: NationalCompetition = { ...comp, ...data, updatedAt: new Date().toISOString() };
+    return this.saveCompetition(updated);
+  }
+
+  public async archiveCompetition(id: string): Promise<boolean> {
+    const comp = await this.getCompetitionById(id);
+    if (!comp) return false;
+    await this.saveCompetition({
+      ...comp,
+      isArchived: true,
+      status: 'completed',
+      updatedAt: new Date().toISOString()
+    });
+    return true;
+  }
+
+  public async getCompetitionEvents(competitionId: string): Promise<ScheduleEvent[]> {
+    const comp = await this.getCompetitionById(competitionId);
+    return comp?.schedule || [];
+  }
+
+  public async getJudgeAssignments(competitionId: string): Promise<any[]> {
+    try {
+      const { judgesAssignmentService } = await import('./judgesAssignmentService');
+      return judgesAssignmentService.getAssignments(competitionId);
+    } catch {
+      return [];
+    }
+  }
+
+  public async assignJudge(data: any): Promise<any> {
+    try {
+      const { judgesAssignmentService } = await import('./judgesAssignmentService');
+      return judgesAssignmentService.assignJudge(data);
+    } catch (e: any) {
+      throw new Error(`Failed to assign judge: ${e.message}`);
+    }
+  }
+
+  public async getCompetitionRegistrations(competitionId: string): Promise<any[]> {
+    try {
+      const { competitionEntriesService } = await import('./competitionEntriesService');
+      return competitionEntriesService.getEntries(competitionId);
+    } catch {
+      return [];
+    }
+  }
+
+  public async getCompetitionResults(competitionId: string): Promise<any[]> {
+    try {
+      const { competitionsBureauService } = await import('./competitionsBureauService');
+      return competitionsBureauService.getCompetitionDisciplinesWithOperations(competitionId);
+    } catch {
+      return [];
+    }
   }
 
   public onActiveCompetitionChanged(listener: (comp: NationalCompetition | null) => void): () => void {
@@ -327,12 +425,17 @@ export class CompetitionsService {
     };
   }
 
-  private async notifyActiveChanged(): Promise<void> {
-    const active = await this.getActiveCompetition();
+  private async notifyActiveChanged(leagueId?: string): Promise<void> {
+    const active = await this.getActiveCompetition(leagueId);
     this.activeListeners.forEach(l => l(active));
     if (typeof window !== 'undefined') {
       try {
         window.dispatchEvent(new CustomEvent('pfp:active-competition-changed', { detail: active }));
+        if ('BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('pfp_active_competition_channel');
+          bc.postMessage({ type: 'ACTIVE_COMPETITION_CHANGED', active, leagueId });
+          bc.close();
+        }
       } catch {}
     }
   }
@@ -380,7 +483,7 @@ export class CompetitionsService {
       if (typeof localStorage !== 'undefined') {
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (k && k.startsWith('pfp_comp_file_')) {
+          if (k && (k.startsWith('pfp_comp_file_') || k.startsWith('pfp_competition_file_v2_') || k.startsWith('pfp_competition_file_'))) {
             const rawFile = localStorage.getItem(k);
             if (rawFile) {
               const file = JSON.parse(rawFile);
@@ -588,13 +691,6 @@ export class CompetitionsService {
     });
   }
 
-  /**
-   * Retrieve a single competition by its ID
-   */
-  public async getCompetitionById(id: string): Promise<NationalCompetition | null> {
-    const list = await this.getCompetitions();
-    return list.find(c => c.id === id) || null;
-  }
 
   /**
    * Save or update a competition
@@ -688,21 +784,27 @@ export class CompetitionsService {
   /**
    * Safely deletes a competition only if it contains no certified results or active assignments
    */
-  public async deleteCompetition(id: string): Promise<{ success: boolean; error?: string }> {
+  /**
+   * Safely deletes a competition, archiving or moving it to the Centralized Recycle Bin
+   */
+  public async deleteCompetition(
+    id: string, 
+    options?: { reason?: string; deletedBy?: string; force?: boolean; permanent?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
     this.initStorage();
     const comp = this.inMemoryList.find(c => c.id === id);
     if (!comp) return { success: false, error: 'المنافسة غير موجودة' };
 
-    // Prevent deletion if competition has certified results
-    if (comp.resultsSummary && comp.resultsSummary.length > 0) {
+    // Prevent deletion if competition has certified results without explicit force override
+    if (comp.resultsSummary && comp.resultsSummary.length > 0 && !options?.force) {
       return {
         success: false,
-        error: 'لا يمكن حذف المنافسة لوجود نتائج رسمية مصادقة مسجلة بها. يمكنك استخدام خيار الأرشفة لحفظ السجل التاريخي.'
+        error: 'لا يمكن حذف المنافسة لوجود نتائج رسمية مصادقة مسجلة بها. يمكنك استخدام خيار الأرشفة أو الحذف الاستثنائي مع توثيق السبب.'
       };
     }
 
     // Check if judges assignments exist
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined' && !options?.force) {
       try {
         const rawAsg = localStorage.getItem('pfp_judge_assignments_v2') || localStorage.getItem('pfp_judges_assignments_v1');
         if (rawAsg) {
@@ -717,6 +819,24 @@ export class CompetitionsService {
       } catch {}
     }
 
+    // Unless explicitly requested as permanent hard delete, move snapshot to Centralized Recycle Bin
+    if (!options?.permanent) {
+      try {
+        await recycleBinService.moveToRecycleBin({
+          leagueId: comp.leagueId || 'lg_saida',
+          entityType: 'competition',
+          entityId: comp.id,
+          entityName: comp.name,
+          sourceModule: 'competitions',
+          payload: { ...comp },
+          deletedBy: options?.deletedBy || portalAuthService.getActiveSession()?.fullName || 'مدير الرابطة',
+          reason: options?.reason || 'حذف ونقل إلى سلة المحذوفات'
+        });
+      } catch (err) {
+        console.warn('[CompetitionsService] Error archiving to recycle bin:', err);
+      }
+    }
+
     this.inMemoryList = this.inMemoryList.filter(c => c.id !== id);
     if (typeof localStorage !== 'undefined') {
       try {
@@ -726,24 +846,74 @@ export class CompetitionsService {
       } catch {}
     }
 
-    this.notifyCompetitionsChanged();
-    if (this.activeCompId === id && this.inMemoryList.length > 0) {
-      this.setActiveCompetitionId(this.inMemoryList[0].id);
+    // Safe Active Competition switch
+    if (this.activeCompId === id) {
+      const remainingSameLeague = this.inMemoryList.filter(c => c.leagueId === comp.leagueId && c.id !== id);
+      if (remainingSameLeague.length > 0) {
+        this.setActiveCompetitionId(remainingSameLeague[0].id);
+      } else if (this.inMemoryList.length > 0) {
+        this.setActiveCompetitionId(this.inMemoryList[0].id);
+      } else {
+        this.activeCompId = '';
+        if (typeof localStorage !== 'undefined') {
+          try { localStorage.removeItem(ACTIVE_COMPETITION_KEY); } catch {}
+        }
+        this.notifyActiveChanged();
+      }
     }
+
+    this.notifyCompetitionsChanged();
     return { success: true };
   }
 
   /**
-   * Archives a competition without deleting historical data
+   * Restores a competition previously moved to the recycle bin
    */
-  public async archiveCompetition(id: string): Promise<boolean> {
-    const comp = await this.getCompetitionById(id);
-    if (!comp) return false;
-    comp.status = 'completed';
-    comp.isArchived = true;
-    await this.saveCompetition(comp);
-    return true;
+  public async restoreCompetition(compData: NationalCompetition): Promise<NationalCompetition> {
+    this.initStorage();
+    const existingIndex = this.inMemoryList.findIndex(c => c.id === compData.id);
+    if (existingIndex >= 0) {
+      this.inMemoryList[existingIndex] = { ...compData, updatedAt: new Date().toISOString() };
+    } else {
+      this.inMemoryList.unshift({ ...compData, updatedAt: new Date().toISOString() });
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.inMemoryList));
+      } catch {}
+    }
+
+    this.notifyCompetitionsChanged();
+    return compData;
   }
+
+  /**
+   * Bulk deletes multiple competitions
+   */
+  public async bulkDeleteCompetitions(
+    ids: string[], 
+    options?: { reason?: string; deletedBy?: string; force?: boolean }
+  ): Promise<{ success: boolean; deletedCount: number; errors: string[] }> {
+    let deletedCount = 0;
+    const errors: string[] = [];
+
+    for (const id of ids) {
+      const res = await this.deleteCompetition(id, options);
+      if (res.success) {
+        deletedCount++;
+      } else if (res.error) {
+        errors.push(`${id}: ${res.error}`);
+      }
+    }
+
+    return {
+      success: deletedCount > 0,
+      deletedCount,
+      errors
+    };
+  }
+
 
   /**
    * Computes dynamic progress indicators for a competition based on real underlying data

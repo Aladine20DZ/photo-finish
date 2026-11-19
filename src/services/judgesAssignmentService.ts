@@ -7,6 +7,7 @@
 
 import { competitionsService } from './competitionsService';
 import { portalAuthService } from './portalAuthService';
+import { recycleBinService } from './recycleBinService';
 
 export type JudgeGrade = 'international' | 'federal' | 'regional' | 'wilaya' | 'candidate';
 export type JudgeStatus = 'active' | 'suspended' | 'isolated';
@@ -460,6 +461,85 @@ export class JudgesAssignmentService {
     return true;
   }
 
+  /**
+   * Soft deletes a judge profile and moves a snapshot to the Centralized Recycle Bin
+   */
+  public async deleteJudge(
+    judgeId: string, 
+    options?: { reason?: string; deletedBy?: string; permanent?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
+    const judge = this.getJudgeById(judgeId);
+    if (!judge) return { success: false, error: 'الحكم غير موجود بالسجل' };
+
+    // Automatically cancel upcoming active assignments
+    this.inMemoryAssignments = this.inMemoryAssignments.map(a => {
+      if (a.judgeId === judgeId && a.status === 'active') {
+        return { ...a, status: 'cancelled' };
+      }
+      return a;
+    });
+
+    if (!options?.permanent) {
+      try {
+        await recycleBinService.moveToRecycleBin({
+          leagueId: judge.leagueId || 'lg_saida',
+          entityType: 'judge',
+          entityId: judge.id,
+          entityName: judge.fullName,
+          sourceModule: 'judges',
+          payload: { ...judge },
+          deletedBy: options?.deletedBy || portalAuthService.getActiveSession()?.fullName || 'مسؤول الحكام',
+          reason: options?.reason || 'حذف ونقل لسلة المحذوفات'
+        });
+      } catch (err) {
+        console.warn('[JudgesAssignmentService] Error archiving judge:', err);
+      }
+    }
+
+    this.inMemoryJudges = this.inMemoryJudges.filter(j => j.id !== judgeId);
+    this.persist();
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pfp:judges-changed'));
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Restores a deleted judge from the recycle bin
+   */
+  public async restoreJudge(judgeData: CertifiedJudge): Promise<CertifiedJudge> {
+    const existingIndex = this.inMemoryJudges.findIndex(j => j.id === judgeData.id);
+    if (existingIndex >= 0) {
+      this.inMemoryJudges[existingIndex] = { ...judgeData };
+    } else {
+      this.inMemoryJudges.unshift({ ...judgeData });
+    }
+    this.persist();
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pfp:judges-changed'));
+    }
+
+    return judgeData;
+  }
+
+  /**
+   * Bulk deletes multiple judges
+   */
+  public async bulkDeleteJudges(
+    judgeIds: string[], 
+    options?: { reason?: string; deletedBy?: string }
+  ): Promise<{ success: boolean; count: number }> {
+    let count = 0;
+    for (const id of judgeIds) {
+      const res = await this.deleteJudge(id, options);
+      if (res.success) count++;
+    }
+    return { success: count > 0, count };
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
   // 3. ASSIGNMENT MATRIX & CONFLICT DETECTION (5.4 & 5.5)
   // ════════════════════════════════════════════════════════════════════════════
@@ -688,6 +768,77 @@ export class JudgesAssignmentService {
     asg.status = 'cancelled';
     this.persist();
     return true;
+  }
+
+  /**
+   * Soft deletes an assignment and archives it to the Centralized Recycle Bin
+   */
+  public async deleteAssignment(
+    assignmentId: string, 
+    options?: { reason?: string; deletedBy?: string; permanent?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
+    const asg = this.inMemoryAssignments.find(a => a.id === assignmentId);
+    if (!asg) return { success: false, error: 'التعيين غير موجود' };
+
+    if (!options?.permanent) {
+      try {
+        await recycleBinService.moveToRecycleBin({
+          leagueId: asg.leagueId || 'lg_saida',
+          entityType: 'assignment',
+          entityId: asg.id,
+          entityName: `${asg.judgeName} • ${asg.taskTitleAr} (${asg.disciplineNameAr})`,
+          sourceModule: 'assignments',
+          payload: { ...asg },
+          deletedBy: options?.deletedBy || portalAuthService.getActiveSession()?.fullName || 'مسؤول الحكام',
+          reason: options?.reason || 'حذف التعيين ونقله لسلة المحذوفات'
+        });
+      } catch (err) {
+        console.warn('[JudgesAssignmentService] Error moving assignment to recycle bin:', err);
+      }
+    }
+
+    this.inMemoryAssignments = this.inMemoryAssignments.filter(a => a.id !== assignmentId);
+    this.persist();
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pfp:assignments-changed'));
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Restores an assignment previously moved to the recycle bin
+   */
+  public async restoreAssignment(asgData: JudgeAssignment): Promise<JudgeAssignment> {
+    const existingIndex = this.inMemoryAssignments.findIndex(a => a.id === asgData.id);
+    if (existingIndex >= 0) {
+      this.inMemoryAssignments[existingIndex] = { ...asgData, status: 'active' };
+    } else {
+      this.inMemoryAssignments.unshift({ ...asgData, status: 'active' });
+    }
+    this.persist();
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pfp:assignments-changed'));
+    }
+
+    return asgData;
+  }
+
+  /**
+   * Bulk deletes multiple assignments
+   */
+  public async bulkDeleteAssignments(
+    assignmentIds: string[], 
+    options?: { reason?: string; deletedBy?: string }
+  ): Promise<{ success: boolean; count: number }> {
+    let count = 0;
+    for (const id of assignmentIds) {
+      const res = await this.deleteAssignment(id, options);
+      if (res.success) count++;
+    }
+    return { success: count > 0, count };
   }
 
   // ════════════════════════════════════════════════════════════════════════════

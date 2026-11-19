@@ -49,6 +49,7 @@ import { DesignSystemShowcase, GlassLoginPage } from './components/design-system
 import { CompetitionEntriesAndResults } from './components/competitions/CompetitionEntriesAndResults';
 import { JudgesManagementOffice } from './components/judges/JudgesManagementOffice';
 import { DigitalCompetitionSheetsWorkspace } from './components/sheets/DigitalCompetitionSheetsWorkspace';
+import { LeagueProvider } from './context/LeagueContext';
 
 const DEFAULT_RUNNERS: Runner[] = [
   { id: 1, bib: 101, name: 'يوسف العبدلي', country: 'الجزائر 🇩🇿', lane: 1, color: '#EF4444', finishTime: 0, status: 'OK' },
@@ -1541,7 +1542,11 @@ const AppRoot: React.FC = () => {
   const [adminMode] = useState<boolean>(() => {
     try { return new URLSearchParams(window.location.search).has('admin'); } catch { return false; }
   });
-  return adminMode ? <AdminGate /> : <App />;
+  return (
+    <LeagueProvider>
+      {adminMode ? <AdminGate /> : <App />}
+    </LeagueProvider>
+  );
 };
 
 export default AppRoot;

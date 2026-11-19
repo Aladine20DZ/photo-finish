@@ -1,4 +1,5 @@
 ﻿import { Athlete, Club, CategorySnapshot } from '../types/athletics';
+import { recycleBinService } from './recycleBinService';
 
 const DB_NAME = 'athletics_competition_db_v1';
 const DB_VERSION = 2; // ترقية قاعدة البيانات لدعم مخازن العدائين والأندية واللقطات
@@ -187,6 +188,51 @@ class AthleteClubStorage {
     return true;
   }
 
+  public async softDeleteAthlete(
+    id: string, 
+    options?: { reason?: string; deletedBy?: string; leagueId?: string; permanent?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
+    const athlete = await this.getAthleteById(id);
+    if (!athlete) return { success: false, error: 'العداء غير موجود' };
+
+    if (!options?.permanent) {
+      try {
+        await recycleBinService.moveToRecycleBin({
+          leagueId: options?.leagueId || 'lg_saida',
+          entityType: 'athlete',
+          entityId: athlete.id,
+          entityName: `${athlete.firstName} ${athlete.lastName} (${athlete.licenseNumber})`,
+          sourceModule: 'athletes',
+          payload: { ...athlete },
+          deletedBy: options?.deletedBy || 'مدير الرابطة',
+          reason: options?.reason || 'حذف ونقل لسلة المحذوفات'
+        });
+      } catch (e) {
+        console.warn('[AthleteClubStorage] Soft delete error:', e);
+      }
+    }
+
+    await this.deleteAthlete(id);
+    return { success: true };
+  }
+
+  public async restoreAthlete(athlete: Athlete): Promise<Athlete> {
+    return await this.saveAthlete(athlete);
+  }
+
+  public async bulkDeleteAthletes(
+    ids: string[], 
+    options?: { reason?: string; deletedBy?: string; leagueId?: string }
+  ): Promise<{ success: boolean; count: number }> {
+    let count = 0;
+    for (const id of ids) {
+      const res = await this.softDeleteAthlete(id, options);
+      if (res.success) count++;
+    }
+    return { success: count > 0, count };
+  }
+
+
   // ═══════════════════════════════════════════════════
   // إدارة الأندية الرياضية (Clubs CRUD)
   // ═══════════════════════════════════════════════════
@@ -265,6 +311,51 @@ class AthleteClubStorage {
     }
     return true;
   }
+
+  public async softDeleteClub(
+    id: string, 
+    options?: { reason?: string; deletedBy?: string; leagueId?: string; permanent?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
+    const club = await this.getClubById(id);
+    if (!club) return { success: false, error: 'النادي غير موجود' };
+
+    if (!options?.permanent) {
+      try {
+        await recycleBinService.moveToRecycleBin({
+          leagueId: options?.leagueId || 'lg_saida',
+          entityType: 'club',
+          entityId: club.id,
+          entityName: `${club.name} (${club.code})`,
+          sourceModule: 'clubs',
+          payload: { ...club },
+          deletedBy: options?.deletedBy || 'مدير الرابطة',
+          reason: options?.reason || 'حذف ونقل لسلة المحذوفات'
+        });
+      } catch (e) {
+        console.warn('[AthleteClubStorage] Soft delete club error:', e);
+      }
+    }
+
+    await this.deleteClub(id);
+    return { success: true };
+  }
+
+  public async restoreClub(club: Club): Promise<Club> {
+    return await this.saveClub(club);
+  }
+
+  public async bulkDeleteClubs(
+    ids: string[], 
+    options?: { reason?: string; deletedBy?: string; leagueId?: string }
+  ): Promise<{ success: boolean; count: number }> {
+    let count = 0;
+    for (const id of ids) {
+      const res = await this.softDeleteClub(id, options);
+      if (res.success) count++;
+    }
+    return { success: count > 0, count };
+  }
+
 
   // ═══════════════════════════════════════════════════
   // لقطات الفئات العمرية المجمدة (Category Snapshots)

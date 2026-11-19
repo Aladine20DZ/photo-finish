@@ -24,11 +24,14 @@ import {
   Key,
   Calendar,
   ArrowRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import { useTranslation } from '../../services/i18nService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { portalAuthService, PortalType, PortalSession } from '../../services/portalAuthService';
+import { competitionsService, NationalCompetition } from '../../services/competitionsService';
 
 export type NavTab = 
   | 'public' 
@@ -74,6 +77,34 @@ export const NavShell: React.FC<NavShellProps> = ({
   }, []);
 
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [activeCompetition, setActiveCompetition] = useState<NationalCompetition | null>(null);
+  const [availableComps, setAvailableComps] = useState<NationalCompetition[]>([]);
+  const [showCompSelector, setShowCompSelector] = useState<boolean>(false);
+
+  useEffect(() => {
+    competitionsService.getActiveCompetition().then(c => setActiveCompetition(c));
+    competitionsService.getCompetitions().then(list => setAvailableComps(list));
+
+    const unsubComp = competitionsService.onCompetitionsChanged(comps => {
+      setAvailableComps(comps);
+    });
+    const unsubActive = competitionsService.onActiveCompetitionChanged(c => {
+      setActiveCompetition(c);
+    });
+
+    const handleActiveEv = (e: Event) => {
+      const ce = e as CustomEvent<NationalCompetition | null>;
+      if (ce.detail) setActiveCompetition(ce.detail);
+    };
+    window.addEventListener('pfp:active-competition-changed', handleActiveEv);
+
+    return () => {
+      unsubComp();
+      unsubActive();
+      window.removeEventListener('pfp:active-competition-changed', handleActiveEv);
+    };
+  }, []);
+
   const [theme, setTheme] = useState<'dark' | 'sunlight' | 'light'>(() => {
     try {
       return (localStorage.getItem('photo_finish_theme') as any) || 'dark';
@@ -132,12 +163,59 @@ export const NavShell: React.FC<NavShellProps> = ({
               <span>مباشر 🔴</span>
             </div>
             
-            <div className="hidden sm:flex items-center gap-2 text-slate-300 truncate">
-              <span className="text-amber-300 font-extrabold truncate">
-                البطولة الولائية الصيفية لألعاب القوى - سعيدة 2026
-              </span>
+            <div className="relative hidden sm:flex items-center gap-2 text-slate-300 truncate">
+              <button
+                type="button"
+                onClick={() => setShowCompSelector(!showCompSelector)}
+                className="flex items-center gap-1.5 hover:bg-slate-800/80 px-2 py-0.5 rounded-lg transition-all text-right cursor-pointer"
+                title="اضغط لتبديل المنافسة النشطة المعتمدة في النظام"
+              >
+                <span className="text-amber-300 font-extrabold truncate max-w-[280px]">
+                  {activeCompetition?.name || 'البطولة الولائية لألعاب القوى - سعيدة 2026'}
+                </span>
+                <ChevronDown className="w-3 h-3 text-amber-400 shrink-0" />
+              </button>
               <span className="text-slate-600">•</span>
-              <span className="text-slate-400 truncate">مضمار 13 أفريل 1958، سعيدة</span>
+              <span className="text-slate-400 truncate text-[10px]">
+                {activeCompetition?.venue || 'مضمار 13 أفريل 1958، سعيدة'}
+              </span>
+
+              {/* القائمة المنسدلة لتبديل المنافسة النشطة */}
+              {showCompSelector && (
+                <div className="absolute top-full right-0 mt-1 w-80 bg-slate-950 border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-black text-amber-400 border-b border-slate-800">
+                    <span>اختر المنافسة النشطة:</span>
+                    <span className="text-slate-400">{availableComps.length} منافسات</span>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto space-y-1">
+                    {availableComps.map(comp => {
+                      const isActive = comp.id === activeCompetition?.id;
+                      return (
+                        <button
+                          key={comp.id}
+                          type="button"
+                          onClick={() => {
+                            competitionsService.setActiveCompetitionId(comp.id, comp.leagueId);
+                            setActiveCompetition(comp);
+                            setShowCompSelector(false);
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-right transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                              : 'hover:bg-slate-900 text-slate-300'
+                          }`}
+                        >
+                          <div className="truncate">
+                            <p className="font-bold text-xs truncate">{comp.name}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{comp.venue} • {comp.date}</p>
+                          </div>
+                          {isActive && <Check className="w-4 h-4 text-amber-400 shrink-0 mr-2" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {currentTime && (

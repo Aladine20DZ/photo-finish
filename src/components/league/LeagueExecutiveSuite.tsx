@@ -57,6 +57,12 @@ import { Badge } from '../design-system/Badge';
 import { Input } from '../design-system/Input';
 import { Modal } from '../design-system/Modal';
 import * as XLSX from 'xlsx';
+import { RecycleBinWorkspace } from './RecycleBinWorkspace';
+import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { recycleBinService, RecycleEntityType } from '../../services/recycleBinService';
+import { athleteClubStorage } from '../../services/athleteClubStorage';
+import { judgesAssignmentService } from '../../services/judgesAssignmentService';
+
 
 export type LeagueSubTab = 
   | 'overview' 
@@ -69,7 +75,8 @@ export type LeagueSubTab =
   | 'identity'
   | 'records' 
   | 'announcements' 
-  | 'roles_audit';
+  | 'roles_audit'
+  | 'recycle_bin';
 
 export interface LeagueExecutiveSuiteProps {
   leagueId?: string;
@@ -183,6 +190,27 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState<LeagueSubTab>(() => initialSubTab || 'overview');
+  const [recycleBinCount, setRecycleBinCount] = useState<number>(0);
+  const [itemToDelete, setItemToDelete] = useState<{
+    id: string;
+    name: string;
+    type: RecycleEntityType;
+    sourceModule: string;
+    warning?: string;
+    isOfficial?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const updateCount = async () => {
+      try {
+        const stats = await recycleBinService.getStats(activeLeagueId);
+        setRecycleBinCount(stats.totalDeleted);
+      } catch {}
+    };
+    updateCount();
+    return recycleBinService.onRecycleBinChanged(updateCount);
+  }, [activeLeagueId]);
+
   const [selectedPlanningCompId, setSelectedPlanningCompId] = useState<string | undefined>(undefined);
   const [selectedBureauCompId, setSelectedBureauCompId] = useState<string | undefined>(undefined);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -744,6 +772,55 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
     notify(`تم توليد وتصدير التقرير الرسمي بصيغة ${format.toUpperCase()}`);
   };
 
+  const handleConfirmDelete = async (opts: { reason: string; permanent: boolean }) => {
+    if (!itemToDelete) return;
+    try {
+      if (itemToDelete.type === 'competition') {
+        const res = await competitionsService.deleteCompetition(itemToDelete.id, {
+          reason: opts.reason,
+          permanent: opts.permanent
+        });
+        if (res.success) {
+          setLeagueCompetitions(prev => prev.filter(c => c.id !== itemToDelete.id));
+          setFeedbackMsg({ text: 'تم نقل المنافسة إلى سلة المحذوفات بنجاح.', type: 'success' });
+        } else {
+          setFeedbackMsg({ text: res.error || 'فشل حذف المنافسة.', type: 'error' });
+        }
+      } else if (itemToDelete.type === 'athlete') {
+        const res = await athleteClubStorage.softDeleteAthlete(itemToDelete.id, {
+          reason: opts.reason,
+          permanent: opts.permanent
+        });
+        if (res.success) {
+          setAthletes(prev => prev.filter(a => a.id !== itemToDelete.id));
+          setFeedbackMsg({ text: 'تم نقل العداء إلى سلة المحذوفات بنجاح.', type: 'success' });
+        }
+      } else if (itemToDelete.type === 'club') {
+        const res = await athleteClubStorage.softDeleteClub(itemToDelete.id, {
+          reason: opts.reason,
+          permanent: opts.permanent
+        });
+        if (res.success) {
+          setClubs(prev => prev.filter(c => c.id !== itemToDelete.id));
+          setFeedbackMsg({ text: 'تم نقل النادي إلى سلة المحذوفات بنجاح.', type: 'success' });
+        }
+      } else if (itemToDelete.type === 'judge') {
+        const res = await judgesAssignmentService.deleteJudge(itemToDelete.id, {
+          reason: opts.reason,
+          permanent: opts.permanent
+        });
+        if (res.success) {
+          setFeedbackMsg({ text: 'تم نقل الحكم إلى سلة المحذوفات بنجاح.', type: 'success' });
+        }
+      }
+    } catch (err: any) {
+      setFeedbackMsg({ text: err.message || 'حدث خطأ أثناء الحذف.', type: 'error' });
+    } finally {
+      setItemToDelete(null);
+      setTimeout(() => setFeedbackMsg(null), 4000);
+    }
+  };
+
   // ── 8 Core Sub-Tabs Navigation List ───────────────────────────────────────
   const subTabsList: { id: LeagueSubTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
     { id: 'overview', label: 'لوحة القيادة', icon: Trophy },
@@ -754,6 +831,7 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
     { id: 'judges', label: 'الحكام والتعيينات', icon: Award },
     { id: 'reports', label: 'المحاضر والتقارير', icon: Printer },
     { id: 'identity', label: 'الإعدادات والهوية والأرشيف', icon: Shield },
+    { id: 'recycle_bin', label: 'سلة المحذوفات المركزية', icon: Archive, badge: recycleBinCount > 0 ? String(recycleBinCount) : undefined },
   ];
 
   return (
@@ -2240,6 +2318,26 @@ export const LeagueExecutiveSuite: React.FC<LeagueExecutiveSuiteProps> = ({
         )}
 
       </div>
+
+      {activeTab === 'recycle_bin' && (
+          <RecycleBinWorkspace
+            leagueId={activeLeagueId}
+            leagueName={currentLeague.name}
+          />
+        )}
+
+      {itemToDelete && (
+        <ConfirmDeleteModal
+          isOpen={true}
+          onClose={() => setItemToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          entityName={itemToDelete.name}
+          entityType={itemToDelete.type}
+          sourceModule={itemToDelete.sourceModule}
+          warningDetails={itemToDelete.warning}
+          isOfficialProtected={itemToDelete.isOfficial}
+        />
+      )}
 
       {/* ── MODALS ─────────────────────────────────────────────────────────── */}
 
