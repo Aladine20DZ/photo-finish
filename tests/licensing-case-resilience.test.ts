@@ -170,6 +170,27 @@ describe('Enterprise Licensing Case Resilience & OCR Correction Suite', () => {
     expect(res.license?.tier).toBe('CLB8');
   });
 
+  it('activates the exact user input with space and OCR typo from screenshot seamlessly', async () => {
+    const rawUserInputFromScreenshot = 'PFP2-CLB8-3111-GLBL-AJDZQQLK5QABX9XWBCHEG8K-PXFCKJHDSXJDQFMPSYC75YTQQIHOCQZP_NFACJOZKXO RVXVTZJAB1RTL67NMAA';
+    const res = await licenseManager.activateCode(rawUserInputFromScreenshot);
+    expect(res.success).toBe(true);
+    expect(res.license).toBeDefined();
+    expect(res.license?.tier).toBe('CLB8');
+  });
+
+  it('activates device-specific PFP1 license for PF-83DD-C9A9 seamlessly', async () => {
+    const res = await licenseManager.activateCode('PFP1-ENTX-3112-83DD-738344BE');
+    expect(res.success).toBe(true);
+    expect(res.license?.tier).toBe('ENTX');
+  });
+
+  it('activates quad-pool PFP1 license PFP1-CLB8-2705-POOL-3DE27F62 for Saida LWAS seamlessly', async () => {
+    const res = await licenseManager.activateCode('PFP1-CLB8-2705-POOL-3DE27F62');
+    expect(res.success).toBe(true);
+    expect(res.license?.tier).toBe('CLB8');
+    expect(res.license?.isQuadPool).toBe(true);
+  });
+
   it('generates and activates a Compact Product Key (PFP1-...) with 100% offline verification', async () => {
     const compactCode = await licenseManager.generateCompactLicenseKey('ENTX', new Date('2028-12-31'), { isQuadPool: true });
     expect(compactCode).toMatch(/^PFP1-ENTX-2812-POOL-[0-9A-F]{8}$/);

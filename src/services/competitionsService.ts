@@ -23,6 +23,9 @@ export interface ScheduleEvent {
   category: string; // أكابر / أواسط / أشبال
   round: string;    // تصفيات / نهائي مباشر
   status: 'scheduled' | 'running' | 'finished';
+  disciplineId?: string;
+  venue?: string;
+  date?: string;
 }
 
 export interface CertifiedResultItem {
@@ -36,6 +39,27 @@ export interface CertifiedResultItem {
   reactionTime?: string;
   isRecord?: boolean;
   status?: string;
+}
+
+export interface CompetitionProgressIndicators {
+  planning: 'not_started' | 'in_progress' | 'completed';
+  planningLabel: string;
+  events: 'not_configured' | 'in_progress' | 'completed';
+  eventsLabel: string;
+  eventsCount: number;
+  registrations: 'closed' | 'open' | 'completed';
+  registrationsLabel: string;
+  athletesCount: number;
+  judges: 'not_assigned' | 'partially_assigned' | 'fully_assigned';
+  judgesLabel: string;
+  assignedJudgesCount: number;
+  refereeing: 'not_started' | 'in_progress' | 'completed';
+  refereeingLabel: string;
+  results: 'not_available' | 'under_review' | 'certified';
+  resultsLabel: string;
+  archived: boolean;
+  archivedLabel: string;
+  overallPercentage: number;
 }
 
 export interface NationalCompetition {
@@ -57,6 +81,7 @@ export interface NationalCompetition {
   schedule: ScheduleEvent[];
   resultsSummary: CertifiedResultItem[];
   isPublished: boolean;
+  isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -245,6 +270,7 @@ export class CompetitionsService {
   private inMemoryList: NationalCompetition[] = [];
   private activeCompId: string = 'comp_lwas_01';
   private activeListeners: ((comp: NationalCompetition | null) => void)[] = [];
+  private compListeners: ((comps: NationalCompetition[]) => void)[] = [];
 
   constructor() {
     this.initStorage();
@@ -294,12 +320,29 @@ export class CompetitionsService {
     };
   }
 
+  public onCompetitionsChanged(listener: (comps: NationalCompetition[]) => void): () => void {
+    this.compListeners.push(listener);
+    return () => {
+      this.compListeners = this.compListeners.filter(l => l !== listener);
+    };
+  }
+
   private async notifyActiveChanged(): Promise<void> {
     const active = await this.getActiveCompetition();
     this.activeListeners.forEach(l => l(active));
     if (typeof window !== 'undefined') {
       try {
         window.dispatchEvent(new CustomEvent('pfp:active-competition-changed', { detail: active }));
+      } catch {}
+    }
+  }
+
+  private notifyCompetitionsChanged(): void {
+    const copy = [...this.inMemoryList];
+    this.compListeners.forEach(l => l(copy));
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('pfp:competitions-changed', { detail: copy }));
       } catch {}
     }
   }
@@ -327,11 +370,71 @@ export class CompetitionsService {
 
   /**
    * Fetch all national competitions, merging local additions and remote Supabase
+   * Supports filtering by leagueId for strict multi-tenant isolation.
    */
-  public async getCompetitions(): Promise<NationalCompetition[]> {
+  public async getCompetitions(leagueId?: string): Promise<NationalCompetition[]> {
     this.initStorage();
 
-    // Ingest competitions created by league executives in local storage
+    // 1. Ingest competitions created in planning bureau (pfp_comp_file_*)
+    try {
+      if (typeof localStorage !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('pfp_comp_file_')) {
+            const rawFile = localStorage.getItem(k);
+            if (rawFile) {
+              const file = JSON.parse(rawFile);
+              if (file?.metadata?.id && !file.metadata.id.startsWith('new_')) {
+                const existingIdx = this.inMemoryList.findIndex(c => c.id === file.metadata.id);
+                const mappedEvents: ScheduleEvent[] = (file.schedule?.allDisciplines || []).map((item: any, idx: number) => ({
+                  id: item.id || `ev_${file.metadata.id}_${idx}`,
+                  time: item.startTime || '09:00',
+                  discipline: item.disciplineNameAr,
+                  disciplineId: item.disciplineId,
+                  gender: item.gender || 'M',
+                  category: item.categoryNameAr || item.categoryCode || 'أكابر',
+                  round: item.round || 'نهائي مباشر',
+                  status: 'scheduled',
+                  venue: file.metadata.venue,
+                  date: file.metadata.startDate
+                }));
+
+                const compRecord: NationalCompetition = {
+                  id: file.metadata.id,
+                  name: file.metadata.name,
+                  date: file.metadata.startDate,
+                  endDate: file.metadata.endDate || file.metadata.startDate,
+                  venue: file.metadata.venue,
+                  city: file.metadata.venue?.includes('سعيدة') ? 'سعيدة' : 'سعيدة',
+                  wilayaCode: '20',
+                  status: existingIdx >= 0 ? this.inMemoryList[existingIdx].status : 'upcoming',
+                  leagueId: file.metadata.organizingLeagueId || 'lg_saida',
+                  leagueName: file.metadata.organizingLeagueName || 'رابطة ألعاب القوى سعيدة (LWAS)',
+                  leagueShort: 'LWAS',
+                  competitionType: 'track_and_field',
+                  eventsCount: file.schedule?.totalEventsCount || mappedEvents.length,
+                  athletesCount: existingIdx >= 0 ? this.inMemoryList[existingIdx].athletesCount : 0,
+                  description: `منافسة معتمدة من مكتب التخطيط والبرمجة (${mappedEvents.length} مسابقة مبرمجة).`,
+                  schedule: mappedEvents.length > 0 ? mappedEvents : (existingIdx >= 0 ? this.inMemoryList[existingIdx].schedule : []),
+                  resultsSummary: existingIdx >= 0 ? this.inMemoryList[existingIdx].resultsSummary : [],
+                  isPublished: true,
+                  createdAt: existingIdx >= 0 ? this.inMemoryList[existingIdx].createdAt : new Date().toISOString(),
+                  updatedAt: file.metadata.updatedAt || new Date().toISOString()
+                };
+
+                if (existingIdx >= 0) {
+                  this.inMemoryList[existingIdx] = { ...this.inMemoryList[existingIdx], ...compRecord };
+                } else {
+                  this.inMemoryList.unshift(compRecord);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Ingest competitions created by league executives in local storage
     try {
       if (typeof localStorage !== 'undefined') {
         const leagueSaved = localStorage.getItem('pfp_league_competitions_saida');
@@ -369,6 +472,7 @@ export class CompetitionsService {
       }
     } catch {}
 
+    // 3. Ingest remote Supabase if available
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await (supabase.from('competitions') as any)
@@ -377,7 +481,6 @@ export class CompetitionsService {
           .order('start_date', { ascending: false });
 
         if (!error && data && (data as any[]).length > 0) {
-          // Merge remote items
           for (const row of (data as any[])) {
             const exists = this.inMemoryList.some(c => c.id === row.id);
             if (!exists) {
@@ -409,7 +512,21 @@ export class CompetitionsService {
       } catch {}
     }
 
+    // 4. Strict League Multi-Tenancy Filter
+    if (leagueId && leagueId !== 'all') {
+      return this.inMemoryList.filter(
+        c => c.leagueId === leagueId || c.leagueShort === leagueId || c.leagueShort?.toLowerCase() === leagueId.toLowerCase()
+      );
+    }
+
     return [...this.inMemoryList];
+  }
+
+  /**
+   * Strict League Scoped Query: Retrieves only competitions belonging to the active league
+   */
+  public async getCompetitionsByLeague(leagueId: string): Promise<NationalCompetition[]> {
+    return this.getCompetitions(leagueId);
   }
 
   /**
@@ -496,19 +613,276 @@ export class CompetitionsService {
   public async saveCompetition(comp: NationalCompetition): Promise<NationalCompetition> {
     this.initStorage();
     const index = this.inMemoryList.findIndex(c => c.id === comp.id);
+    const updatedRecord: NationalCompetition = {
+      ...comp,
+      updatedAt: new Date().toISOString()
+    };
+
     if (index >= 0) {
-      this.inMemoryList[index] = { ...comp, updatedAt: new Date().toISOString() };
+      this.inMemoryList[index] = updatedRecord;
     } else {
-      this.inMemoryList.unshift(comp);
+      this.inMemoryList.unshift(updatedRecord);
     }
 
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.inMemoryList));
+        
+        // Also keep league storage in sync for Saida LWAS
+        if (comp.leagueId === 'lg_saida' || comp.leagueShort === 'LWAS' || comp.leagueShort === 'SAIDA') {
+          const saidaComps = this.inMemoryList.filter(c => c.leagueId === 'lg_saida' || c.leagueShort === 'LWAS' || c.leagueShort === 'SAIDA');
+          localStorage.setItem('pfp_league_competitions_saida', JSON.stringify(saidaComps));
+        }
       } catch {}
     }
 
-    return comp;
+    // Broadcast change to all active components and tabs
+    this.notifyCompetitionsChanged();
+    if (comp.id === this.activeCompId) {
+      this.notifyActiveChanged();
+    }
+
+    return updatedRecord;
+  }
+
+  /**
+   * Creates a new official competition with a stable unique identifier
+   */
+  public async createCompetition(data: Partial<NationalCompetition>): Promise<NationalCompetition> {
+    const session = portalAuthService.getActiveSession();
+    const activeLeague = portalAuthService.getAllLeagues()[0];
+    const leagueId = data.leagueId || session?.leagueId || activeLeague?.id || 'lg_saida';
+    const leagueName = data.leagueName || session?.leagueName || activeLeague?.name || 'رابطة ألعاب القوى سعيدة (LWAS)';
+    const leagueShort = data.leagueShort || session?.leagueShort || activeLeague?.shortName || 'LWAS';
+
+    const id = data.id || `comp_${leagueShort.toLowerCase()}_${Date.now()}`;
+    const newComp: NationalCompetition = {
+      id,
+      name: data.name || 'منافسة ألعاب قوى جديدة',
+      date: data.date || new Date().toISOString().split('T')[0],
+      endDate: data.endDate || data.date || new Date().toISOString().split('T')[0],
+      venue: data.venue || 'المضمار الولائي 13 أفريل 1958، سعيدة',
+      city: data.city || 'سعيدة',
+      wilayaCode: data.wilayaCode || '20',
+      status: data.status || 'upcoming',
+      leagueId,
+      leagueName,
+      leagueShort,
+      competitionType: data.competitionType || 'track_and_field',
+      eventsCount: data.eventsCount || (data.schedule?.length || 0),
+      athletesCount: data.athletesCount || 0,
+      description: data.description || 'منافسة رياضية مبرمجة ومسجلة في السجل المركزي الموحد للرابطة.',
+      schedule: data.schedule || [],
+      resultsSummary: data.resultsSummary || [],
+      isPublished: data.isPublished !== undefined ? data.isPublished : true,
+      isArchived: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await this.saveCompetition(newComp);
+    this.setActiveCompetitionId(id);
+    return newComp;
+  }
+
+  /**
+   * Safely deletes a competition only if it contains no certified results or active assignments
+   */
+  public async deleteCompetition(id: string): Promise<{ success: boolean; error?: string }> {
+    this.initStorage();
+    const comp = this.inMemoryList.find(c => c.id === id);
+    if (!comp) return { success: false, error: 'المنافسة غير موجودة' };
+
+    // Prevent deletion if competition has certified results
+    if (comp.resultsSummary && comp.resultsSummary.length > 0) {
+      return {
+        success: false,
+        error: 'لا يمكن حذف المنافسة لوجود نتائج رسمية مصادقة مسجلة بها. يمكنك استخدام خيار الأرشفة لحفظ السجل التاريخي.'
+      };
+    }
+
+    // Check if judges assignments exist
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const rawAsg = localStorage.getItem('pfp_judge_assignments_v2') || localStorage.getItem('pfp_judges_assignments_v1');
+        if (rawAsg) {
+          const list: any[] = JSON.parse(rawAsg);
+          if (Array.isArray(list) && list.some(a => a.competitionId === id && a.status === 'active')) {
+            return {
+              success: false,
+              error: 'لا يمكن حذف المنافسة لوجود تعيينات حكام نشطة مرتبطة بها. يرجى إلغاء التعيينات أولاً أو أرشفة المنافسة.'
+            };
+          }
+        }
+      } catch {}
+    }
+
+    this.inMemoryList = this.inMemoryList.filter(c => c.id !== id);
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.inMemoryList));
+        localStorage.removeItem(`pfp_comp_file_${id}`);
+        localStorage.removeItem(`pfp_competition_planning_v2_${id}`);
+      } catch {}
+    }
+
+    this.notifyCompetitionsChanged();
+    if (this.activeCompId === id && this.inMemoryList.length > 0) {
+      this.setActiveCompetitionId(this.inMemoryList[0].id);
+    }
+    return { success: true };
+  }
+
+  /**
+   * Archives a competition without deleting historical data
+   */
+  public async archiveCompetition(id: string): Promise<boolean> {
+    const comp = await this.getCompetitionById(id);
+    if (!comp) return false;
+    comp.status = 'completed';
+    comp.isArchived = true;
+    await this.saveCompetition(comp);
+    return true;
+  }
+
+  /**
+   * Computes dynamic progress indicators for a competition based on real underlying data
+   */
+  public computeCompetitionProgress(comp: NationalCompetition): CompetitionProgressIndicators {
+    // 1. Planning
+    const hasEvents = comp.schedule && comp.schedule.length > 0;
+    const hasVenueAndDate = Boolean(comp.venue && comp.date);
+    let planning: 'not_started' | 'in_progress' | 'completed' = 'not_started';
+    let planningLabel = 'لم يبدأ التخطيط';
+    let pScore = 0;
+
+    if (hasEvents && hasVenueAndDate) {
+      planning = 'completed';
+      planningLabel = 'مكتمل ومعتمد';
+      pScore = 100;
+    } else if (comp.name && (comp.date || comp.venue)) {
+      planning = 'in_progress';
+      planningLabel = 'قيد الإعداد';
+      pScore = 50;
+    }
+
+    // 2. Events & Disciplines
+    const eventsCount = comp.schedule?.length || comp.eventsCount || 0;
+    let events: 'not_configured' | 'in_progress' | 'completed' = 'not_configured';
+    let eventsLabel = 'غير مهيأة';
+    let eScore = 0;
+
+    if (eventsCount >= 6) {
+      events = 'completed';
+      eventsLabel = `مكتملة (${eventsCount} مسابقة)`;
+      eScore = 100;
+    } else if (eventsCount > 0) {
+      events = 'in_progress';
+      eventsLabel = `قيد البرمجة (${eventsCount} مسابقات)`;
+      eScore = 50;
+    }
+
+    // 3. Registrations & Athletes
+    const athletesCount = comp.athletesCount || 0;
+    let registrations: 'closed' | 'open' | 'completed' = 'closed';
+    let registrationsLabel = 'غير مفتوحة';
+    let rScore = 0;
+
+    if (comp.status === 'completed') {
+      registrations = 'completed';
+      registrationsLabel = `مغلقة ومصادقة (${athletesCount} عداء)`;
+      rScore = 100;
+    } else if (comp.status === 'live' || athletesCount > 0) {
+      registrations = 'open';
+      registrationsLabel = `مفتوحة (${athletesCount} عداء)`;
+      rScore = 75;
+    }
+
+    // 4. Judges Assignments
+    let assignedJudgesCount = 0;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const rawAsg = localStorage.getItem('pfp_judge_assignments_v2') || localStorage.getItem('pfp_judges_assignments_v1');
+        if (rawAsg) {
+          const list: any[] = JSON.parse(rawAsg);
+          if (Array.isArray(list)) {
+            assignedJudgesCount = list.filter(a => a.competitionId === comp.id && a.status === 'active').length;
+          }
+        }
+      } catch {}
+    }
+
+    let judges: 'not_assigned' | 'partially_assigned' | 'fully_assigned' = 'not_assigned';
+    let judgesLabel = 'لم يتم التعيين';
+    let jScore = 0;
+
+    if (assignedJudgesCount >= Math.max(1, eventsCount)) {
+      judges = 'fully_assigned';
+      judgesLabel = `تعيين مكتمل (${assignedJudgesCount} حكام)`;
+      jScore = 100;
+    } else if (assignedJudgesCount > 0) {
+      judges = 'partially_assigned';
+      judgesLabel = `تعيين جزئي (${assignedJudgesCount} حكام)`;
+      jScore = 50;
+    }
+
+    // 5. Refereeing & Live Field Action
+    let refereeing: 'not_started' | 'in_progress' | 'completed' = 'not_started';
+    let refereeingLabel = 'لم يبدأ';
+    let refScore = 0;
+
+    if (comp.status === 'completed') {
+      refereeing = 'completed';
+      refereeingLabel = 'مكتمل ومصادق';
+      refScore = 100;
+    } else if (comp.status === 'live' || comp.schedule?.some(s => s.status === 'running' || s.status === 'finished')) {
+      refereeing = 'in_progress';
+      refereeingLabel = 'جارٍ بالميدان 🔴';
+      refScore = 60;
+    }
+
+    // 6. Certified Results
+    const resultsCount = comp.resultsSummary?.length || 0;
+    let results: 'not_available' | 'under_review' | 'certified' = 'not_available';
+    let resultsLabel = 'غير متوفرة';
+    let resScore = 0;
+
+    if (resultsCount > 0 && comp.status === 'completed') {
+      results = 'certified';
+      resultsLabel = `معتمدة (${resultsCount} نتيجة)`;
+      resScore = 100;
+    } else if (resultsCount > 0 || comp.status === 'live') {
+      results = 'under_review';
+      resultsLabel = resultsCount > 0 ? `قيد المراجعة (${resultsCount})` : 'قيد التسجيل';
+      resScore = 50;
+    }
+
+    // 7. Archive Status
+    const isArchived = Boolean(comp.isArchived || comp.status === 'completed');
+    const archivedLabel = isArchived ? 'مؤرشفة' : 'نشطة وميدانية';
+
+    const overallPercentage = Math.round((pScore + eScore + rScore + jScore + refScore + resScore) / 6);
+
+    return {
+      planning,
+      planningLabel,
+      events,
+      eventsLabel,
+      eventsCount,
+      registrations,
+      registrationsLabel,
+      athletesCount,
+      judges,
+      judgesLabel,
+      assignedJudgesCount,
+      refereeing,
+      refereeingLabel,
+      results,
+      resultsLabel,
+      archived: isArchived,
+      archivedLabel,
+      overallPercentage
+    };
   }
 
   /**

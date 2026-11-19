@@ -824,11 +824,19 @@ export const JudgesManagementOffice: React.FC = () => {
                   onChange={(e) => setAssignDisciplineId(e.target.value)}
                   className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
                 >
-                  {allAvailableDisciplines.slice(0, 20).map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.nameAr} ({d.code})
-                    </option>
-                  ))}
+                  {activeComp?.schedule && activeComp.schedule.length > 0 ? (
+                    activeComp.schedule.map(evt => (
+                      <option key={evt.id} value={evt.disciplineId || evt.id}>
+                        {evt.disciplineName || evt.disciplineId} ({evt.category} {evt.gender === 'F' ? 'إناث' : 'ذكور'} - {evt.scheduledTime || '09:00'})
+                      </option>
+                    ))
+                  ) : (
+                    allAvailableDisciplines.slice(0, 20).map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.nameAr} ({d.code})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -935,9 +943,17 @@ export const JudgesManagementOffice: React.FC = () => {
                   onChange={(e) => setAssignDisciplineId(e.target.value)}
                   className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
                 >
-                  {allAvailableDisciplines.slice(0, 15).map(d => (
-                    <option key={d.id} value={d.id}>{d.nameAr}</option>
-                  ))}
+                  {activeComp?.schedule && activeComp.schedule.length > 0 ? (
+                    activeComp.schedule.map(evt => (
+                      <option key={evt.id} value={evt.disciplineId || evt.id}>
+                        {evt.disciplineName || evt.disciplineId} ({evt.category} - {evt.scheduledTime || '09:00'})
+                      </option>
+                    ))
+                  ) : (
+                    allAvailableDisciplines.slice(0, 15).map(d => (
+                      <option key={d.id} value={d.id}>{d.nameAr}</option>
+                    ))
+                  )}
                 </select>
               </div>
 

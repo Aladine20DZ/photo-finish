@@ -132,6 +132,72 @@ export const BUILTIN_AUTHORIZED_LICENSES: StoredLicense[] = [
     activatedAt: '2026-11-14T00:00:00.000Z',
     isQuadPool: true,
     maxSharedSlots: 4
+  },
+  {
+    code: 'PFP1-ENTX-3112-83DD-738344BE',
+    tier: 'ENTX',
+    tierName: 'رخصة الاتحادات الرسمية (Enterprise - 10 مسارات)',
+    clientName: 'جهاز التحكيم المعتمد (PF-83DD-C9A9)',
+    deviceId: 'PF-83DD-C9A9',
+    expiryDate: '2031-12-31',
+    activatedAt: '2026-11-19T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP1-ENTX-3112-POOL-9068EFF4',
+    tier: 'ENTX',
+    tierName: 'رخصة الاتحادات الرسمية (Enterprise - 10 مسارات)',
+    clientName: 'اشتراك شبكي رباعي 1*4 لكافة الهواتف',
+    deviceId: 'POOL',
+    expiryDate: '2031-12-31',
+    activatedAt: '2026-11-19T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP1-ENTX-3112-GLBL-6072CE27',
+    tier: 'ENTX',
+    tierName: 'رخصة الاتحادات الرسمية (Enterprise - 10 مسارات)',
+    clientName: 'رخصة عامة موحدة',
+    deviceId: 'GLOBAL',
+    expiryDate: '2031-12-31',
+    activatedAt: '2026-11-19T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP2-ENTX-3112-83DD-MT4dRtIx0BOwn1DzY4tEM4epaKp--jF0Sev5iLLZSvdJUUY4armliQAE5svDnziWopnZ39OOWuV5WJT8Vnf_Dg',
+    tier: 'ENTX',
+    tierName: 'رخصة الاتحادات الرسمية (Enterprise - 10 مسارات)',
+    clientName: 'جهاز التحكيم المعتمد (PF-83DD-C9A9)',
+    deviceId: 'PF-83DD-C9A9',
+    expiryDate: '2031-12-31',
+    activatedAt: '2026-11-19T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP2-CLB8-3111-GLBL-AJDZQQLK5QABX9XWBCHEG8K-PXFCKJHDSXJDQFMPSYC75YTQQIHOCQZP_NFACJOZKXORVXVTZJAB1RTL67NMAA',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club - 8 مسارات)',
+    clientName: 'نادي رياضي معتمد',
+    deviceId: 'GLOBAL',
+    expiryDate: '2031-11-30',
+    activatedAt: '2026-11-14T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
+  },
+  {
+    code: 'PFP2-CLB8-3111-GLBL-AJDZQQLK5QABX9XWBCHEG8K-PXFCKJHDSXJDQFMPSYC75YTQQIHOCQZP_NFACJOZKXXORVXVZTJAB1RTL67NMAA',
+    tier: 'CLB8',
+    tierName: 'باقة الأندية المعتمدة (Pro Club - 8 مسارات)',
+    clientName: 'نادي رياضي معتمد',
+    deviceId: 'GLOBAL',
+    expiryDate: '2031-11-30',
+    activatedAt: '2026-11-14T00:00:00.000Z',
+    isQuadPool: true,
+    maxSharedSlots: 4
   }
 ];
 

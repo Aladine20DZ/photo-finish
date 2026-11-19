@@ -14,6 +14,7 @@
 
 import { GeneratedCompetitionSchedule, ScheduledDisciplineItem, planningBureauService } from './planningBureauService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { competitionsService, NationalCompetition, ScheduleEvent } from './competitionsService';
 
 export type CompetitionLevel = 'national' | 'wilaya' | 'regional' | 'local';
 
@@ -235,6 +236,49 @@ export class CompetitionFileService {
           },
           file.schedule
         );
+
+        // Keep centralized competitionsService in sync with real schedule events
+        if (!file.metadata.id.startsWith('new_')) {
+          const mappedEvents: ScheduleEvent[] = (file.schedule?.allDisciplines || []).map((item, idx) => ({
+            id: item.id || `ev_${file.metadata.id}_${idx}`,
+            time: item.startTime || '09:00',
+            discipline: item.disciplineNameAr || (item as any).disciplineName || item.disciplineId,
+            disciplineName: item.disciplineNameAr || (item as any).disciplineName || item.disciplineId,
+            disciplineId: item.disciplineId,
+            gender: (item.gender as any) || 'M',
+            category: item.categoryNameAr || item.categoryCode || 'أكابر',
+            round: item.round || 'نهائي مباشر',
+            status: 'scheduled',
+            venue: file.metadata.venue,
+            date: file.metadata.startDate
+          }));
+
+          const existingComp = await competitionsService.getCompetitionById(file.metadata.id);
+          const compRecord: NationalCompetition = {
+            id: file.metadata.id,
+            name: file.metadata.name,
+            date: file.metadata.startDate,
+            endDate: file.metadata.endDate || file.metadata.startDate,
+            venue: file.metadata.venue,
+            city: file.metadata.city || (file.metadata.venue?.includes('سعيدة') ? 'سعيدة' : 'سعيدة'),
+            wilayaCode: file.metadata.wilayaCode || '20',
+            status: existingComp?.status || 'upcoming',
+            leagueId: file.metadata.organizingLeagueId || 'lg_saida',
+            leagueName: file.metadata.organizingLeagueName || 'رابطة ألعاب القوى سعيدة (LWAS)',
+            leagueShort: 'LWAS',
+            competitionType: (existingComp?.competitionType as any) || 'track_and_field',
+            eventsCount: file.schedule?.totalEventsCount || mappedEvents.length,
+            athletesCount: existingComp?.athletesCount || 0,
+            description: `منافسة معتمدة من مكتب التخطيط والبرمجة (${mappedEvents.length} مسابقة مبرمجة).`,
+            schedule: mappedEvents.length > 0 ? mappedEvents : (existingComp?.schedule || []),
+            resultsSummary: existingComp?.resultsSummary || [],
+            isPublished: true,
+            createdAt: existingComp?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          await competitionsService.saveCompetition(compRecord);
+        }
       } catch (e) {
         console.error('[CompetitionFileService] Local save error:', e);
       }

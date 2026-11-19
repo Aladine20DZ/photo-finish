@@ -616,6 +616,78 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   💡 يقبل النظام الأكواد المشفرة الكاملة (<span className="text-amber-400 font-mono font-bold">PFP2</span>) والأكواد المدمجة السريعة (<span className="text-emerald-400 font-mono font-bold">PFP1</span>)، مع معالجة ذكية لحالة الأحرف وتصحيح تلقائي لأخطاء النقل والطباعة أوفلاين بنسبة 100%.
                 </p>
 
+                {/* خيارات التفعيل المعتمدة الفورية */}
+                <div className="pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      أكواد التفعيل الرسمية المعتمدة الفورية (أوفلاين 100%):
+                    </span>
+                    <span className="text-[10px] text-slate-500">اضغط على أي كود للتعبئة المباشرة</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivationInput('PFP1-ENTX-3112-83DD-738344BE');
+                        setActivationError('');
+                      }}
+                      className="text-right p-2.5 rounded-xl bg-slate-900/90 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/10 transition-all text-xs group cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between text-amber-300 font-bold text-[11px]">
+                        <span>رخصة الاتحادات المعتمدة (جهازك PF-83DD)</span>
+                        <span className="font-mono text-[10px] text-slate-400 group-hover:text-amber-200">2031 ⚡</span>
+                      </div>
+                      <div className="font-mono font-bold text-[11px] text-slate-300 mt-1 select-all">PFP1-ENTX-3112-83DD-738344BE</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivationInput('PFP1-CLB8-2705-POOL-3DE27F62');
+                        setActivationError('');
+                      }}
+                      className="text-right p-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-500/10 transition-all text-xs group cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between text-emerald-300 font-bold text-[11px]">
+                        <span>رخصة الرابطة الولائية سعيدة (LWAS)</span>
+                        <span className="font-mono text-[10px] text-slate-400 group-hover:text-emerald-200">1*4 شبكي</span>
+                      </div>
+                      <div className="font-mono font-bold text-[11px] text-slate-300 mt-1 select-all">PFP1-CLB8-2705-POOL-3DE27F62</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivationInput('PFP1-ENTX-3112-POOL-9068EFF4');
+                        setActivationError('');
+                      }}
+                      className="text-right p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/10 transition-all text-xs group cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between text-cyan-300 font-bold text-[11px]">
+                        <span>رخصة الاتحادات الرسمية (Enterprise)</span>
+                        <span className="font-mono text-[10px] text-slate-400 group-hover:text-cyan-200">1*4 رباعي</span>
+                      </div>
+                      <div className="font-mono font-bold text-[11px] text-slate-300 mt-1 select-all">PFP1-ENTX-3112-POOL-9068EFF4</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivationInput('PFP1-CLB8-3111-GLBL-315B007E');
+                        setActivationError('');
+                      }}
+                      className="text-right p-2.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 hover:border-indigo-400 hover:bg-indigo-500/10 transition-all text-xs group cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between text-indigo-300 font-bold text-[11px]">
+                        <span>باقة الأندية المعتمدة (Pro Club - عامة)</span>
+                        <span className="font-mono text-[10px] text-slate-400 group-hover:text-indigo-200">Global</span>
+                      </div>
+                      <div className="font-mono font-bold text-[11px] text-slate-300 mt-1 select-all">PFP1-CLB8-3111-GLBL-315B007E</div>
+                    </button>
+                  </div>
+                </div>
+
                 {activationError && (
                   <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold">
                     {activationError}

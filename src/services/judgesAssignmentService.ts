@@ -48,6 +48,8 @@ export interface CertifiedJudge {
 export interface JudgeAssignment {
   id: string;
   competitionId: string;
+  leagueId?: string;
+  eventId?: string;
   judgeId: string;
   judgeName: string;
   judgeGrade: JudgeGrade;
@@ -56,6 +58,8 @@ export interface JudgeAssignment {
   venue: string;
   task: OfficialDutyTask;
   taskTitleAr: string;
+  assignmentRole?: string;
+  assignmentStatus?: string;
   scheduledStartTime: string;
   scheduledEndTime: string;
   date: string;
@@ -569,6 +573,10 @@ export class JudgesAssignmentService {
 
   public async assignJudge(params: {
     competitionId: string;
+    leagueId?: string;
+    eventId?: string;
+    assignmentRole?: string;
+    assignmentStatus?: string;
     judgeId: string;
     disciplineId: string;
     disciplineNameAr: string;
@@ -601,6 +609,8 @@ export class JudgesAssignmentService {
     const assignment: JudgeAssignment = {
       id: `asg_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
       competitionId: params.competitionId,
+      leagueId: params.leagueId || 'lg_saida',
+      eventId: params.eventId || params.disciplineId,
       judgeId: params.judgeId,
       judgeName: judge.fullName,
       judgeGrade: judge.grade,
@@ -609,6 +619,8 @@ export class JudgesAssignmentService {
       venue: params.venue,
       task: params.task,
       taskTitleAr: DUTY_TASKS_MAP[params.task]?.titleAr || 'حكم معتمد',
+      assignmentRole: params.assignmentRole || DUTY_TASKS_MAP[params.task]?.titleAr || 'حكم معتمد',
+      assignmentStatus: params.assignmentStatus || 'assigned',
       scheduledStartTime: params.startTime,
       scheduledEndTime: params.endTime,
       date: params.date,
