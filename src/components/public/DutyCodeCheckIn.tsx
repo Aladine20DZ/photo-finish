@@ -18,7 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { PhoneRole } from '../../types/race';
-import { judgesAssignmentService, JudgeAssignment } from '../../services/judgesAssignmentService';
+import { judgesAssignmentService } from '../../services/judgesAssignmentService';
 
 export interface TaskAssignment {
   code: string;

@@ -535,7 +535,7 @@ export class FieldEventService {
       competitionId: params.competitionId,
       name: params.name || `مسابقة ${cleanDisc}`,
       discipline: cleanDisc,
-      gender: params.gender || 'M',
+      gender: (params.gender === 'mixed' ? 'MIXED' : params.gender) || 'M',
       category: params.category || 'SENIOR',
       venue: params.venue || 'الميدان الرئيسي',
       date: new Date().toISOString().split('T')[0],

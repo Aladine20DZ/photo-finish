@@ -23,16 +23,11 @@ import {
   MapPin, 
   Calendar, 
   Clock, 
-  CheckCircle2, 
   ArrowLeft, 
-  Wifi, 
-  WifiOff, 
   RefreshCw, 
-  ShieldCheck, 
   Layers,
   ChevronLeft,
   Sparkles,
-  Trophy,
   Activity,
   Bell,
   Settings,
@@ -41,21 +36,15 @@ import {
   Edit3,
   HelpCircle,
   ClipboardList,
-  Flame,
-  Check,
-  ChevronRight,
-  Sun,
-  Moon
+  Check
 } from 'lucide-react';
 import { 
   CertifiedJudge, 
-  JudgeAssignment, 
-  judgesAssignmentService 
+  JudgeAssignment
 } from '../../services/judgesAssignmentService';
 import { NationalCompetition } from '../../services/competitionsService';
 import { smartJudgeWorkspaceService } from '../../services/smartJudgeWorkspaceService';
 import { UniversalJudgeFooter } from './UniversalJudgeFooter';
-import { AthleticVisualHero } from './AthleticVisualHero';
 
 interface SmartJudgeDashboardProps {
   judge: CertifiedJudge;
@@ -75,7 +64,6 @@ export const SmartJudgeDashboard: React.FC<SmartJudgeDashboardProps> = ({
   onOpenAssignmentsOffice
 }) => {
   const isOnline = smartJudgeWorkspaceService.isOnline();
-  const pendingCount = smartJudgeWorkspaceService.getPendingQueueCount();
   const lastSynced = smartJudgeWorkspaceService.getLastSyncedTime();
 
   const [showNotificationsModal, setShowNotificationsModal] = useState<boolean>(false);

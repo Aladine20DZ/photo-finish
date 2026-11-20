@@ -12,14 +12,12 @@
  *     3) Page 2 of COURSES.docx (Club Results: No, CLUB, CW, PER, CLS)
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Trophy,
-  Shield,
   FileSpreadsheet,
   FileText,
   Printer,
-  Download,
   Plus,
   Trash2,
   RefreshCw,
@@ -27,38 +25,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Lock,
-  Unlock,
   CheckSquare,
   History,
-  X,
-  ChevronDown,
-  Layers,
-  Sparkles,
-  Award,
-  Users,
-  Timer,
-  Wind,
-  Settings,
-  Globe,
-  Sliders,
-  Check
+  X
 } from 'lucide-react';
 import {
   digitalResultSheetsService,
   DigitalResultSheet,
   ResultSheetRow,
-  SheetType,
   SheetStatus,
   ParticipantStatus,
   DocumentLanguage
 } from '../../services/digitalResultSheetsService';
 import { competitionsService, NationalCompetition } from '../../services/competitionsService';
-import { disciplinesSeedService, AthleticsDiscipline } from '../../services/disciplinesSeedService';
-import { portalAuthService } from '../../services/portalAuthService';
-import { Button } from '../design-system/Button';
-import { Badge } from '../design-system/Badge';
+import { disciplinesSeedService } from '../../services/disciplinesSeedService';
 import { Modal } from '../design-system/Modal';
-import { StatusPill } from '../design-system/StatusPill';
 
 export interface DigitalCompetitionSheetsWorkspaceProps {
   onBackToHome?: () => void;
@@ -66,13 +47,12 @@ export interface DigitalCompetitionSheetsWorkspaceProps {
 }
 
 export const DigitalCompetitionSheetsWorkspace: React.FC<DigitalCompetitionSheetsWorkspaceProps> = ({
-  onBackToHome,
-  onOpenFieldMode
+  onBackToHome
 }) => {
   // ── 1. States: Competitions & Filters ──────────────────────────────────────
   const [competitions, setCompetitions] = useState<NationalCompetition[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<string>('');
-  const [selectedCompetition, setSelectedCompetition] = useState<NationalCompetition | null>(null);
+  const [, setSelectedCompetition] = useState<NationalCompetition | null>(null);
 
   const [activeGroup, setActiveGroup] = useState<'course' | 'concours' | 'club_results'>('course');
   const [selectedDisciplineCode, setSelectedDisciplineCode] = useState<string>('100M');
@@ -117,7 +97,7 @@ export const DigitalCompetitionSheetsWorkspace: React.FC<DigitalCompetitionSheet
 
   // Save feedback
   const [saveStatus, setSaveStatus] = useState<string>('محفوظ محلياً 💾');
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [, setSaveError] = useState<string | null>(null);
 
   // ── 2. Data Initialization ───────────────────────────────────────────────
   useEffect(() => {

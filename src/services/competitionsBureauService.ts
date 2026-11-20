@@ -335,7 +335,7 @@ class CompetitionsBureauService {
         leagueId: session?.leagueId || 'lg_saida',
         entityType: 'result',
         entityId: op.id,
-        entityName: `${op.athleteName} • ${op.mark} (${disc.disciplineNameAr})`,
+        entityName: `${op.athleteName} • ${op.mark} (${disc.nameAr})`,
         sourceModule: 'results',
         payload: { ...op, competitionId, disciplineId },
         deletedBy: performer,

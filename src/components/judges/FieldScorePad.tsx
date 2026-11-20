@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Delete, Wind, ArrowRight, User } from 'lucide-react';
+import { X, Check, Delete, Wind, ArrowRight } from 'lucide-react';
 import { FieldAttemptResult } from '../../types/athletics';
 
 interface FieldScorePadProps {
@@ -82,11 +82,6 @@ export const FieldScorePad: React.FC<FieldScorePadProps> = ({
 
   const handleBackspace = () => {
     setMeasurementStr(prev => prev.slice(0, -1));
-  };
-
-  const handleClear = () => {
-    setMeasurementStr('');
-    setResultType('valid');
   };
 
   const handleActionType = (type: FieldAttemptResult) => {

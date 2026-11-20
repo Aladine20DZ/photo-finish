@@ -10,9 +10,10 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { competitionsService, NationalCompetition } from '../services/competitionsService';
-import { portalAuthService, RegisteredLeague, PortalSession } from '../services/portalAuthService';
+import { portalAuthService, RegisteredLeague } from '../services/portalAuthService';
 import { isSupabaseConfigured, supabase } from '../services/supabaseClient';
-import { ExecutiveUserRole } from '../types/athletics';
+
+export type ExecutiveUserRole = 'super_admin' | 'league_admin' | 'chief_judge' | 'competition_manager' | 'read_only';
 
 export type SynchronizationStatus = 'synced' | 'syncing' | 'offline' | 'error';
 
@@ -51,19 +52,20 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children, initia
       id: currentLeagueId,
       name: 'رابطة ألعاب القوى سعيدة (LWAS)',
       shortName: 'LWAS',
-      wilayaCode: '20',
-      wilayaNameAr: 'سعيدة',
+      type: 'wilaya',
+      region: 'ولاية سعيدة • المستوى الولائي',
+      wilaya: 'سعيدة',
+      logoCode: '🏃',
+      accreditationNumber: '',
       officialEmail: 'lwassaida20@gmail.com',
       phone: '+213 48 51 00 20',
-      presidentName: 'رئيس الرابطة الولائية',
-      technicalDirector: 'المدير الفني الولائي',
-      address: 'المضمار الولائي 13 أفريل 1958، سعيدة',
+      adminFullName: 'رئيس الرابطة الولائية',
       adminUsername: 'saida2026',
+      adminPassword: '',
+      createdAt: '2026-01-01T00:00:00Z',
       isActive: true,
-      registeredAt: '2026-01-01T00:00:00Z',
-      competitionsCount: 1,
-      clubsCount: 4,
-      refereesCount: 16
+      presidentName: 'رئيس الرابطة الولائية',
+      address: 'المضمار الولائي 13 أفريل 1958، سعيدة'
     };
   });
 

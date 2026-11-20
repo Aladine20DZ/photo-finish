@@ -12,26 +12,20 @@
  * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
-  Trophy, 
   User, 
-  Edit3, 
   CheckCircle2, 
-  AlertCircle,
-  Clock,
   ChevronLeft,
   ChevronRight,
   Save,
   X as XIcon,
   UserX,
   Maximize2,
-  Award,
   Disc
 } from 'lucide-react';
 import { 
   FieldEventCompetition, 
-  FieldAthleteScore, 
   FieldAttempt,
   FieldAttemptResult 
 } from '../../types/athletics';
@@ -66,7 +60,7 @@ export const ThrowsWorkspace: React.FC<ThrowsWorkspaceProps> = ({
   const canEdit = !readOnly && (assignment.permissions?.canRecord ?? true);
   const athletes = competition.athletes || [];
   const currentAthlete = athletes[selectedAthleteIndex] || athletes[0];
-  const maxAttempts = competition.totalAttempts || 6;
+  const maxAttempts = competition.totalAttemptsAllowed || 6;
 
   const handleSelectAthlete = (index: number) => {
     if (index < 0 || index >= athletes.length) return;
@@ -162,7 +156,7 @@ export const ThrowsWorkspace: React.FC<ThrowsWorkspaceProps> = ({
       <div className="bg-[#0E172A] border border-[#1E293B] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs font-bold text-slate-300">
         <div className="flex items-center gap-2">
           <span className="text-[#60A5FA]">المسابقة:</span>
-          <span>{competition.competitionName || 'البطولة الولائية لألعاب القوى'}</span>
+          <span>{competition.name || 'البطولة الولائية لألعاب القوى'}</span>
           <span className="text-slate-600">|</span>
           <span className="text-[#60A5FA]">المكان:</span>
           <span>{assignment.venue || 'منطقة الرمي 1'}</span>
@@ -245,7 +239,7 @@ export const ThrowsWorkspace: React.FC<ThrowsWorkspaceProps> = ({
                       </td>
 
                       <td className="py-3 px-3 font-mono font-black text-[#13A879]">
-                        {ath.bestMeasurement ? `${ath.bestMeasurement.toFixed(2)} m` : '—'}
+                        {ath.bestValidMeasurement ? `${ath.bestValidMeasurement.toFixed(2)} m` : '—'}
                       </td>
 
                       <td className="py-3 px-3 font-mono text-slate-300">

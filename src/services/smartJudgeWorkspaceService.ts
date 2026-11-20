@@ -11,11 +11,9 @@
  * - Official certification workflow (Draft -> In-Progress -> Official Certified).
  */
 
-import { 
-  judgesAssignmentService, 
-  JudgeAssignment, 
-  JudgeActivityLog,
-  DisciplineCategoryType
+import {
+  judgesAssignmentService,
+  JudgeAssignment
 } from './judgesAssignmentService';
 import { 
   fieldEventService 

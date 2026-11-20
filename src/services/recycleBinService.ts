@@ -424,7 +424,7 @@ class LeagueRecycleBinService {
     return { deletedCount: count };
   }
 
-  public async emptyRecycleBin(leagueId: string, performedBy: string = 'مسؤول الرابطة'): Promise<{ count: number }> {
+  public async emptyRecycleBin(leagueId: string, _performedBy: string = 'مسؤول الرابطة'): Promise<{ count: number }> {
     const items = this.ensureLoaded(leagueId);
     const activeItems = items.filter(i => !i.isPurged);
     const count = activeItems.length;

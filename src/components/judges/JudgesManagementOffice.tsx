@@ -852,7 +852,7 @@ export const JudgesManagementOffice: React.FC = () => {
                   {activeComp?.schedule && activeComp.schedule.length > 0 ? (
                     activeComp.schedule.map(evt => (
                       <option key={evt.id} value={evt.disciplineId || evt.id}>
-                        {evt.disciplineName || evt.disciplineId} ({evt.category} {evt.gender === 'F' ? 'إناث' : 'ذكور'} - {evt.scheduledTime || '09:00'})
+                        {evt.discipline || evt.disciplineId} ({evt.category} {evt.gender === 'F' ? 'إناث' : 'ذكور'} - {evt.time || '09:00'})
                       </option>
                     ))
                   ) : (
@@ -971,7 +971,7 @@ export const JudgesManagementOffice: React.FC = () => {
                   {activeComp?.schedule && activeComp.schedule.length > 0 ? (
                     activeComp.schedule.map(evt => (
                       <option key={evt.id} value={evt.disciplineId || evt.id}>
-                        {evt.disciplineName || evt.disciplineId} ({evt.category} - {evt.scheduledTime || '09:00'})
+                        {evt.discipline || evt.disciplineId} ({evt.category} - {evt.time || '09:00'})
                       </option>
                     ))
                   ) : (

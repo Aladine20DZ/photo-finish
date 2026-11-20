@@ -18,6 +18,23 @@ import { competitionsService, NationalCompetition, ScheduleEvent } from './compe
 
 export type CompetitionLevel = 'national' | 'wilaya' | 'regional' | 'local';
 
+/**
+ * Legacy/loose shape of a scheduled discipline item found on imported or
+ * externally generated schedule bundles (see `schedule.allDisciplines`).
+ * Mirrors the fields consumed when syncing schedule events into competitionsService.
+ */
+interface LegacyScheduleDisciplineItem {
+  id?: string;
+  startTime?: string;
+  disciplineNameAr?: string;
+  disciplineName?: string;
+  disciplineId: string;
+  gender?: string;
+  categoryNameAr?: string;
+  categoryCode?: string;
+  round?: string;
+}
+
 export interface CompetitionFileMetadata {
   id: string;
   name: string;
@@ -239,7 +256,7 @@ export class CompetitionFileService {
 
         // Keep centralized competitionsService in sync with real schedule events
         if (!file.metadata.id.startsWith('new_')) {
-          const mappedEvents: ScheduleEvent[] = (file.schedule?.allDisciplines || []).map((item, idx) => ({
+          const mappedEvents: ScheduleEvent[] = ((file.schedule as GeneratedCompetitionSchedule & { allDisciplines?: LegacyScheduleDisciplineItem[] })?.allDisciplines || []).map((item, idx) => ({
             id: item.id || `ev_${file.metadata.id}_${idx}`,
             time: item.startTime || '09:00',
             discipline: item.disciplineNameAr || (item as any).disciplineName || item.disciplineId,

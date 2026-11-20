@@ -9,23 +9,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Award, 
   ArrowRight, 
   Wifi, 
   WifiOff, 
   Lock, 
-  Unlock, 
   CheckCircle2, 
   Maximize2, 
-  Minimize2, 
   Printer, 
-  FileSpreadsheet, 
-  Users, 
   Activity, 
   ShieldCheck,
-  MapPin,
-  Clock,
-  Sparkles,
   ChevronDown
 } from 'lucide-react';
 import { 
@@ -40,7 +32,6 @@ import { VerticalJumpsWorkspace } from './VerticalJumpsWorkspace';
 import { ThrowsWorkspace } from './ThrowsWorkspace';
 import { TrackCourseJudgeWorkspace } from './TrackCourseJudgeWorkspace';
 import { FieldModeWorkspace } from './FieldModeWorkspace';
-import { CheckpointJudgeView } from '../checkpoints/CheckpointJudgeView';
 import { OfficialFederationHeader, OfficialFederationFooter } from '../athletics/OfficialFederationHeader';
 
 interface SmartJudgeWorkspaceProps {
@@ -293,8 +284,8 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
         {/* Official Header for Print & A4 Review */}
         <div className="hidden print:block">
           <OfficialFederationHeader
-            competitionTitle={assignment.disciplineNameAr}
-            disciplineName={assignment.disciplineNameAr}
+            competitionName={assignment.disciplineNameAr}
+            discipline={assignment.disciplineNameAr}
             venue={assignment.venue}
             date={assignment.date}
           />
@@ -352,9 +343,6 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
         <div className="hidden print:block pt-8">
           <OfficialFederationFooter
             chiefJudgeName={assignment.judgeName}
-            chiefJudgeLicense={assignment.judgeGrade}
-            isCertified={isOfficialLocked}
-            certifiedAt={eventComp?.updatedAt ? new Date(eventComp.updatedAt).toLocaleString('ar-DZ') : undefined}
           />
         </div>
 

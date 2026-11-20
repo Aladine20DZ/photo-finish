@@ -17,33 +17,24 @@
  * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
-  Trophy, 
   Wind, 
   User, 
-  Edit3, 
   CheckCircle2, 
-  AlertCircle,
-  Clock,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   Save,
   X as XIcon,
   UserX,
-  ArrowRight,
   Maximize2,
-  RefreshCw,
   Award
 } from 'lucide-react';
 import { 
   FieldEventCompetition, 
-  FieldAthleteScore, 
   FieldAttempt,
   FieldAttemptResult 
 } from '../../types/athletics';
-import { FieldScorePad } from './FieldScorePad';
 import { smartJudgeWorkspaceService } from '../../services/smartJudgeWorkspaceService';
 import { JudgeAssignment } from '../../services/judgesAssignmentService';
 import { UniversalJudgeFooter } from './UniversalJudgeFooter';
@@ -71,7 +62,6 @@ export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> =
   const [currentMeasurementInput, setCurrentMeasurementInput] = useState<string>('6.45');
   const [currentResultType, setCurrentResultType] = useState<FieldAttemptResult>('valid');
   const [currentWindInput, setCurrentWindInput] = useState<string>('1.4');
-  const [isScorePadOpen, setIsScorePadOpen] = useState<boolean>(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
   const canEdit = !readOnly && (assignment.permissions?.canRecord ?? true);
@@ -79,13 +69,7 @@ export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> =
   const currentAthlete = athletes[selectedAthleteIndex] || athletes[0];
 
   // Dynamic maximum attempts based on competition setup (defaults to 6)
-  const maxAttempts = competition.totalAttempts || 6;
-
-  // Set initial attempt measurement from active athlete if exists
-  const activeAttemptData = useMemo(() => {
-    if (!currentAthlete || !currentAthlete.attempts) return null;
-    return currentAthlete.attempts.find(a => a.attemptNumber === activeAttemptNumber) || null;
-  }, [currentAthlete, activeAttemptNumber]);
+  const maxAttempts = competition.totalAttemptsAllowed || 6;
 
   const handleSelectAthlete = (index: number) => {
     if (index < 0 || index >= athletes.length) return;
@@ -200,7 +184,7 @@ export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> =
       <div className="bg-[#0E172A] border border-[#1E293B] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs font-bold text-slate-300">
         <div className="flex items-center gap-2">
           <span className="text-[#60A5FA]">المسابقة:</span>
-          <span>{competition.competitionName || 'البطولة الولائية لألعاب القوى'}</span>
+          <span>{competition.name || 'البطولة الولائية لألعاب القوى'}</span>
           <span className="text-slate-600">|</span>
           <span className="text-[#60A5FA]">المكان:</span>
           <span>{assignment.venue || 'الحفرة 1'}</span>
@@ -292,7 +276,7 @@ export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> =
 
                       {/* أفضل أداء */}
                       <td className="py-3 px-3 font-mono font-black text-[#13A879]">
-                        {ath.bestMeasurement ? `${ath.bestMeasurement.toFixed(2)} m` : '—'}
+                        {ath.bestValidMeasurement ? `${ath.bestValidMeasurement.toFixed(2)} m` : '—'}
                       </td>
 
                       {/* المحاولات */}

@@ -80,10 +80,6 @@ export interface RegisteredLeague {
   address?: string;
 }
 
-const isDevOrTest = 
-  (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)) || 
-  (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
-
 const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
   {
     id: 'lg_saida',

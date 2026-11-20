@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  AlertTriangle, 
-  Trash2, 
-  X, 
-  Archive, 
-  ShieldAlert, 
-  Check, 
-  Info,
+import {
+  AlertTriangle,
+  Trash2,
+  X,
+  Archive,
+  ShieldAlert,
+  Check,
   Clock
 } from 'lucide-react';
 import { RecycleEntityType } from '../../services/recycleBinService';

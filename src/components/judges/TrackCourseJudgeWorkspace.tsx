@@ -19,20 +19,11 @@
 import React, { useState } from 'react';
 import { 
   Timer, 
-  Trophy, 
-  Clock, 
-  Flag, 
-  AlertCircle, 
-  CheckCircle2, 
   Edit3,
-  Layers,
   Camera,
   Maximize2,
   ChevronRight,
   Plus,
-  Play,
-  RotateCcw,
-  Award,
   Users
 } from 'lucide-react';
 import { JudgeAssignment } from '../../services/judgesAssignmentService';
@@ -76,7 +67,6 @@ const SEED_TRACK_RUNNERS: TrackAthleteEntry[] = [
 
 export const TrackCourseJudgeWorkspace: React.FC<TrackCourseJudgeWorkspaceProps> = ({
   assignment,
-  competitionTitle = 'البطولة الولائية لألعاب القوى',
   readOnly = false,
   onOpenFieldMode,
   onBackToDashboard

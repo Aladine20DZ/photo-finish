@@ -12,21 +12,20 @@
  */
 
 import * as XLSX from 'xlsx';
-import { 
-  Document, 
-  Packer, 
-  Paragraph, 
-  Table, 
-  TableCell, 
-  TableRow, 
-  TextRun, 
-  AlignmentType, 
-  WidthType,
-  BorderStyle
+import {
+  Document,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  AlignmentType,
+  WidthType
 } from 'docx';
-import { portalAuthService, RegisteredLeague } from './portalAuthService';
-import { competitionsService, NationalCompetition } from './competitionsService';
-import { competitionEntriesService, AthleteCompetitionEntry } from './competitionEntriesService';
+import { portalAuthService } from './portalAuthService';
+import { competitionsService } from './competitionsService';
+import { competitionEntriesService } from './competitionEntriesService';
 import { disciplinesSeedService, AthleticsDiscipline } from './disciplinesSeedService';
 import { athleteClubStorage } from './athleteClubStorage';
 
@@ -454,7 +453,7 @@ export class DigitalResultSheetsService {
       const parsedTime = this.parseTimeToSeconds(r.pre || '');
       return {
         ...r,
-        numericTime: parsedTime
+        numericTime: parsedTime ?? undefined
       };
     });
 
@@ -581,7 +580,7 @@ export class DigitalResultSheetsService {
    * إنشاء جدول ترتيب الأندية (CLUB RESULTS - Page 2 of COURSES)
    * يجمع النقاط تلقائياً لكافة أندية المنافسة وفق معيار الاتحاد الدولي (Top 8 Points: 9-7-6-5-4-3-2-1)
    */
-  public async generateClubResultsSheet(competitionId: string, rule: 'wa_top8' | 'rule19_xc' = 'wa_top8'): Promise<DigitalResultSheet> {
+  public async generateClubResultsSheet(competitionId: string, _rule: 'wa_top8' | 'rule19_xc' = 'wa_top8'): Promise<DigitalResultSheet> {
     const comp = await competitionsService.getCompetitionById(competitionId);
     const allCompSheets = Array.from(this.sheets.values()).filter(s => s.competitionId === competitionId && s.sheetType !== 'club_results');
 
@@ -902,7 +901,7 @@ export class DigitalResultSheetsService {
   /**
    * تصدير ملف Excel (.xlsx) مطابق تماماً لجداول COURSES و CONCOUR و CLUB RESULTS
    */
-  public exportToExcel(sheet: DigitalResultSheet, language: DocumentLanguage = 'fr'): void {
+  public exportToExcel(sheet: DigitalResultSheet, _language: DocumentLanguage = 'fr'): void {
     const wb = XLSX.utils.book_new();
     const rowsData: any[][] = [];
 

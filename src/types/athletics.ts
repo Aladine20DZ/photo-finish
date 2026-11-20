@@ -361,7 +361,7 @@ export type FieldEventType =
   | 'javelin_throw'   // رمي الرمح
   | 'hammer_throw';   // رمي المطرقة
 
-export type FieldAttemptResult = 'valid' | 'foul' | 'pass' | 'no_mark';
+export type FieldAttemptResult = 'valid' | 'foul' | 'pass' | 'no_mark' | 'dns' | 'dnf';
 
 export interface FieldAttempt {
   attemptNumber: number;          // رقم المحاولة (1 إلى 6)
@@ -374,7 +374,7 @@ export interface FieldAttempt {
 
 export interface VerticalHeightTrial {
   heightMeters: number;           // الارتفاع (مثلاً 2.15م أو 5.60م)
-  trials: ('O' | 'X' | '-' | 'r')[]; // O=نجاح، X=فشل، -=تنازل، r=انسحاب
+  trials: ('O' | 'X' | '-' | 'r' | '—')[]; // O=نجاح، X=فشل، -=تنازل، r=انسحاب (— used by UI as pass marker too)
   cleared: boolean;               // هل تم اجتياز هذا الارتفاع
   attemptsCount: number;          // عدد المحاولات المستهلكة في هذا الارتفاع
 }

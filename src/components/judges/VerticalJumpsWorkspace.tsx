@@ -18,16 +18,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  Trophy, 
   ArrowUp, 
   ArrowDown, 
-  Plus, 
   Check, 
   X as XIcon, 
   Minus, 
-  AlertTriangle,
-  UserCheck,
-  ShieldCheck,
   RotateCcw,
   Maximize2,
   ChevronRight,
@@ -36,8 +31,7 @@ import {
 } from 'lucide-react';
 import { 
   FieldEventCompetition, 
-  FieldAthleteScore, 
-  VerticalHeightTrial 
+  FieldAthleteScore 
 } from '../../types/athletics';
 import { smartJudgeWorkspaceService } from '../../services/smartJudgeWorkspaceService';
 import { JudgeAssignment } from '../../services/judgesAssignmentService';
@@ -80,8 +74,6 @@ export const VerticalJumpsWorkspace: React.FC<VerticalJumpsWorkspaceProps> = ({
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>(() => {
     return competition.athletes[0]?.athleteId || 'ath_01';
   });
-  const [showAddHeightModal, setShowAddHeightModal] = useState<boolean>(false);
-  const [newHeightInput, setNewHeightInput] = useState<string>('');
 
   const canEdit = !readOnly && (assignment.permissions?.canRecord ?? true);
   const athletes = competition.athletes || [];
@@ -409,7 +401,7 @@ export const VerticalJumpsWorkspace: React.FC<VerticalJumpsWorkspaceProps> = ({
                           <span className="w-6 h-6 rounded-full bg-[#EF4444]/20 text-[#EF4444] font-black inline-flex items-center justify-center border border-[#EF4444]/40">
                             X
                           </span>
-                        ) : lastResult === '—' ? (
+                        ) : lastResult === '-' ? (
                           <span className="text-slate-500 font-bold">—</span>
                         ) : (
                           <span className="text-slate-600">—</span>

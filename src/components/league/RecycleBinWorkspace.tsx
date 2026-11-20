@@ -1,19 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Trash2, 
-  RotateCcw, 
-  Search, 
-  Filter, 
-  AlertTriangle, 
-  Archive, 
-  Clock, 
-  User, 
-  ShieldAlert, 
-  CheckCircle2, 
-  Layers, 
-  CheckSquare, 
+import {
+  Trash2,
+  RotateCcw,
+  Search,
+  AlertTriangle,
+  Archive,
+  User,
+  CheckCircle2,
+  CheckSquare,
   Square,
-  Sparkles,
   ArrowRight
 } from 'lucide-react';
 import { recycleBinService, RecycleBinItem, RecycleEntityType } from '../../services/recycleBinService';

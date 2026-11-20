@@ -15,29 +15,22 @@
  * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
-  Award, 
   User, 
   CheckCircle2, 
   RotateCcw, 
-  ArrowLeft, 
   ChevronRight, 
-  ChevronLeft,
-  Save, 
   Trophy, 
   FileText, 
   Activity, 
   Layers, 
   Check, 
-  Wifi, 
-  ShieldCheck,
   Zap,
-  Sparkles,
-  Maximize2
+  RefreshCw
 } from 'lucide-react';
 import { JudgeAssignment } from '../../services/judgesAssignmentService';
-import { FieldEventCompetition, FieldAthleteScore, FieldAttempt } from '../../types/athletics';
+import { FieldEventCompetition, FieldAttempt } from '../../types/athletics';
 import { smartJudgeWorkspaceService } from '../../services/smartJudgeWorkspaceService';
 import { UniversalJudgeFooter } from './UniversalJudgeFooter';
 import { AthleticVisualHero } from './AthleticVisualHero';
@@ -57,7 +50,7 @@ export const FieldModeWorkspace: React.FC<FieldModeWorkspaceProps> = ({
 }) => {
   const [activeSideTab, setActiveSideTab] = useState<'attempts' | 'rankings' | 'reports' | 'logs'>('attempts');
   const [selectedAthleteIndex, setSelectedAthleteIndex] = useState<number>(0);
-  const [activeAttemptNum, setActiveAttemptNum] = useState<number>(1);
+  const [activeAttemptNum] = useState<number>(1);
   const [measurementInput, setMeasurementInput] = useState<string>('6.45');
   const [saveToast, setSaveToast] = useState<string | null>(null);
 

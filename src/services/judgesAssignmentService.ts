@@ -24,6 +24,7 @@ export interface JudgeAssignmentPermissions {
   canEdit: boolean;
   canCertify: boolean;
   canDelete: boolean;
+  canApprove?: boolean;
 }
 
 export type OfficialDutyTask = 
