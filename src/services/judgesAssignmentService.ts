@@ -750,8 +750,9 @@ export class JudgesAssignmentService {
       return result;
     }
 
-    // Helper: convert HH:MM to minutes from midnight
-    const toMinutes = (timeStr: string) => {
+    // Helper: convert HH:MM to minutes from midnight safely
+    const toMinutes = (timeStr?: string) => {
+      if (!timeStr) return 0;
       const parts = timeStr.split(':').map(Number);
       return (parts[0] || 0) * 60 + (parts[1] || 0);
     };

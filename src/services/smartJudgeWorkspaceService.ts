@@ -380,8 +380,17 @@ export class SmartJudgeWorkspaceService {
     assignment: JudgeAssignment;
     athleteId: string;
     athleteBib?: number;
-    heightTrial: VerticalHeightTrial;
+    heightTrial?: VerticalHeightTrial;
+    heightMeters?: number;
+    trialResult?: 'O' | 'X' | '—';
   }): Promise<FieldEventCompetition | null> {
+    const heightTrial: VerticalHeightTrial = params.heightTrial || {
+      heightMeters: params.heightMeters || 1.80,
+      cleared: params.trialResult === 'O',
+      attemptsCount: 1,
+      trials: [params.trialResult || 'O']
+    };
+
     const queueId = `q_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
     
     const queueItem: OfflineAttemptQueueItem = {
@@ -391,7 +400,7 @@ export class SmartJudgeWorkspaceService {
       competitionId: params.assignment.competitionId,
       athleteId: params.athleteId,
       type: 'vertical_trial',
-      payload: params.heightTrial,
+      payload: heightTrial,
       timestamp: Date.now(),
       synced: this.onlineStatus
     };
@@ -408,13 +417,13 @@ export class SmartJudgeWorkspaceService {
       actionType: 'CHANGE_HEIGHT',
       athleteId: params.athleteId,
       athleteBib: params.athleteBib,
-      newValue: `${params.heightTrial.heightMeters}م: ${params.heightTrial.trials.join(' ')}`
+      newValue: `${heightTrial.heightMeters}م: ${heightTrial.trials?.join(' ')}`
     });
 
     const updated = await fieldEventService.recordVerticalTrial(
       params.eventCompetitionId,
       params.athleteId,
-      params.heightTrial
+      heightTrial
     );
 
     if (typeof localStorage !== 'undefined') {

@@ -231,7 +231,8 @@ export const App: React.FC = () => {
         }
       }
     } catch {}
-    return null;
+    const all = judgesAssignmentService.getAssignments();
+    return all.length > 0 ? all[0] : null;
   });
 
   const [currentJudgeProfile, setCurrentJudgeProfile] = useState<CertifiedJudge | null>(() => {
@@ -251,7 +252,8 @@ export const App: React.FC = () => {
         }
       }
     } catch {}
-    return null;
+    const judges = judgesAssignmentService.getAllJudges();
+    return judges.length > 0 ? judges[0] : null;
   });
 
   const [judgeAssignmentsList, setJudgeAssignmentsList] = useState<JudgeAssignment[]>(() => {
@@ -271,7 +273,12 @@ export const App: React.FC = () => {
         }
       }
     } catch {}
-    return [];
+    const judges = judgesAssignmentService.getAllJudges();
+    if (judges.length > 0) {
+      const asgs = judgesAssignmentService.getAssignmentsForJudge(judges[0].id);
+      if (asgs.length > 0) return asgs;
+    }
+    return judgesAssignmentService.getAssignments();
   });
   const [activeLeague] = useState<string>('الرابطة الولائية لألعاب القوى - سعيدة');
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
@@ -1259,10 +1266,10 @@ export const App: React.FC = () => {
           />
         )}
 
-        {!role && currentTab === 'judge-dashboard' && currentJudgeProfile && (
+        {!role && currentTab === 'judge-dashboard' && (
           <SmartJudgeDashboard
-            judge={currentJudgeProfile}
-            assignments={judgeAssignmentsList}
+            judge={currentJudgeProfile || judgesAssignmentService.getAllJudges()[0]}
+            assignments={judgeAssignmentsList.length > 0 ? judgeAssignmentsList : judgesAssignmentService.getAssignments()}
             activeCompetition={currentCompetition as any}
             onSelectAssignment={(asg) => {
               setActiveJudgeAssignment(asg);
@@ -1273,6 +1280,7 @@ export const App: React.FC = () => {
               setActiveJudgeAssignment(null);
               setCurrentTab('public');
             }}
+            onOpenAssignmentsOffice={() => setCurrentTab('judges-office')}
           />
         )}
 

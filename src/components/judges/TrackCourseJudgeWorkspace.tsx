@@ -1,12 +1,19 @@
 /**
- * PHOTO FINISH PRO AI — Track & Relays Judge Workspace (COURSE)
+ * PHOTO FINISH PRO — SCREEN 04: TRACK RACES & COURSE (السباقات - المضمار 4)
  * Dedicated workspace for Track races (100m, 200m, 400m, hurdles, relays).
+ * Conforms directly to the official reference design (Panel 4).
  * World Athletics Rule 164 & 165 Compliant.
  * Features:
- * - Heats/Series navigation.
- * - Lane, Bib, Athlete, Club, Gun Time, Status (OK, DNS, DNF, DQ).
- * - Direct FAT & manual timing entry.
- * - Integration with official Photo Finish time records.
+ * - Top header with system logo and "السباقات (المضمار) 4".
+ * - Series & Heats Selector: "سباق 100 متر - سلسلة 1".
+ * - RTL Athletes Table: # | العداء | النادي | المسار | النتيجة | الحالة.
+ * - Action buttons: "+ عرض النتيجة", "إضافة نتيجة يدوية".
+ * - Status pills: "مؤكد" (Green), "قيد الإنجاز" (Orange), DNS, DNF, DQ (with rule codes).
+ * - Integration with photo finish and FAT gun timing engine.
+ * - Right athletic visual hero: sprinters dashing across finish line.
+ * - Universal Judge Footer.
+ *
+ * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
 import React, { useState } from 'react';
@@ -19,10 +26,18 @@ import {
   CheckCircle2, 
   Edit3,
   Layers,
-  Camera
+  Camera,
+  Maximize2,
+  ChevronRight,
+  Plus,
+  Play,
+  RotateCcw,
+  Award,
+  Users
 } from 'lucide-react';
-import { Runner } from '../../types/race';
 import { JudgeAssignment } from '../../services/judgesAssignmentService';
+import { UniversalJudgeFooter } from './UniversalJudgeFooter';
+import { AthleticVisualHero } from './AthleticVisualHero';
 
 export interface TrackAthleteEntry {
   id: string;
@@ -30,289 +45,355 @@ export interface TrackAthleteEntry {
   bib: number;
   athleteName: string;
   clubName: string;
-  status: 'OK' | 'DNS' | 'DNF' | 'DQ';
+  status: 'confirmed' | 'in_progress' | 'DNS' | 'DNF' | 'DQ';
   dqRule?: string;
   gunTimeMs?: number;
   formattedTime?: string;
-  manualTimeMs?: number;
   rank?: number;
 }
 
 interface TrackCourseJudgeWorkspaceProps {
   assignment: JudgeAssignment;
-  competitionTitle: string;
+  competitionTitle?: string;
   readOnly?: boolean;
+  onOpenFieldMode?: () => void;
+  onBackToDashboard?: () => void;
 }
 
+// Seed entries reflecting the reference design in Panel 4:
+// 301 | بلال جابر | وفاق سعيدة | 4 | 10.72 | مؤكد
+// 302 | أنس بوزيان | شباب السهلة | 5 | 10.78 | مؤكد
+// 303 | كريم لعروسي | أمل سعيدة | 6 | 10.81 | مؤكد
+// 304 | نادر بن خليفة | نجم المدينة | 7 | -- | قيد الإنجاز
 const SEED_TRACK_RUNNERS: TrackAthleteEntry[] = [
-  { id: 'r_1', lane: 1, bib: 110, athleteName: 'أيوب بن عائشة', clubName: 'مولودية سعيدة (MCS)', status: 'OK', gunTimeMs: 10420, formattedTime: '10.42', rank: 1 },
-  { id: 'r_2', lane: 2, bib: 112, athleteName: 'حمزة غربي', clubName: 'وفاق سعيدة (WBS)', status: 'OK', gunTimeMs: 10580, formattedTime: '10.58', rank: 2 },
-  { id: 'r_3', lane: 3, bib: 115, athleteName: 'سيد علي بوقرة', clubName: 'أولمبي الحساسنة', status: 'OK', gunTimeMs: 10720, formattedTime: '10.72', rank: 3 },
-  { id: 'r_4', lane: 4, bib: 118, athleteName: 'سفيان دربال', clubName: 'شباب ألعاب القوى عين الحجر', status: 'OK', gunTimeMs: 10890, formattedTime: '10.89', rank: 4 },
-  { id: 'r_5', lane: 5, bib: 121, athleteName: 'عصام قوادري', clubName: 'نادي ألعاب القوى يوب', status: 'DNS', rank: 5 },
-  { id: 'r_6', lane: 6, bib: 124, athleteName: 'طارق فلاح', clubName: 'مولودية سعيدة (MCS)', status: 'DNF', rank: 6 },
-  { id: 'r_7', lane: 7, bib: 128, athleteName: 'مصطفى بن علي', clubName: 'أمل دير الحمر', status: 'DQ', dqRule: 'TR16.8 (انطلاقة خاطئة)', rank: 7 },
-  { id: 'r_8', lane: 8, bib: 130, athleteName: 'محمد لمين شريف', clubName: 'وفاق سعيدة (WBS)', status: 'OK', gunTimeMs: 11150, formattedTime: '11.15', rank: 5 }
+  { id: 'r_301', lane: 4, bib: 301, athleteName: 'بلال جابر', clubName: 'وفاق سعيدة', status: 'confirmed', formattedTime: '10.72', rank: 1 },
+  { id: 'r_302', lane: 5, bib: 302, athleteName: 'أنس بوزيان', clubName: 'شباب السهلة', status: 'confirmed', formattedTime: '10.78', rank: 2 },
+  { id: 'r_303', lane: 6, bib: 303, athleteName: 'كريم لعروسي', clubName: 'أمل سعيدة', status: 'confirmed', formattedTime: '10.81', rank: 3 },
+  { id: 'r_304', lane: 7, bib: 304, athleteName: 'نادر بن خليفة', clubName: 'نجم المدينة', status: 'in_progress', formattedTime: '--', rank: 4 },
+  { id: 'r_305', lane: 2, bib: 305, athleteName: 'صلاح الدين عمار', clubName: 'مولودية سعيدة', status: 'DNS', formattedTime: 'DNS', rank: 5 },
+  { id: 'r_306', lane: 3, bib: 306, athleteName: 'هشام مجدوب', clubName: 'أمل دير الحمر', status: 'DQ', dqRule: 'TR16.8 (انطلاقة خاطئة)', formattedTime: 'DQ', rank: 6 }
 ];
 
 export const TrackCourseJudgeWorkspace: React.FC<TrackCourseJudgeWorkspaceProps> = ({
   assignment,
-  competitionTitle,
-  readOnly = false
+  competitionTitle = 'البطولة الولائية لألعاب القوى',
+  readOnly = false,
+  onOpenFieldMode,
+  onBackToDashboard
 }) => {
   const [runners, setRunners] = useState<TrackAthleteEntry[]>(SEED_TRACK_RUNNERS);
-  const [activeHeatIndex, setActiveHeatIndex] = useState<number>(0);
+  const [activeHeatIndex, setActiveHeatIndex] = useState<number>(1);
   const [editingRunner, setEditingRunner] = useState<TrackAthleteEntry | null>(null);
-  const [timeInput, setTimeInput] = useState<string>('');
-  const [statusInput, setStatusInput] = useState<'OK' | 'DNS' | 'DNF' | 'DQ'>('OK');
-  const [dqRuleInput, setDqRuleInput] = useState<string>('TR16.8');
+  const [manualTimeInput, setManualTimeInput] = useState<string>('');
+  const [showManualModal, setShowManualModal] = useState<boolean>(false);
+  const [showPhotoReviewModal, setShowPhotoReviewModal] = useState<boolean>(false);
 
   const canEdit = !readOnly && (assignment.permissions?.canRecord ?? true);
 
-  const handleOpenEdit = (runner: TrackAthleteEntry) => {
-    if (!canEdit) return;
-    setEditingRunner(runner);
-    setTimeInput(runner.formattedTime || '');
-    setStatusInput(runner.status);
-    setDqRuleInput(runner.dqRule || 'TR16.8');
-  };
-
-  const handleSaveRunner = () => {
+  const handleSaveManualTime = () => {
     if (!editingRunner) return;
-
     setRunners(prev => prev.map(r => {
       if (r.id !== editingRunner.id) return r;
       return {
         ...r,
-        status: statusInput,
-        formattedTime: statusInput === 'OK' ? timeInput : undefined,
-        dqRule: statusInput === 'DQ' ? dqRuleInput : undefined
+        formattedTime: manualTimeInput,
+        status: 'confirmed'
       };
     }));
-
+    setShowManualModal(false);
     setEditingRunner(null);
   };
 
   return (
-    <div dir="rtl" className="space-y-4">
-      {/* Series / Heats Selector */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-3 rounded-2xl flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">السلسلة / النهائي:</span>
-          <div className="flex gap-1.5">
-            {['النهائي الرسمي (FAT)', 'السلسلة 1', 'السلسلة 2'].map((heatName, idx) => (
-              <button
-                key={heatName}
-                type="button"
-                onClick={() => setActiveHeatIndex(idx)}
-                className={`py-1.5 px-3 rounded-xl font-bold text-xs transition-all border ${
-                  activeHeatIndex === idx
-                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-950/40'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                {heatName}
-              </button>
-            ))}
+    <div dir="rtl" className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6 text-slate-100 font-sans">
+      
+      {/* ═══════════════════════════════════════════════════════════
+          SCREEN 04 HEADER: Logo, Title (السباقات - المضمار 4)
+          Matches Panel 4 in reference image
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="bg-[#101D35] border border-[#1E293B] rounded-2xl px-5 py-4 shadow-xl flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#1677E8] text-white flex items-center justify-center font-black shadow-md shrink-0">
+            <Timer className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-black text-white tracking-wide">السباقات (المضمار)</h1>
+              <span className="w-6 h-6 rounded-full bg-[#1677E8] text-white font-black text-xs flex items-center justify-center">4</span>
+            </div>
+            <div className="text-xs text-[#94A3B8] font-medium">
+              توقيت إلكتروني رسمي (Photo Finish FAT) • {assignment.venue || 'المضمار الرئيسي'}
+            </div>
           </div>
         </div>
 
-        <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
-          <Camera className="w-4 h-4 text-cyan-400" />
-          <span>مرتبط بكاميرا Photo Finish والمؤقت الإلكتروني</span>
+        <div className="flex items-center gap-3">
+          {onOpenFieldMode && (
+            <button
+              type="button"
+              onClick={onOpenFieldMode}
+              className="px-3.5 py-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#1E293B] text-xs font-black text-[#13A879] flex items-center gap-1.5 transition-all shadow"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>وضع الميدان الشامل (5)</span>
+            </button>
+          )}
+
+          {onBackToDashboard && (
+            <button
+              type="button"
+              onClick={onBackToDashboard}
+              className="px-3.5 py-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#1E293B] text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5 transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+              <span>لوحة التحكم (1)</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main Track Table (RTL First) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs font-black uppercase tracking-wider">
-                <th className="py-3 px-3 w-14 text-center">الترتيب</th>
-                <th className="py-3 px-3 w-14 text-center">الرواق</th>
-                <th className="py-3 px-3 w-16 text-center">الصدرية</th>
-                <th className="py-3 px-4 min-w-[150px]">العداء</th>
-                <th className="py-3 px-4 min-w-[120px]">النادي</th>
-                <th className="py-3 px-4 text-center w-36 bg-amber-500/10 text-amber-300 border-r border-slate-800">التوقيت الرسمي (FAT)</th>
-                <th className="py-3 px-3 text-center w-28">الحالة</th>
-                <th className="py-3 px-3 text-center w-20">تعديل</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 text-sm">
-              {runners.map((r, idx) => {
-                const isWinner = r.rank === 1 && r.status === 'OK';
+      {/* Subtitle / Race Selector Banner */}
+      <div className="bg-[#0E172A] border border-[#1E293B] rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-base font-black text-white">
+            {assignment.disciplineNameAr || 'سباق 100 متر'} - سلسلة {activeHeatIndex}
+          </span>
+          <span className="px-2.5 py-0.5 rounded-full bg-[#1677E8]/20 border border-[#1677E8]/40 text-[#60A5FA] text-xs font-bold">
+            الدور نصف النهائي
+          </span>
+        </div>
 
-                return (
-                  <tr 
-                    key={r.id}
-                    className={`transition-colors hover:bg-slate-800/50 ${
-                      isWinner ? 'bg-amber-500/5' : idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-transparent'
-                    }`}
-                  >
-                    {/* Rank */}
-                    <td className="py-3 px-3 text-center">
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg font-black text-xs font-mono ${
-                        r.rank === 1 && r.status === 'OK' ? 'bg-amber-500 text-slate-950 font-black' :
-                        r.rank === 2 && r.status === 'OK' ? 'bg-slate-300 text-slate-950 font-black' :
-                        r.rank === 3 && r.status === 'OK' ? 'bg-amber-800 text-white font-black' :
-                        'bg-slate-800 text-slate-400'
-                      }`}>
-                        {r.status === 'OK' ? r.rank : '—'}
-                      </span>
-                    </td>
+        {/* Heats Selector */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-slate-400 font-bold">السلاسل:</span>
+          {[1, 2, 3].map((heatNum) => (
+            <button
+              key={heatNum}
+              type="button"
+              onClick={() => setActiveHeatIndex(heatNum)}
+              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                activeHeatIndex === heatNum
+                  ? 'bg-[#1677E8] text-white shadow'
+                  : 'bg-[#101D35] text-slate-400 hover:text-white border border-[#1E293B]'
+              }`}
+            >
+              سلسلة {heatNum}
+            </button>
+          ))}
+        </div>
+      </div>
 
-                    {/* Lane */}
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
-                      {r.lane}
-                    </td>
+      {/* ═══════════════════════════════════════════════════════════
+          MAIN WORKSPACE LAYOUT:
+          Left / Middle: Table & Action Buttons (8.5 Cols)
+          Right: Athletic Visual Hero (3.5 Cols)
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Table & Action Buttons (8.5 Cols) */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="bg-[#101D35] border border-[#1E293B] rounded-2xl overflow-hidden shadow-xl">
+            <div className="p-3.5 border-b border-[#1E293B] bg-[#0E172A] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#1677E8]" />
+                <h3 className="text-xs font-black text-white">قائمة العدائين وتوزيع الحارات</h3>
+              </div>
+              <span className="text-xs text-[#13A879] font-bold">
+                توقيت معتمد بالصورة (FAT)
+              </span>
+            </div>
 
-                    {/* Bib */}
-                    <td className="py-3 px-3 text-center">
-                      <span className="font-mono font-black text-amber-400 bg-slate-950 border border-slate-800 px-2 py-1 rounded-md text-xs">
-                        #{r.bib}
-                      </span>
-                    </td>
-
-                    {/* Name */}
-                    <td className="py-3 px-4 font-bold text-slate-100 flex items-center gap-2">
-                      <span>{r.athleteName}</span>
-                      {isWinner && <Trophy className="w-4 h-4 text-amber-400 shrink-0" />}
-                    </td>
-
-                    {/* Club */}
-                    <td className="py-3 px-4 text-xs text-slate-400 font-medium">
-                      {r.clubName}
-                    </td>
-
-                    {/* FAT Gun Time */}
-                    <td className="py-3 px-4 text-center bg-amber-500/5 border-r border-slate-800 font-mono font-black text-base text-amber-400">
-                      {r.status === 'OK' ? (r.formattedTime ? `${r.formattedTime} ثا` : '—') : '—'}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3 px-3 text-center">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold font-mono ${
-                        r.status === 'OK' ? 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-400' :
-                        r.status === 'DNS' ? 'bg-slate-800 border border-slate-700 text-slate-400' :
-                        r.status === 'DNF' ? 'bg-purple-950/60 border border-purple-800/60 text-purple-400' :
-                        'bg-red-950/60 border border-red-800/60 text-red-400'
-                      }`}>
-                        {r.status === 'OK' ? 'أنهى' :
-                         r.status === 'DNS' ? 'غياب' :
-                         r.status === 'DNF' ? 'انسحاب' :
-                         `استبعاد (${r.dqRule || 'DQ'})`}
-                      </span>
-                    </td>
-
-                    {/* Edit button */}
-                    <td className="py-3 px-3 text-center">
-                      {canEdit && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(r)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-[#0A101D] text-slate-400 font-bold border-b border-[#1E293B]">
+                  <tr>
+                    <th className="py-3 px-4 text-center">الحالة</th>
+                    <th className="py-3 px-4">النتيجة</th>
+                    <th className="py-3 px-4 text-center">المسار</th>
+                    <th className="py-3 px-4">النادي</th>
+                    <th className="py-3 px-4">العداء</th>
+                    <th className="py-3 px-4 text-center">#</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-[#1E293B]">
+                  {runners.map((runner) => (
+                    <tr
+                      key={runner.id}
+                      className="hover:bg-[#1E293B]/60 transition-colors"
+                    >
+                      {/* الحالة (مؤكد / قيد الإنجاز / DNS / DQ) */}
+                      <td className="py-3 px-4 text-center">
+                        {runner.status === 'confirmed' ? (
+                          <span className="px-3 py-1 rounded-full bg-[#13A879]/20 text-[#13A879] border border-[#13A879]/40 font-black text-xs">
+                            مؤكد
+                          </span>
+                        ) : runner.status === 'in_progress' ? (
+                          <span className="px-3 py-1 rounded-full bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40 font-black text-xs">
+                            قيد الإنجاز
+                          </span>
+                        ) : runner.status === 'DQ' ? (
+                          <span className="px-3 py-1 rounded-full bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40 font-black text-xs" title={runner.dqRule}>
+                            إقصاء DQ
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-black text-xs">
+                            DNS غائب
+                          </span>
+                        )}
+                      </td>
+
+                      {/* النتيجة */}
+                      <td className="py-3 px-4 font-mono font-black text-base text-white">
+                        {runner.formattedTime}
+                      </td>
+
+                      {/* المسار */}
+                      <td className="py-3 px-4 font-mono font-bold text-center text-[#60A5FA]">
+                        {runner.lane}
+                      </td>
+
+                      {/* النادي */}
+                      <td className="py-3 px-4 text-slate-300">
+                        {runner.clubName}
+                      </td>
+
+                      {/* العداء */}
+                      <td className="py-3 px-4 font-black text-white whitespace-nowrap">
+                        {runner.athleteName}
+                      </td>
+
+                      {/* رقم الصدرية # */}
+                      <td className="py-3 px-4 font-mono font-black text-white text-center">
+                        {runner.bib}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Action Buttons matching Panel 4:
+              [+ عرض النتيجة] (Blue), [إضافة نتيجة يدوية] (Outlined) */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowPhotoReviewModal(true)}
+              className="px-5 py-3 rounded-xl bg-[#1677E8] hover:bg-[#1260BD] text-white font-black text-xs flex items-center gap-2 shadow-lg transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>عرض النتيجة ومراجعة خط النهاية</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={() => {
+                setEditingRunner(runners[0]);
+                setManualTimeInput(runners[0]?.formattedTime !== '--' ? runners[0]?.formattedTime || '' : '');
+                setShowManualModal(true);
+              }}
+              className="px-5 py-3 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#1677E8]/60 text-slate-200 hover:text-white font-bold text-xs flex items-center gap-2 shadow transition-all"
+            >
+              <Edit3 className="w-4 h-4 text-[#60A5FA]" />
+              <span>إضافة نتيجة يدوية</span>
+            </button>
+          </div>
         </div>
+
+        {/* Right: Athletic Visual Hero (3.5 Cols) */}
+        <div className="lg:col-span-4 h-full">
+          <AthleticVisualHero 
+            scene="track_finish" 
+            title="سباقات السرعة"
+            badgeText="دقة التوقيت 0.001 ثانية"
+            className="h-full min-h-[380px]"
+          />
+        </div>
+
       </div>
 
-      {/* Quick Edit Runner Modal */}
-      {editingRunner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-5 space-y-4 text-slate-100">
-            <h3 className="text-base font-black text-white flex items-center justify-between">
-              <span>تعديل نتيجة الرواق {editingRunner.lane}</span>
-              <span className="font-mono text-amber-400">#{editingRunner.bib}</span>
+      {/* Manual Time Entry Modal (Solid Background, NO blur) */}
+      {showManualModal && editingRunner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+          <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <h3 className="text-base font-black text-white">
+              إضافة نتيجة يدوية — #{editingRunner.bib} {editingRunner.athleteName}
             </h3>
 
-            <div className="text-xs text-slate-400">
-              {editingRunner.athleteName} • {editingRunner.clubName}
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400 font-bold block">التوقيت المسجل (ثوانٍ):</label>
+              <input
+                type="text"
+                placeholder="10.75"
+                value={manualTimeInput}
+                onChange={(e) => setManualTimeInput(e.target.value)}
+                className="w-full bg-[#0E172A] border border-[#1E293B] rounded-xl px-4 py-2.5 font-mono text-white text-lg font-black outline-none focus:border-[#1677E8]"
+              />
             </div>
 
-            {/* Status Selector */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1.5">حالة العداء:</label>
-              <div className="grid grid-cols-4 gap-2">
-                {(['OK', 'DNS', 'DNF', 'DQ'] as const).map(st => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setStatusInput(st)}
-                    className={`py-2 rounded-xl text-xs font-black border transition-all ${
-                      statusInput === st
-                        ? 'bg-amber-500 text-slate-950 border-amber-400'
-                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Time Input if OK */}
-            {statusInput === 'OK' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">
-                  التوقيت بالثواني (مثال: 10.42):
-                </label>
-                <input
-                  type="text"
-                  value={timeInput}
-                  onChange={(e) => setTimeInput(e.target.value)}
-                  placeholder="10.42"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 font-mono text-lg text-amber-400 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            )}
-
-            {/* DQ Rule if DQ */}
-            {statusInput === 'DQ' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">
-                  مادة الاستبعاد (World Athletics):
-                </label>
-                <select
-                  value={dqRuleInput}
-                  onChange={(e) => setDqRuleInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-xs text-slate-200 focus:outline-none"
-                >
-                  <option value="TR16.8 (انطلاقة خاطئة)">TR16.8 (انطلاقة خاطئة - False Start)</option>
-                  <option value="TR17.3.1 (دوس الخط الداخلي)">TR17.3.1 (دوس خط الحارة الداخلي)</option>
-                  <option value="TR17.2.2 (إعاقة عداء آخر)">TR17.2.2 (إعاقة متسابق آخر)</option>
-                  <option value="TR24.7 (تسليم العصا خارج المنطقة)">TR24.7 (تسليم العصا خارج منطقة التبديل)</option>
-                </select>
-              </div>
-            )}
-
-            <div className="flex gap-2 justify-end pt-2">
+            <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setEditingRunner(null)}
-                className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                onClick={handleSaveManualTime}
+                className="flex-1 py-2.5 rounded-xl bg-[#1677E8] hover:bg-[#1260BD] text-white font-black text-xs"
               >
-                إلغاء
+                تأكيد النتيجة
               </button>
               <button
                 type="button"
-                onClick={handleSaveRunner}
-                className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black"
+                onClick={() => setShowManualModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[#0E172A] text-slate-400 hover:text-white font-bold text-xs"
               >
-                حفظ التعديل
+                إلغاء
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Photo Finish Viewer Modal (Solid Background, NO blur) */}
+      {showPhotoReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85">
+          <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <Camera className="w-5 h-5 text-[#1677E8]" />
+                <span>شريط تصوير خط النهاية (Photo Finish Slit-Scan)</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPhotoReviewModal(false)}
+                className="text-slate-400 hover:text-white font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-black rounded-2xl border border-[#1E293B] p-4 text-center">
+              <div className="h-48 w-full bg-gradient-to-r from-red-950 via-slate-900 to-blue-950 rounded-xl flex items-center justify-center border border-red-500/30 relative overflow-hidden">
+                <line x1="50%" y1="0" x2="50%" y2="100%" className="stroke-red-500 stroke-2" />
+                <span className="font-mono text-xs text-red-400 bg-black/80 px-3 py-1 rounded-full border border-red-500/40">
+                  خط القراءة الميكرومترية: 10.720s
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPhotoReviewModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#1677E8] text-white font-bold text-xs"
+            >
+              إغلاق نافذة المعاينة
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          UNIVERSAL JUDGE FOOTER
+          ═══════════════════════════════════════════════════════════ */}
+      <UniversalJudgeFooter />
     </div>
   );
 };

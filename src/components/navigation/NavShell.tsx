@@ -148,6 +148,7 @@ export const NavShell: React.FC<NavShellProps> = ({
     { id: 'results', label: 'النتائج المعتمدة', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
     { id: 'competitions', label: 'المنافسات والرزنامة', icon: <Calendar className="w-4 h-4 text-emerald-400" /> },
     { id: 'entries', label: 'النوادي والرياضيون', icon: <FileSpreadsheet className="w-4 h-4 text-cyan-400" /> },
+    { id: 'judge-dashboard', label: 'مساحة الحكم الميداني', icon: <Award className="w-4 h-4 text-amber-400" />, badge: 'PRO' },
     { id: 'league', label: 'إدارة الرابطة', icon: <Shield className="w-4 h-4 text-teal-400" /> },
   ];
 

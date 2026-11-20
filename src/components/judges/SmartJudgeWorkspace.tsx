@@ -1,7 +1,10 @@
 /**
- * PHOTO FINISH PRO AI — Master Smart Judge Workspace
+ * PHOTO FINISH PRO — Master Smart Judge Workspace
  * The core field workstation automatically specialized per judge assignment.
  * World Athletics Rule 18, 19, 25 & 26 Compliant.
+ * Coordinates Screens 02, 03, 04, and 05 (Field Mode).
+ *
+ * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -36,6 +39,7 @@ import { HorizontalJumpsWorkspace } from './HorizontalJumpsWorkspace';
 import { VerticalJumpsWorkspace } from './VerticalJumpsWorkspace';
 import { ThrowsWorkspace } from './ThrowsWorkspace';
 import { TrackCourseJudgeWorkspace } from './TrackCourseJudgeWorkspace';
+import { FieldModeWorkspace } from './FieldModeWorkspace';
 import { CheckpointJudgeView } from '../checkpoints/CheckpointJudgeView';
 import { OfficialFederationHeader, OfficialFederationFooter } from '../athletics/OfficialFederationHeader';
 
@@ -115,21 +119,34 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
   const isOfficialLocked = eventComp?.status === 'official';
   const canCertify = assignment.permissions?.canCertify || assignment.task.includes('chief');
 
+  // If Field Mode (Screen 05) is toggled, render Screen 05
+  if (isFieldMode && eventComp) {
+    return (
+      <FieldModeWorkspace
+        assignment={assignment}
+        competition={eventComp}
+        onCloseFieldMode={() => setIsFieldMode(false)}
+        onUpdateCompetition={setEventComp}
+      />
+    );
+  }
+
   return (
-    <div dir="rtl" className={`min-h-screen text-slate-100 ${isFieldMode ? 'bg-black p-2 sm:p-4' : 'bg-slate-950 p-3 sm:p-6'}`}>
+    <div dir="rtl" className="min-h-screen text-slate-100 bg-[#0A101D] p-3 sm:p-6 font-sans">
       <div className="max-w-7xl mx-auto space-y-4">
+        
         {/* Top Control Ribbon */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex items-center justify-between flex-wrap gap-4">
+        <div className="bg-[#101D35] border border-[#1E293B] rounded-2xl p-4 shadow-xl flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             {onBackToDashboard && (
               <button
                 type="button"
                 onClick={onBackToDashboard}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all flex items-center gap-1.5 text-xs font-bold"
-                title="العودة للوحة التعيينات"
+                className="p-2.5 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] text-slate-300 hover:text-white border border-[#1E293B] transition-all flex items-center gap-1.5 text-xs font-bold"
+                title="العودة للوحة التحكم الرئيسية"
               >
                 <ArrowRight className="w-4 h-4" />
-                <span className="hidden sm:inline">لوحة التعيينات</span>
+                <span className="hidden sm:inline">لوحة التحكم (1)</span>
               </button>
             )}
 
@@ -139,14 +156,14 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSwitchDropdown(prev => !prev)}
-                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-black flex items-center gap-1.5 transition-all"
+                  className="py-2 px-3 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] text-[#60A5FA] border border-[#1E293B] text-xs font-black flex items-center gap-1.5 transition-all"
                 >
                   <span>تبديل التخصص ({otherAssignments.length})</span>
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
 
                 {showSwitchDropdown && (
-                  <div className="absolute top-full right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-[#101D35] border border-[#1E293B] rounded-2xl shadow-2xl p-2 z-50 space-y-1">
                     {otherAssignments.map(asg => (
                       <button
                         key={asg.id}
@@ -157,8 +174,8 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
                         }}
                         className={`w-full text-right p-2.5 rounded-xl text-xs transition-all flex flex-col ${
                           asg.id === assignment.id
-                            ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-                            : 'hover:bg-slate-800 text-slate-300'
+                            ? 'bg-[#1677E8]/20 text-[#60A5FA] border border-[#1677E8]/40'
+                            : 'hover:bg-[#0E172A] text-slate-300'
                         }`}
                       >
                         <span className="font-bold">{asg.disciplineNameAr}</span>
@@ -173,7 +190,7 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-black text-white">{assignment.disciplineNameAr}</h1>
-                <span className="font-mono text-xs text-amber-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">
+                <span className="font-mono text-xs text-[#60A5FA] bg-[#0E172A] border border-[#1E293B] px-2 py-0.5 rounded-md">
                   {assignment.dutyCode}
                 </span>
               </div>
@@ -190,8 +207,8 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             {/* Sync Status Badge */}
             <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
               isOnline && pendingCount === 0
-                ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400'
-                : 'bg-amber-950/40 border-amber-800/60 text-amber-400'
+                ? 'bg-[#13A879]/15 border-[#13A879]/50 text-[#13A879]'
+                : 'bg-[#F59E0B]/15 border-[#F59E0B]/50 text-[#F59E0B]'
             }`}>
               {isOnline ? (
                 <>
@@ -210,10 +227,10 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => setShowAuditModal(true)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1"
+              className="p-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] text-slate-300 border border-[#1E293B] text-xs font-bold flex items-center gap-1"
               title="سجل العمليات والتدقيق الميداني"
             >
-              <Activity className="w-4 h-4 text-cyan-400" />
+              <Activity className="w-4 h-4 text-[#F59E0B]" />
               <span className="hidden sm:inline">السجل ({auditLogs.length})</span>
             </button>
 
@@ -221,24 +238,20 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold"
+              className="p-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] text-slate-300 border border-[#1E293B] text-xs font-bold"
               title="طباعة المحضر الرسمي"
             >
               <Printer className="w-4 h-4" />
             </button>
 
-            {/* Field Mode Toggle */}
+            {/* Field Mode Toggle (Screen 05) */}
             <button
               type="button"
-              onClick={() => setIsFieldMode(prev => !prev)}
-              className={`py-1.5 px-3 rounded-xl border text-xs font-black flex items-center gap-1.5 transition-all ${
-                isFieldMode 
-                  ? 'bg-amber-500 text-slate-950 border-amber-400' 
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-              }`}
+              onClick={() => setIsFieldMode(true)}
+              className="py-1.5 px-3 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#13A879]/50 text-[#13A879] text-xs font-black flex items-center gap-1.5 transition-all shadow"
             >
-              {isFieldMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              <span>{isFieldMode ? 'إنهاء وضع الميدان' : 'وضع الميدان'}</span>
+              <Maximize2 className="w-4 h-4" />
+              <span>وضع الميدان الشامل (5)</span>
             </button>
 
             {/* Official Certification Button */}
@@ -249,13 +262,13 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
                 disabled={isOfficialLocked}
                 className={`py-2 px-4 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
                   isOfficialLocked
-                    ? 'bg-slate-800 text-emerald-400 border border-emerald-800/40 cursor-default'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/40'
+                    ? 'bg-[#0E172A] text-[#13A879] border border-[#13A879]/40 cursor-default'
+                    : 'bg-[#13A879] hover:bg-[#0E8962] text-white shadow-lg'
                 }`}
               >
                 {isOfficialLocked ? (
                   <>
-                    <Lock className="w-4 h-4 text-emerald-400" />
+                    <Lock className="w-4 h-4 text-[#13A879]" />
                     <span>معتمد رسمياً ومقفل</span>
                   </>
                 ) : (
@@ -271,8 +284,8 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
 
         {/* Notification Alert */}
         {notification && (
-          <div className="bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 p-3 rounded-2xl text-xs font-bold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="bg-[#13A879]/20 border border-[#13A879]/40 text-[#13A879] p-3 rounded-2xl text-xs font-bold flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-[#13A879] shrink-0" />
             <span>{notification}</span>
           </div>
         )}
@@ -289,7 +302,7 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
 
         {/* Discipline-Specific Workstation */}
         {loading || !eventComp ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center text-slate-400 text-sm font-bold">
+          <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-12 text-center text-slate-400 text-sm font-bold">
             جاري تهيئة مساحة العمل الميدانية ومطابقة قائمة الرياضيين...
           </div>
         ) : category === 'jumps_horizontal' ? (
@@ -298,6 +311,8 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             assignment={assignment}
             readOnly={isOfficialLocked}
             onUpdateCompetition={setEventComp}
+            onOpenFieldMode={() => setIsFieldMode(true)}
+            onBackToDashboard={onBackToDashboard}
           />
         ) : category === 'jumps_vertical' ? (
           <VerticalJumpsWorkspace
@@ -305,6 +320,8 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             assignment={assignment}
             readOnly={isOfficialLocked}
             onUpdateCompetition={setEventComp}
+            onOpenFieldMode={() => setIsFieldMode(true)}
+            onBackToDashboard={onBackToDashboard}
           />
         ) : category === 'throws' ? (
           <ThrowsWorkspace
@@ -312,15 +329,19 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             assignment={assignment}
             readOnly={isOfficialLocked}
             onUpdateCompetition={setEventComp}
+            onOpenFieldMode={() => setIsFieldMode(true)}
+            onBackToDashboard={onBackToDashboard}
           />
         ) : category === 'running' ? (
           <TrackCourseJudgeWorkspace
             assignment={assignment}
             competitionTitle={assignment.disciplineNameAr}
             readOnly={isOfficialLocked}
+            onOpenFieldMode={() => setIsFieldMode(true)}
+            onBackToDashboard={onBackToDashboard}
           />
         ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+          <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-6">
             <div className="text-center text-slate-300 font-bold mb-4">
               نقطة مراقبة مسار السباق (Checkpoint Station)
             </div>
@@ -337,13 +358,13 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
           />
         </div>
 
-        {/* Audit Log Modal */}
+        {/* Audit Log Modal (Solid Background, NO blur) */}
         {showAuditModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80">
-            <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl p-5 space-y-4 text-slate-100 max-h-[85vh] flex flex-col">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="bg-[#101D35] border border-[#1E293B] w-full max-w-lg rounded-2xl p-5 space-y-4 text-slate-100 max-h-[85vh] flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
                 <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-cyan-400" />
+                  <Activity className="w-5 h-5 text-[#F59E0B]" />
                   <span>سجل التدقيق والعمليات الميدانية للحكام</span>
                 </h3>
                 <button
@@ -363,17 +384,17 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
                   auditLogs.map((log) => (
                     <div 
                       key={log.id}
-                      className="bg-slate-950 border border-slate-800/80 p-3 rounded-xl text-xs space-y-1"
+                      className="bg-[#0E172A] border border-[#1E293B] p-3 rounded-xl text-xs space-y-1"
                     >
                       <div className="flex items-center justify-between text-slate-400">
-                        <span className="font-bold text-amber-400">{log.judgeName} ({log.judgeRole})</span>
+                        <span className="font-bold text-[#F59E0B]">{log.judgeName} ({log.judgeRole})</span>
                         <span className="font-mono text-[10px]">
                           {new Date(log.timestamp).toLocaleTimeString('ar-DZ')}
                         </span>
                       </div>
                       <div className="text-slate-200">
-                        العملية: <span className="font-bold text-emerald-400">{log.actionType}</span>
-                        {log.athleteBib && <span className="font-mono text-amber-400 mr-2">صدرية #{log.athleteBib}</span>}
+                        العملية: <span className="font-bold text-[#13A879]">{log.actionType}</span>
+                        {log.athleteBib && <span className="font-mono text-[#60A5FA] mr-2">صدرية #{log.athleteBib}</span>}
                         {log.attemptNumber && <span className="mr-2">محاولة {log.attemptNumber}</span>}
                       </div>
                       {log.newValue && (
@@ -386,11 +407,11 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
                 )}
               </div>
 
-              <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <div className="pt-2 border-t border-[#1E293B] flex justify-end">
                 <button
                   type="button"
                   onClick={() => setShowAuditModal(false)}
-                  className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                  className="py-2 px-4 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] text-slate-300 text-xs font-bold"
                 >
                   إغلاق
                 </button>

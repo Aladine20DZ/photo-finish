@@ -1,15 +1,23 @@
 /**
- * PHOTO FINISH PRO AI — Horizontal Jumps Field Workspace
- * Dedicated workspace for Long Jump (الوثب الطويل) and Triple Jump (الوثب الثلاثي).
+ * PHOTO FINISH PRO — SCREEN 02: LONG JUMP & TRIPLE JUMP (الوثب الطويل والثلاثي 2)
+ * Specialized field workstation for Horizontal Jumps & Field Events.
+ * Conforms directly to the official reference design (Panel 2).
  * World Athletics Rule 25 Compliant.
  * Features:
- * - 6 Attempts recording with live Rule 25 Countback tie-breaker.
- * - Wind gauge (m/s) recording per attempt.
- * - Foul (X), Pass (-), DNS, DNF states.
- * - RTL table with high-contrast stadium tokens.
+ * - Top header with system logo and "الوثب الطويل والثلاثي 2".
+ * - Subheader: "المسابقة: البطولة الولائية | المكان: الحفرة 1".
+ * - RTL Athletes Table: الترتيب | أفضل أداء | المحاولات | النادي | العداء.
+ * - Dedicated Attempt Entry Panel: "المحاولة الحالية" (6.45 m, صحيحة, حفظ, DNS, X فاشلة).
+ * - Bottom athlete navigator: "< العداء السابق", "1 / 24", "العداء التالي >".
+ * - Right athletic visual hero: jumper over sand pit.
+ * - Live Rule 25 Countback tie-breaker.
+ * - Wind speed (m/s) recording.
+ * - Universal Judge Footer.
+ *
+ * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Trophy, 
   Wind, 
@@ -18,7 +26,16 @@ import {
   CheckCircle2, 
   AlertCircle,
   Clock,
-  Sparkles
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  X as XIcon,
+  UserX,
+  ArrowRight,
+  Maximize2,
+  RefreshCw,
+  Award
 } from 'lucide-react';
 import { 
   FieldEventCompetition, 
@@ -29,50 +46,75 @@ import {
 import { FieldScorePad } from './FieldScorePad';
 import { smartJudgeWorkspaceService } from '../../services/smartJudgeWorkspaceService';
 import { JudgeAssignment } from '../../services/judgesAssignmentService';
+import { UniversalJudgeFooter } from './UniversalJudgeFooter';
+import { AthleticVisualHero } from './AthleticVisualHero';
 
 interface HorizontalJumpsWorkspaceProps {
   competition: FieldEventCompetition;
   assignment: JudgeAssignment;
   readOnly?: boolean;
   onUpdateCompetition?: (updated: FieldEventCompetition) => void;
+  onOpenFieldMode?: () => void;
+  onBackToDashboard?: () => void;
 }
 
 export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> = ({
   competition,
   assignment,
   readOnly = false,
-  onUpdateCompetition
+  onUpdateCompetition,
+  onOpenFieldMode,
+  onBackToDashboard
 }) => {
+  const [selectedAthleteIndex, setSelectedAthleteIndex] = useState<number>(0);
   const [activeAttemptNumber, setActiveAttemptNumber] = useState<number>(1);
-  const [editingAthlete, setEditingAthlete] = useState<FieldAthleteScore | null>(null);
-  const [editingAttemptNumber, setEditingAttemptNumber] = useState<number>(1);
+  const [currentMeasurementInput, setCurrentMeasurementInput] = useState<string>('6.45');
+  const [currentResultType, setCurrentResultType] = useState<FieldAttemptResult>('valid');
+  const [currentWindInput, setCurrentWindInput] = useState<string>('1.4');
   const [isScorePadOpen, setIsScorePadOpen] = useState<boolean>(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
   const canEdit = !readOnly && (assignment.permissions?.canRecord ?? true);
+  const athletes = competition.athletes || [];
+  const currentAthlete = athletes[selectedAthleteIndex] || athletes[0];
 
-  const handleOpenPad = (athlete: FieldAthleteScore, attemptNum: number) => {
-    if (!canEdit) return;
-    if (competition.status === 'official') {
-      alert('المسابقة معتمدة ومقفلة رسمياً. لا يمكن تعديل النتائج إلا بإعادة فتح المحضر من طرف الحكم العام.');
-      return;
+  // Dynamic maximum attempts based on competition setup (defaults to 6)
+  const maxAttempts = competition.totalAttempts || 6;
+
+  // Set initial attempt measurement from active athlete if exists
+  const activeAttemptData = useMemo(() => {
+    if (!currentAthlete || !currentAthlete.attempts) return null;
+    return currentAthlete.attempts.find(a => a.attemptNumber === activeAttemptNumber) || null;
+  }, [currentAthlete, activeAttemptNumber]);
+
+  const handleSelectAthlete = (index: number) => {
+    if (index < 0 || index >= athletes.length) return;
+    setSelectedAthleteIndex(index);
+    const ath = athletes[index];
+    const att = ath?.attempts?.find(a => a.attemptNumber === activeAttemptNumber);
+    if (att) {
+      setCurrentMeasurementInput(att.measurementMeters ? att.measurementMeters.toFixed(2) : '');
+      setCurrentResultType(att.resultType);
+      setCurrentWindInput(att.wind !== undefined ? att.wind.toString() : '1.4');
     }
-    setEditingAthlete(athlete);
-    setEditingAttemptNumber(attemptNum);
-    setIsScorePadOpen(true);
   };
 
-  const handleSaveAttempt = async (data: {
-    resultType: FieldAttemptResult;
-    measurement: number;
-    wind?: number;
-  }) => {
-    if (!editingAthlete) return;
+  const handleSaveCurrentAttempt = async (forcedResultType?: FieldAttemptResult) => {
+    if (!canEdit || !currentAthlete) return;
+    if (competition.status === 'official') {
+      alert('المسابقة معتمدة ومقفلة رسمياً من طرف رئيس الحكام.');
+      return;
+    }
+
+    const typeToSave = forcedResultType || currentResultType;
+    const numericMeasurement = typeToSave === 'valid' ? parseFloat(currentMeasurementInput) || 0 : 0;
+    const numericWind = parseFloat(currentWindInput) || 0;
 
     const attempt: FieldAttempt = {
-      attemptNumber: editingAttemptNumber,
-      resultType: data.resultType,
-      measurementMeters: data.measurement,
-      wind: data.wind,
+      attemptNumber: activeAttemptNumber,
+      resultType: typeToSave,
+      measurementMeters: numericMeasurement,
+      wind: numericWind,
       timestamp: Date.now(),
       judgeId: assignment.judgeId
     };
@@ -80,8 +122,8 @@ export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> =
     const updated = await smartJudgeWorkspaceService.recordDistanceAttempt({
       eventCompetitionId: competition.id,
       assignment,
-      athleteId: editingAthlete.athleteId,
-      athleteBib: editingAthlete.bibNumber,
+      athleteId: currentAthlete.athleteId,
+      athleteBib: currentAthlete.bibNumber,
       attempt
     });
 
@@ -89,198 +131,364 @@ export const HorizontalJumpsWorkspace: React.FC<HorizontalJumpsWorkspaceProps> =
       onUpdateCompetition(updated);
     }
 
-    setIsScorePadOpen(false);
-    setEditingAthlete(null);
+    setSaveSuccessMessage('تم الحفظ بنجاح');
+    setTimeout(() => setSaveSuccessMessage(null), 2500);
   };
 
   const handleNextAthlete = () => {
-    if (!editingAthlete) return;
-    const currentIndex = competition.athletes.findIndex(a => a.athleteId === editingAthlete.athleteId);
-    if (currentIndex >= 0 && currentIndex < competition.athletes.length - 1) {
-      setEditingAthlete(competition.athletes[currentIndex + 1]);
-    } else {
-      setIsScorePadOpen(false);
-      setEditingAthlete(null);
+    if (selectedAthleteIndex < athletes.length - 1) {
+      handleSelectAthlete(selectedAthleteIndex + 1);
     }
   };
 
-  // Find existing attempt if editing
-  const existingAttempt = editingAthlete?.attempts.find(a => a.attemptNumber === editingAttemptNumber);
+  const handlePrevAthlete = () => {
+    if (selectedAthleteIndex > 0) {
+      handleSelectAthlete(selectedAthleteIndex - 1);
+    }
+  };
 
   return (
-    <div dir="rtl" className="space-y-4">
-      {/* Attempt Selector Pills (1 to 6) */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-3 rounded-2xl flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">المحاولة الحالية في الميدان:</span>
-          <div className="flex gap-1.5">
-            {[1, 2, 3, 4, 5, 6].map((num) => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => setActiveAttemptNumber(num)}
-                className={`w-9 h-9 rounded-xl font-mono font-black text-sm transition-all border ${
-                  activeAttemptNumber === num
-                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-950/40'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                {num}
-              </button>
-            ))}
+    <div dir="rtl" className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6 text-slate-100 font-sans">
+      
+      {/* ═══════════════════════════════════════════════════════════
+          SCREEN 02 HEADER: Logo, Title (الوثب الطويل والثلاثي 2), Breadcrumb
+          Matches Panel 2 in reference image
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="bg-[#101D35] border border-[#1E293B] rounded-2xl px-5 py-4 shadow-xl flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#1677E8] text-white flex items-center justify-center font-black shadow-md shrink-0">
+            <Award className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-black text-white tracking-wide">الوثب الطويل والثلاثي</h1>
+              <span className="w-6 h-6 rounded-full bg-[#1677E8] text-white font-black text-xs flex items-center justify-center">2</span>
+            </div>
+            <div className="text-xs text-[#94A3B8] font-medium">
+              مسابقة الوثب الميداني • {assignment.venue || 'المكان: الحفرة 1'}
+            </div>
           </div>
         </div>
 
-        <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span>نظام المحاولات الست وفق المادة 25 للاتحاد الدولي (World Athletics)</span>
+        {/* Action Controls & Navigation */}
+        <div className="flex items-center gap-3">
+          {onOpenFieldMode && (
+            <button
+              type="button"
+              onClick={onOpenFieldMode}
+              className="px-3.5 py-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#1E293B] text-xs font-black text-[#13A879] hover:text-[#13A879] flex items-center gap-1.5 transition-all shadow"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>وضع الميدان الشامل (5)</span>
+            </button>
+          )}
+
+          {onBackToDashboard && (
+            <button
+              type="button"
+              onClick={onBackToDashboard}
+              className="px-3.5 py-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#1E293B] text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5 transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+              <span>لوحة التحكم (1)</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main Scoring Table (RTL First) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs font-black uppercase tracking-wider">
-                <th className="py-3 px-3 w-14 text-center">الترتيب</th>
-                <th className="py-3 px-3 w-16 text-center">الصدرية</th>
-                <th className="py-3 px-4 min-w-[140px]">اللقب والاسم</th>
-                <th className="py-3 px-3 min-w-[110px]">النادي</th>
-                <th className="py-3 px-2 text-center w-20">م 1</th>
-                <th className="py-3 px-2 text-center w-20">م 2</th>
-                <th className="py-3 px-2 text-center w-20">م 3</th>
-                <th className="py-3 px-2 text-center w-20">م 4</th>
-                <th className="py-3 px-2 text-center w-20">م 5</th>
-                <th className="py-3 px-2 text-center w-20">م 6</th>
-                <th className="py-3 px-3 text-center w-28 bg-amber-500/10 text-amber-300 border-r border-slate-800">أفضل إنجاز</th>
-                <th className="py-3 px-2 text-center w-16">الرياح</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 text-sm">
-              {competition.athletes.map((ath, idx) => {
-                const isLeader = ath.rank === 1 && ath.bestValidMeasurement > 0;
-                const bestAttempt = ath.attempts.find(a => a.measurementMeters === ath.bestValidMeasurement && a.resultType === 'valid');
+      {/* Breadcrumb Info Bar */}
+      <div className="bg-[#0E172A] border border-[#1E293B] rounded-xl px-4 py-2.5 flex items-center justify-between text-xs font-bold text-slate-300">
+        <div className="flex items-center gap-2">
+          <span className="text-[#60A5FA]">المسابقة:</span>
+          <span>{competition.competitionName || 'البطولة الولائية لألعاب القوى'}</span>
+          <span className="text-slate-600">|</span>
+          <span className="text-[#60A5FA]">المكان:</span>
+          <span>{assignment.venue || 'الحفرة 1'}</span>
+          <span className="text-slate-600">|</span>
+          <span className="text-[#60A5FA]">الحكم:</span>
+          <span>{assignment.judgeName}</span>
+        </div>
 
-                return (
-                  <tr 
-                    key={ath.athleteId}
-                    className={`transition-colors hover:bg-slate-800/50 ${
-                      isLeader ? 'bg-amber-500/5' : idx % 2 === 0 ? 'bg-slate-900/30' : 'bg-transparent'
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-0.5 rounded-full bg-[#13A879]/15 text-[#13A879] border border-[#13A879]/30 text-[11px]">
+            {competition.status === 'official' ? 'معتمدة رسمياً' : 'مباشر قيد التحكيم'}
+          </span>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MAIN WORKSPACE GRID:
+          Left: Athletes Table (5.5 cols)
+          Center: Attempt Entry Panel (3.5 cols)
+          Right: Athletic Visual Hero (3 cols)
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* RTL Athletes Table (5.5 Cols) */}
+        <div className="lg:col-span-5 bg-[#101D35] border border-[#1E293B] rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-3.5 border-b border-[#1E293B] bg-[#0E172A] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-[#1677E8]" />
+              <h3 className="text-xs font-black text-white">قائمة المتنافسين والنتائج</h3>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-400">المحاولة الحالية:</span>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5, 6].slice(0, maxAttempts).map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setActiveAttemptNumber(num)}
+                    className={`w-6 h-6 rounded-md font-mono text-xs font-bold transition-all ${
+                      activeAttemptNumber === num
+                        ? 'bg-[#1677E8] text-white shadow'
+                        : 'bg-[#101D35] text-slate-400 hover:text-white'
                     }`}
                   >
-                    {/* Rank */}
-                    <td className="py-3 px-3 text-center">
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg font-black text-xs font-mono ${
-                        ath.rank === 1 && ath.bestValidMeasurement > 0 ? 'bg-amber-500 text-slate-950 font-black' :
-                        ath.rank === 2 && ath.bestValidMeasurement > 0 ? 'bg-slate-300 text-slate-950 font-black' :
-                        ath.rank === 3 && ath.bestValidMeasurement > 0 ? 'bg-amber-800 text-white font-black' :
-                        'bg-slate-800 text-slate-400'
-                      }`}>
-                        {ath.bestValidMeasurement > 0 ? ath.rank : '—'}
-                      </span>
-                    </td>
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-                    {/* Bib */}
-                    <td className="py-3 px-3 text-center">
-                      <span className="font-mono font-black text-amber-400 bg-slate-950 border border-slate-800 px-2 py-1 rounded-md text-xs">
-                        #{ath.bibNumber}
-                      </span>
-                    </td>
-
-                    {/* Name */}
-                    <td className="py-3 px-4 font-bold text-slate-100 flex items-center gap-2">
-                      <span>{ath.athleteName}</span>
-                      {isLeader && <Trophy className="w-4 h-4 text-amber-400 shrink-0" />}
-                    </td>
-
-                    {/* Club */}
-                    <td className="py-3 px-3 text-xs text-slate-400 font-medium">
-                      {ath.clubName}
-                    </td>
-
-                    {/* Attempts 1 to 6 */}
-                    {[1, 2, 3, 4, 5, 6].map((attemptNum) => {
-                      const att = ath.attempts.find(a => a.attemptNumber === attemptNum);
-                      const isBest = att && att.resultType === 'valid' && att.measurementMeters === ath.bestValidMeasurement && ath.bestValidMeasurement > 0;
-                      const isCurrentRound = activeAttemptNumber === attemptNum;
-
-                      return (
-                        <td 
-                          key={attemptNum}
-                          onClick={() => handleOpenPad(ath, attemptNum)}
-                          className={`py-2 px-1 text-center cursor-pointer transition-all ${
-                            isCurrentRound ? 'bg-slate-800/40' : ''
-                          }`}
-                        >
-                          <div className={`py-1.5 px-1 rounded-lg border font-mono text-xs font-black transition-all ${
-                            !att ? 'border-dashed border-slate-700/60 text-slate-600 hover:border-amber-500/50 hover:text-slate-300' :
-                            att.resultType === 'foul' ? 'bg-red-950/40 border-red-900/60 text-red-400' :
-                            att.resultType === 'pass' ? 'bg-amber-950/30 border-amber-900/50 text-amber-400' :
-                            att.resultType === 'dns' ? 'bg-slate-800 border-slate-700 text-slate-500' :
-                            isBest ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300 font-extrabold shadow-sm' :
-                            'bg-slate-800/80 border-slate-700 text-slate-200'
-                          }`}>
-                            {!att ? '—' :
-                             att.resultType === 'foul' ? 'X' :
-                             att.resultType === 'pass' ? '—' :
-                             att.resultType === 'dns' ? 'DNS' :
-                             att.resultType === 'dnf' ? 'DNF' :
-                             `${att.measurementMeters.toFixed(2)}`}
-                            
-                            {att?.resultType === 'valid' && att.wind !== undefined && (
-                              <div className="text-[9px] text-slate-400 font-normal">
-                                {att.wind > 0 ? `+${att.wind}` : att.wind}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
-
-                    {/* Best Measurement */}
-                    <td className="py-3 px-3 text-center bg-amber-500/5 border-r border-slate-800 font-mono font-black text-base text-amber-400">
-                      {ath.bestValidMeasurement > 0 ? `${ath.bestValidMeasurement.toFixed(2)} م` : 'NM'}
-                    </td>
-
-                    {/* Wind for best measurement */}
-                    <td className="py-3 px-2 text-center text-xs font-mono text-slate-400">
-                      {bestAttempt?.wind !== undefined ? (
-                        <span className={bestAttempt.wind > 2.0 ? 'text-red-400 font-bold' : 'text-slate-400'}>
-                          {bestAttempt.wind > 0 ? `+${bestAttempt.wind}` : bestAttempt.wind}
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-[#0A101D] text-slate-400 font-bold border-b border-[#1E293B]">
+                <tr>
+                  <th className="py-2.5 px-3">الترتيب</th>
+                  <th className="py-2.5 px-3">أفضل أداء</th>
+                  <th className="py-2.5 px-3">المحاولات</th>
+                  <th className="py-2.5 px-3">النادي</th>
+                  <th className="py-2.5 px-3">العداء</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1E293B]">
+                {athletes.map((ath, idx) => {
+                  const isSelected = idx === selectedAthleteIndex;
+                  const currentAttemptObj = ath.attempts?.find(a => a.attemptNumber === activeAttemptNumber);
+                  
+                  return (
+                    <tr
+                      key={ath.athleteId}
+                      onClick={() => handleSelectAthlete(idx)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected 
+                          ? 'bg-[#1677E8]/20 border-r-4 border-r-[#1677E8]' 
+                          : 'hover:bg-[#1E293B]/60'
+                      }`}
+                    >
+                      {/* الترتيب */}
+                      <td className="py-3 px-3 font-mono font-black text-center">
+                        <span className={`inline-block w-6 h-6 rounded-full text-center leading-6 text-xs ${
+                          ath.rank === 1 ? 'bg-[#F59E0B] text-black font-black' :
+                          ath.rank === 2 ? 'bg-slate-300 text-black font-black' :
+                          ath.rank === 3 ? 'bg-amber-700 text-white font-black' :
+                          'text-slate-400'
+                        }`}>
+                          {ath.rank || idx + 1}
                         </span>
-                      ) : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+
+                      {/* أفضل أداء */}
+                      <td className="py-3 px-3 font-mono font-black text-[#13A879]">
+                        {ath.bestMeasurement ? `${ath.bestMeasurement.toFixed(2)} m` : '—'}
+                      </td>
+
+                      {/* المحاولات */}
+                      <td className="py-3 px-3 font-mono text-slate-300">
+                        {currentAttemptObj ? (
+                          currentAttemptObj.resultType === 'foul' ? (
+                            <span className="text-[#EF4444] font-black">X</span>
+                          ) : currentAttemptObj.resultType === 'pass' ? (
+                            <span className="text-slate-500">—</span>
+                          ) : currentAttemptObj.resultType === 'dns' ? (
+                            <span className="text-slate-500">DNS</span>
+                          ) : (
+                            <span className="text-white font-bold">{currentAttemptObj.measurementMeters?.toFixed(2)}</span>
+                          )
+                        ) : (
+                          <span className="text-slate-600">—</span>
+                        )}
+                      </td>
+
+                      {/* النادي */}
+                      <td className="py-3 px-3 text-slate-300 truncate max-w-[120px]">
+                        {ath.clubName}
+                      </td>
+
+                      {/* العداء */}
+                      <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#60A5FA] font-mono font-normal">#{ath.bibNumber}</span>
+                          <span>{ath.athleteName}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* Center: Attempt Entry Panel (المحاولة الحالية - 4 Cols) */}
+        <div className="lg:col-span-4 bg-[#101D35] border border-[#1E293B] rounded-2xl p-5 shadow-xl space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+            <div>
+              <span className="text-xs text-slate-400 font-bold">المحاولة الحالية</span>
+              <h3 className="text-base font-black text-white">
+                {currentAthlete ? currentAthlete.athleteName : 'اختر عداء'}
+              </h3>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-[#1677E8]/15 border border-[#1677E8]/40 text-[#60A5FA] text-xs font-mono font-bold">
+              المحاولة {activeAttemptNumber} / {maxAttempts}
+            </span>
+          </div>
+
+          {/* Large Distance Display matching reference image (6.45 m with صحيحة pill) */}
+          <div className="bg-[#0E172A] border border-[#1E293B] rounded-2xl p-5 text-center space-y-2 shadow-inner">
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="text"
+                value={currentMeasurementInput}
+                onChange={(e) => setCurrentMeasurementInput(e.target.value)}
+                disabled={!canEdit}
+                className="w-36 text-center text-4xl sm:text-5xl font-black font-mono text-[#13A879] bg-transparent outline-none focus:ring-2 focus:ring-[#13A879] rounded-xl"
+              />
+              <span className="text-2xl font-black text-slate-400 font-mono">m</span>
+            </div>
+
+            {/* Status Pill e.g. صحيحة */}
+            <div className="flex items-center justify-center">
+              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black ${
+                currentResultType === 'valid' ? 'bg-[#13A879]/20 text-[#13A879] border border-[#13A879]/40' :
+                currentResultType === 'foul' ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40' :
+                'bg-slate-700 text-slate-300'
+              }`}>
+                {currentResultType === 'valid' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>صحيحة</span>
+                  </>
+                ) : currentResultType === 'foul' ? (
+                  <>
+                    <XIcon className="w-3.5 h-3.5" />
+                    <span>محاولة فاشلة</span>
+                  </>
+                ) : (
+                  <span>غائب (DNS)</span>
+                )}
+              </span>
+            </div>
+
+            {/* Wind input */}
+            <div className="flex items-center justify-center gap-2 pt-2 text-xs text-slate-400">
+              <Wind className="w-3.5 h-3.5 text-[#60A5FA]" />
+              <span>الرياح:</span>
+              <input
+                type="text"
+                value={currentWindInput}
+                onChange={(e) => setCurrentWindInput(e.target.value)}
+                className="w-16 bg-[#101D35] border border-[#1E293B] rounded-md px-2 py-0.5 text-center font-mono text-white text-xs"
+              />
+              <span>m/s</span>
+            </div>
+          </div>
+
+          {/* 3 Main Action Buttons matching reference image (حفظ, DNS غائب, X فاشلة) */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {/* حفظ Button (Green) */}
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={() => handleSaveCurrentAttempt('valid')}
+              className="py-3 px-3 rounded-xl bg-[#13A879] hover:bg-[#0E8962] disabled:opacity-50 text-white font-black text-xs flex flex-col items-center justify-center gap-1 shadow-lg transition-all"
+            >
+              <Save className="w-4 h-4" />
+              <span>حفظ</span>
+            </button>
+
+            {/* DNS غائب Button */}
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={() => {
+                setCurrentResultType('dns');
+                handleSaveCurrentAttempt('dns');
+              }}
+              className="py-3 px-3 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] border border-[#1E293B] disabled:opacity-50 text-slate-200 font-black text-xs flex flex-col items-center justify-center gap-1 shadow transition-all"
+            >
+              <UserX className="w-4 h-4 text-slate-400" />
+              <span>DNS غائب</span>
+            </button>
+
+            {/* X فاشلة Button (Red/Dark) */}
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={() => {
+                setCurrentResultType('foul');
+                handleSaveCurrentAttempt('foul');
+              }}
+              className="py-3 px-3 rounded-xl bg-[#1E1B2E] hover:bg-[#EF4444]/30 border border-[#EF4444]/40 disabled:opacity-50 text-[#EF4444] font-black text-xs flex flex-col items-center justify-center gap-1 shadow transition-all"
+            >
+              <XIcon className="w-4 h-4" />
+              <span>X فاشلة</span>
+            </button>
+          </div>
+
+          {/* Save notification */}
+          {saveSuccessMessage && (
+            <div className="p-2.5 rounded-xl bg-[#13A879]/20 border border-[#13A879]/40 text-[#13A879] text-center text-xs font-black animate-fade-in">
+              {saveSuccessMessage}
+            </div>
+          )}
+
+          {/* Bottom Athlete Navigator Bar: < العداء السابق | 1 / 24 | العداء التالي > */}
+          <div className="pt-3 border-t border-[#1E293B] flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={handlePrevAthlete}
+              disabled={selectedAthleteIndex === 0}
+              className="px-3 py-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] disabled:opacity-40 text-xs font-bold text-slate-300 flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              <span>العداء السابق</span>
+            </button>
+
+            <span className="font-mono text-xs font-black text-slate-400 bg-[#0E172A] px-3 py-1 rounded-lg border border-[#1E293B]">
+              {selectedAthleteIndex + 1} / {athletes.length}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleNextAthlete}
+              disabled={selectedAthleteIndex >= athletes.length - 1}
+              className="px-3 py-2 rounded-xl bg-[#0E172A] hover:bg-[#1E293B] disabled:opacity-40 text-xs font-bold text-slate-300 flex items-center gap-1"
+            >
+              <span>العداء التالي</span>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Athletic Visual Hero (2.5 Cols) */}
+        <div className="lg:col-span-3 h-full">
+          <AthleticVisualHero 
+            scene="long_jump" 
+            title="الوثب الطويل"
+            badgeText="القاعدة 25 للاتحاد الدولي"
+            className="h-full min-h-[360px]"
+          />
+        </div>
+
       </div>
 
-      {/* Touch ScorePad Modal */}
-      {editingAthlete && (
-        <FieldScorePad
-          isOpen={isScorePadOpen}
-          athleteName={editingAthlete.athleteName}
-          bibNumber={editingAthlete.bibNumber}
-          clubName={editingAthlete.clubName}
-          attemptNumber={editingAttemptNumber}
-          totalAttempts={6}
-          existingValue={existingAttempt?.measurementMeters || existingAttempt?.resultType}
-          existingResultType={existingAttempt?.resultType || 'valid'}
-          existingWind={existingAttempt?.wind ?? 0.0}
-          showWindInput={true}
-          unitLabel="متر"
-          onSave={handleSaveAttempt}
-          onClose={() => {
-            setIsScorePadOpen(false);
-            setEditingAthlete(null);
-          }}
-          onNextAthlete={handleNextAthlete}
-        />
-      )}
+      {/* ═══════════════════════════════════════════════════════════
+          UNIVERSAL JUDGE FOOTER
+          ═══════════════════════════════════════════════════════════ */}
+      <UniversalJudgeFooter />
     </div>
   );
 };

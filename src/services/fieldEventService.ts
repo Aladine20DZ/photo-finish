@@ -464,8 +464,24 @@ export class FieldEventService {
     const updatedAthletes = comp.athletes.map((ath) => {
       if (ath.athleteId !== athleteId) return ath;
 
-      const trials = (ath.verticalTrials || []).filter((t) => t.heightMeters !== heightTrial.heightMeters);
-      trials.push(heightTrial);
+      const existingTrial = (ath.verticalTrials || []).find((t) => t.heightMeters === heightTrial.heightMeters);
+      const otherTrials = (ath.verticalTrials || []).filter((t) => t.heightMeters !== heightTrial.heightMeters);
+
+      let mergedTrial: VerticalHeightTrial;
+      if (existingTrial && existingTrial !== heightTrial) {
+        const mergedList = [...existingTrial.trials, ...heightTrial.trials].slice(0, 3);
+        const isCleared = mergedList.includes('O');
+        mergedTrial = {
+          heightMeters: heightTrial.heightMeters,
+          cleared: isCleared,
+          attemptsCount: mergedList.length,
+          trials: mergedList
+        };
+      } else {
+        mergedTrial = heightTrial;
+      }
+
+      const trials = [...otherTrials, mergedTrial];
       trials.sort((a, b) => a.heightMeters - b.heightMeters);
 
       return {
