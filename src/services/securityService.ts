@@ -21,10 +21,14 @@ import { PhoneRole } from '../types/race';
 //   1) متغير البيئة VITE_LICENSE_PUBLIC_KEY عند البناء (موصى به للإنتاج)
 //   2) مفتاح موثوق محقون وقت التشغيل (setTrustedPublicKeyBase64) أو مخزّن سابقاً من الخادم
 //   3) جلب من الخادم /api/public-key (Trust-On-First-Use) وحفظه محلياً
-// المفتاح العام الاحتياطي الموثوق للمنظومة (Ed25519)
+// المفتاح العام الاحتياطي الموثوق للمنظومة (Ed25519) — المفاتيح العامة ليست أسراراً
 export const DEFAULT_LICENSE_PUBLIC_KEY = 'QKXMTkpN9uC57U/O4G+N/9pUHyS3AgFOvrupynA3vWo=';
-// المفتاح الخاص الاحتياطي لمولد التراخيص المحلي أوفلاين (Ed25519)
-export const DEFAULT_LICENSE_PRIVATE_KEY = 'ydyqLd+QflMzl6NTdma1ZUq6BidICTTaxpunjhoLRkA=';
+// ملاحظة أمنية حرجة: حُذف المفتاح الخاص المضمّن سابقاً من حزمة الواجهة —
+// المفاتيح الخاصة لا تُشحن أبداً في الباندل الأمامي. توقيع التراخيص Ed25519 يتوفر عبر:
+//   1) الخادم /api/admin/generate-license (المصدر الأساسي)
+//   2) متغير بيئة VITE_LICENSE_PRIVATE_KEY وقت البناء (بيئة موثوقة فقط)
+//   3) حقن وقت التشغيل setTrustedPrivateKeyBase64 (مولد التراخيص الخادمي أو الاختبار)
+// أما المولد المحلي PFP1 فلا يحتاج مفتاحاً خاصاً إطلاقاً (بصمة SHA-256 مبنية على المفتاح العام)
 
 export const ED25519_PUBLIC_KEY_BASE64: string =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PUBLIC_KEY) || DEFAULT_LICENSE_PUBLIC_KEY;
@@ -355,9 +359,9 @@ export async function generateEd25519LicenseCode(params: {
     throw new Error('محرك التوقيع والتشفير غير متاح');
   }
 
-  const privKeyBase64 = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || cachedPrivKeyBase64 || DEFAULT_LICENSE_PRIVATE_KEY;
+  const privKeyBase64 = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || cachedPrivKeyBase64;
   if (!privKeyBase64) {
-    throw new Error('لا يوجد مفتاح خاص Ed25519 متاح لتوليد التراخيص محلياً — شغّل الخادم أو اضبط VITE_LICENSE_PRIVATE_KEY');
+    throw new Error('لا يوجد مفتاح خاص Ed25519 متاح لتوليد التراخيص محلياً — شغّل الخادم أو اضبط VITE_LICENSE_PRIVATE_KEY أو استخدم المولد المدمج PFP1');
   }
 
   const pkcs8Header = new Uint8Array([
