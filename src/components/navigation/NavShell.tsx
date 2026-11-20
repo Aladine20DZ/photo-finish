@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
+  Award,
   Globe, 
   Shield, 
   Timer, 
