@@ -44,6 +44,48 @@ import { smartJudgeWorkspaceService } from '../services/smartJudgeWorkspaceServi
 import type { FieldAthleteScore } from '../types/athletics';
 import type { DisciplineCategoryType, OfficialDutyTask } from '../services/judgesAssignmentService';
 
+/** مدة بقاء حالة التأكيد قبل العودة تلقائياً للحالة الآمنة */
+const CONFIRM_RESET_MS = 3200;
+
+/**
+ * زر حذف بتأكيد داخلي ثنائي الخطوة (بلا confirm() المتصفح):
+ * النقرة الأولى تحوّله لحالة تحذير مؤقتة، والثانية تنفّذ الحذف فعلاً.
+ * يحمي بيانات التحكيم من الفقدان الناتج عن لمسة خاطئة على الأجهزة اللمسية.
+ */
+const ConfirmDeleteButton: React.FC<{
+  onConfirm: () => void;
+  confirmLabel: string;
+  ariaLabel: string;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ onConfirm, confirmLabel, ariaLabel, className = '', children }) => {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = window.setTimeout(() => setArmed(false), CONFIRM_RESET_MS);
+    return () => window.clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      type="button"
+      onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
+      onBlur={() => setArmed(false)}
+      aria-label={armed ? confirmLabel : ariaLabel}
+      aria-pressed={armed}
+      className={`${armed
+        ? 'bg-red-600 border-red-500 text-white hover:bg-red-500'
+        : 'bg-red-950/60 border-red-900/60 text-red-300 hover:text-red-200'}
+      p-2 rounded-lg border transition-colors ${className}`}
+    >
+      {armed ? (
+        <span className="text-[10px] font-black px-0.5 whitespace-nowrap">{confirmLabel}</span>
+      ) : (
+        children
+      )}
+    </button>
+  );
+};
+
 type FieldView = 'entry' | 'active';
 type StandalonePanel = 'none' | 'manage' | 'detail';
 
@@ -427,17 +469,18 @@ export const FieldSpaceEntry: React.FC = () => {
                       className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors">
                       فتح
                     </button>
-                    <button
-                      onClick={() => {
+                    <ConfirmDeleteButton
+                      onConfirm={() => {
                         standaloneWorkspaceService.deleteWorkspace(ws.id);
                         refreshWorkspaces();
                         if (openWorkspaceId === ws.id) setOpenWorkspaceId(null);
+                        setNotice(`تم حذف مساحة العمل (${ws.id}) نهائياً من هذا الجهاز.`);
                       }}
-                      className="p-2 rounded-lg bg-red-950/60 border border-red-900/60 text-red-300 hover:text-red-200 transition-colors"
-                      aria-label={`حذف مساحة ${ws.nameAr}`}
+                      confirmLabel="تأكيد الحذف؟"
+                      ariaLabel={`حذف مساحة ${ws.nameAr} — نقرة ثانية للتأكيد`}
                     >
                       <Trash2 className="w-4 h-4" aria-hidden="true" />
-                    </button>
+                    </ConfirmDeleteButton>
                   </div>
                 ))}
               </div>
@@ -585,13 +628,14 @@ const StandaloneWorkspacePanel: React.FC<PanelProps> = ({
                   <p className="text-sm font-black text-slate-100 truncate">{d.nameAr}</p>
                   <p className="text-[10px] text-slate-400">{CATEGORY_OPTIONS.find(c => c.value === d.category)?.labelAr || d.category}</p>
                 </div>
-                <button
-                  onClick={() => { standaloneWorkspaceService.removeDiscipline(ws.id, d.id); onChanged(); }}
-                  className="p-1.5 rounded-lg bg-red-950/50 border border-red-900/50 text-red-300 hover:text-red-200"
-                  aria-label={`حذف تخصص ${d.nameAr}`}
+                <ConfirmDeleteButton
+                  onConfirm={() => { standaloneWorkspaceService.removeDiscipline(ws.id, d.id); onChanged(); setNotice(`تم حذف التخصص (${d.nameAr}) من المساحة.`); }}
+                  confirmLabel="تأكيد؟"
+                  ariaLabel={`حذف تخصص ${d.nameAr} — نقرة ثانية للتأكيد`}
+                  className="p-1.5"
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
+                </ConfirmDeleteButton>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <input value={judgeName} onChange={e => setJudgeName(e.target.value)} placeholder="اسم الحكم"
@@ -662,13 +706,14 @@ const StandaloneWorkspacePanel: React.FC<PanelProps> = ({
                     <td className="font-bold text-slate-100">{a.fullName}</td>
                     <td className="text-slate-400">{a.clubName || '—'}</td>
                     <td>
-                      <button
-                        onClick={() => { standaloneWorkspaceService.removeAthlete(ws.id, a.id); onChanged(); }}
-                        className="p-1.5 rounded-lg text-red-300 hover:text-red-200"
-                        aria-label={`حذف العداء ${a.fullName}`}
+                      <ConfirmDeleteButton
+                        onConfirm={() => { standaloneWorkspaceService.removeAthlete(ws.id, a.id); onChanged(); setNotice(`تم حذف العداء ${a.fullName} من المساحة.`); }}
+                        confirmLabel="تأكيد؟"
+                        ariaLabel={`حذف العداء ${a.fullName} — نقرة ثانية للتأكيد`}
+                        className="p-1.5"
                       >
                         <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                      </button>
+                      </ConfirmDeleteButton>
                     </td>
                   </tr>
                 ))}
