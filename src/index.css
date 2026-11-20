@@ -638,6 +638,124 @@ html.light .dark-chrono-deck * {
   background-color: inherit;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ═══ الثيم الميداني الشمسي (Sunlight) — تجاوزات الواجهات المثبتة ═══
+   كان صنف .sunlight ميتاً تماماً (بدون أي قواعد)؛ هذه الكتلة تحوّل
+   الواجهات المبنية بألوان slate مثبتة إلى لوحة نهارية دافئة عالية
+   التباين قابلة للقراءة تحت الشمس المباشرة في الميدان.
+   ═══════════════════════════════════════════════════════════════ */
+html.sunlight {
+  background-color: #FFFDF7;
+  color: #171204;
+}
+
+html.sunlight body,
+html.sunlight .min-h-screen,
+html.sunlight .mesh-gradient-bg {
+  background-color: #FFFDF7 !important;
+  color: #171204 !important;
+}
+
+html.sunlight [class*="bg-slate-950"],
+html.sunlight [class*="bg-slate-900"],
+html.sunlight [class*="bg-slate-850"] {
+  background-color: #ffffff !important;
+}
+
+html.sunlight [class*="bg-slate-950/"],
+html.sunlight [class*="bg-slate-900/"] {
+  background-color: rgba(255, 253, 247, 0.95) !important;
+}
+
+html.sunlight [class*="bg-slate-800"] {
+  background-color: #FFF8E8 !important;
+}
+
+html.sunlight [class*="border-slate-800"],
+html.sunlight [class*="border-slate-700"],
+html.sunlight [class*="border-emerald-950"],
+html.sunlight [class*="border-emerald-900"] {
+  border-color: #E7DCC0 !important;
+}
+
+html.sunlight header,
+html.sunlight nav,
+html.sunlight .nav-shell {
+  background-color: #ffffff !important;
+  border-color: #E7DCC0 !important;
+}
+
+html.sunlight [class*="text-slate-100"],
+html.sunlight [class*="text-slate-200"],
+html.sunlight h1:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.sunlight h2:not(.dark-athletic-card *):not(.dark-chrono-deck *),
+html.sunlight h3:not(.dark-athletic-card *):not(.dark-chrono-deck *) {
+  color: #171204 !important;
+}
+
+html.sunlight [class*="text-slate-300"] {
+  color: #2E2410 !important;
+}
+
+html.sunlight [class*="text-slate-400"] {
+  color: #4A3F20 !important;
+}
+
+html.sunlight [class*="text-slate-500"] {
+  color: #857A55 !important;
+}
+
+html.sunlight p:not(.dark-athletic-card *):not(.dark-chrono-deck *) {
+  color: #4A3F20 !important;
+}
+
+html.sunlight input:not([type="checkbox"]):not([type="radio"]),
+html.sunlight select,
+html.sunlight textarea {
+  background-color: #ffffff !important;
+  color: #171204 !important;
+  border-color: #E7DCC0 !important;
+}
+
+html.sunlight [class*="fixed"][class*="inset-0"][class*="bg-slate-950"],
+html.sunlight [class*="fixed"][class*="inset-0"][class*="bg-black"] {
+  background-color: rgba(23, 18, 4, 0.55) !important;
+}
+
+/* نصوص الأزرار الملونة تبقى بيضاء واضحة تحت الشمس */
+html.sunlight button[class*="bg-emerald-"],
+html.sunlight button[class*="bg-teal-"],
+html.sunlight button[class*="bg-blue-"],
+html.sunlight button[class*="bg-red-"],
+html.sunlight button[class*="from-emerald-"],
+html.sunlight button[class*="bg-emerald-"] *,
+html.sunlight button[class*="from-emerald-"] *,
+html.sunlight a[class*="bg-emerald-"],
+html.sunlight a[class*="bg-emerald-"] * {
+  color: #ffffff !important;
+}
+
+html.sunlight button[class*="bg-amber-"],
+html.sunlight button[class*="from-amber-"],
+html.sunlight button[class*="bg-amber-"] * {
+  color: #171204 !important;
+}
+
+/* بطاقات الكاميرا والتوقيت تبقى داكنة (مناطق بصرية محمية) */
+html.sunlight .dark-chrono-deck,
+html.sunlight .dark-chrono-deck * {
+  background-color: inherit;
+}
+
+html.sunlight .brand-gradient-text,
+html.sunlight .hero-title-gradient {
+  background: linear-gradient(135deg, #14652F, #0f766e, #9A5B00) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* ═══ نهاية تجاوزات الثيم الشمسي ═══ */
+
 /* تحسينات بصرية إضافية للوضع النهاري الأنيق */
 html.light .brand-gradient-text {
   background: linear-gradient(135deg, #047857, #0f766e, #b45309) !important;
