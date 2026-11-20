@@ -19,7 +19,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowRight, Users, ClipboardList, Activity, Printer, Download,
-  CalendarDays, MapPin, FileText, AlertTriangle, Inbox, type LucideIcon
+  CalendarDays, MapPin, FileText, AlertTriangle, Inbox, ShieldAlert, type LucideIcon
 } from 'lucide-react';
 import { judgesAssignmentService, type JudgeAssignment, type JudgeGrade } from '../../services/judgesAssignmentService';
 import { competitionsService, type NationalCompetition } from '../../services/competitionsService';
@@ -138,6 +138,8 @@ const ErrorBanner: React.FC<{ message: string }> = ({ message }) => (
 export const CompetitionSecretaryWorkspace: React.FC<CompetitionSecretaryWorkspaceProps> = ({
   assignment, readOnly = false, onBackToDashboard
 }) => {
+  // عزل النمط المستقل: مساحة العمل المستقلة (STW-) لا تلمس قاعدة بيانات المنصة إطلاقاً
+  const isStandalone = assignment.assignmentRole === 'standalone' || assignment.competitionId.startsWith('STW-');
   const [competitions, setCompetitions] = useState<NationalCompetition[]>([]);
   const [competitionsLoading, setCompetitionsLoading] = useState(true);
   const [competitionsError, setCompetitionsError] = useState<string | null>(null);
@@ -151,7 +153,16 @@ export const CompetitionSecretaryWorkspace: React.FC<CompetitionSecretaryWorkspa
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   // Load competitions list ONCE on mount; prefer assignment.competitionId when present in the list.
+  // في النمط المستقل: لا تحميل لأي بيانات منصة — عزل بالتصميم (الرؤية المعمارية PHASE 3.1)
   useEffect(() => {
+    if (isStandalone) {
+      setCompetitions([]);
+      setCompetitionsLoading(false);
+      setEntries([]);
+      setAssignments([]);
+      setDisciplines([]);
+      return;
+    }
     let cancelled = false;
     setCompetitionsLoading(true);
     competitionsService.getCompetitions()
@@ -166,10 +177,12 @@ export const CompetitionSecretaryWorkspace: React.FC<CompetitionSecretaryWorkspa
       .catch(() => { if (!cancelled) setCompetitionsError('تعذر تحميل قائمة المنافسات من خدمة المنافسات.'); })
       .finally(() => { if (!cancelled) setCompetitionsLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [isStandalone]);
 
   // Load per-competition data (entries + assignments + bureau result operations) on selection change.
+  // في النمط المستقل: القوائم فارغة بالتصميم — تُعرض لوحات «لا بيانات» بدل تسريب بيانات المنصة
   useEffect(() => {
+    if (isStandalone) return;
     if (!selectedCompetitionId) { setEntries([]); setAssignments([]); setDisciplines([]); return; }
     let cancelled = false;
     setDetailLoading(true);
@@ -188,7 +201,7 @@ export const CompetitionSecretaryWorkspace: React.FC<CompetitionSecretaryWorkspa
       .catch(() => { if (!cancelled) setDetailError('تعذر تحميل بيانات المنافسة المحددة. حاول تغيير المنافسة أو إعادة المحاولة.'); })
       .finally(() => { if (!cancelled) setDetailLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedCompetitionId]);
+  }, [selectedCompetitionId, isStandalone]);
 
   const selectedCompetition = competitions.find(c => c.id === selectedCompetitionId) ?? null;
   const allOperations = disciplines?.flatMap(d => d.operations) ?? [];
@@ -404,16 +417,26 @@ export const CompetitionSecretaryWorkspace: React.FC<CompetitionSecretaryWorkspa
       </div>
 
       <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-4 space-y-3 print:hidden no-print">
-        <label className="block">
-          <span className="block text-xs font-bold text-slate-400 mb-1.5">اختيار المنافسة</span>
-          <select value={selectedCompetitionId} disabled={competitionsLoading}
-            onChange={ev => { setSelectedCompetitionId(ev.target.value); setExportFeedback(null); }}
-            className="w-full sm:w-96 rounded-2xl bg-[#0B162B] border border-[#1E293B] text-white text-sm font-bold px-3 py-2.5 outline-none focus:border-emerald-500/50 disabled:opacity-50">
-            {competitionsLoading && <option value="">جاري تحميل قائمة المنافسات...</option>}
-            {competitions.length === 0 && !competitionsLoading && <option value={selectedCompetitionId}>لا توجد منافسات متاحة</option>}
-            {competitions.map(c => <option key={c.id} value={c.id}>{c.name} — {fmtDate(c.date)}</option>)}
-          </select>
-        </label>
+        {isStandalone ? (
+          <div className="flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-300">
+            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+            <span>
+              النمط المستقل: هذه المساحة تعمل بمعزل تام عن بيانات الرابطة — لا توجد منافسات منصة
+              متصلة. صدّر مساحة العمل من فضاء الميدان لمراجعة بياناتها المحلية خارج التطبيق.
+            </span>
+          </div>
+        ) : (
+          <label className="block">
+            <span className="block text-xs font-bold text-slate-400 mb-1.5">اختيار المنافسة</span>
+            <select value={selectedCompetitionId} disabled={competitionsLoading}
+              onChange={ev => { setSelectedCompetitionId(ev.target.value); setExportFeedback(null); }}
+              className="w-full sm:w-96 rounded-2xl bg-[#0B162B] border border-[#1E293B] text-white text-sm font-bold px-3 py-2.5 outline-none focus:border-emerald-500/50 disabled:opacity-50">
+              {competitionsLoading && <option value="">جاري تحميل قائمة المنافسات...</option>}
+              {competitions.length === 0 && !competitionsLoading && <option value={selectedCompetitionId}>لا توجد منافسات متاحة</option>}
+              {competitions.map(c => <option key={c.id} value={c.id}>{c.name} — {fmtDate(c.date)}</option>)}
+            </select>
+          </label>
+        )}
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="أقسام مساحة السكرتارية">
           {TABS.map(tab => {
             const Icon = tab.icon;
