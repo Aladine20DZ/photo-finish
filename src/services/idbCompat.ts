@@ -34,6 +34,24 @@ interface DbState {
 
 const states = new Map<string, DbState>();
 
+/** الاتصالات التي أُغلقت (versionchange/onclose) — لا تصلح لأي عملية جديدة */
+const deadConnections = new WeakSet<IDBDatabase>();
+
+function markDead(db: IDBDatabase, dbName: string): void {
+  deadConnections.add(db);
+  const s = states.get(dbName);
+  if (s && s.db === db) s.db = null;
+}
+
+function wireLifecycle(db: IDBDatabase, dbName: string): void {
+  db.onversionchange = () => {
+    try { db.close(); } catch { /* مغلق مسبقاً */ }
+    markDead(db, dbName);
+  };
+  // onclose يلتقط الإغلاق غير الطبيعي (حذف القاعدة، انهيار التبويب الشريك...)
+  db.onclose = () => markDead(db, dbName);
+}
+
 function openNoVersion(dbName: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(dbName);
@@ -41,6 +59,9 @@ function openNoVersion(dbName: string): Promise<IDBDatabase> {
     req.onerror = () => reject(req.error);
   });
 }
+
+/** مهلة انتظار رد التبويبات الأخرى قبل التصريح بالفشل (was: تعليق صامت للأبد) */
+const BLOCKED_TIMEOUT_MS = 4000;
 
 function openWithSteps(
   dbName: string,
@@ -50,6 +71,14 @@ function openWithSteps(
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(dbName, version);
+    let settled = false;
+    let blockedTimer: number | null = null;
+    const fail = (err: unknown): void => {
+      if (settled) return;
+      settled = true;
+      if (blockedTimer !== null) window.clearTimeout(blockedTimer);
+      reject(err);
+    };
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
       for (const fn of st.steps) {
@@ -60,29 +89,37 @@ function openWithSteps(
         }
       }
     };
+    // انسداد من تبويب/اتصال خارجي: ننتظر مهلة ثم نفشل بخطأ واضح
+    req.onblocked = () => {
+      if (settled) return;
+      console.warn('[idbCompat] ترقية محجوبة من اتصال خارجي — انتظار تحرر القاعدة...');
+      if (blockedTimer === null) {
+        blockedTimer = window.setTimeout(() => {
+          fail(new DOMException(
+            `تعذر ترقية قاعدة البيانات (${dbName}) — اتصال خارجي محتجز للإصدار القديم. أغلق تبويبات التطبيق الأخرى ثم أعد المحاولة.`,
+            'BlockedError'
+          ));
+        }, BLOCKED_TIMEOUT_MS);
+      }
+    };
     req.onsuccess = () => {
+      if (settled) { try { req.result.close(); } catch { /* لا شيء */ } return; }
+      settled = true;
+      if (blockedTimer !== null) window.clearTimeout(blockedTimer);
       const db = req.result;
-      db.onversionchange = () => {
-        try { db.close(); } catch { /* مغلق مسبقاً */ }
-        const s = states.get(dbName);
-        if (s && s.db === db) s.db = null;
-      };
+      wireLifecycle(db, dbName);
       st.db = db;
       st.appliedCount = st.steps.length;
       st.appliedAtVersion = version;
       attach(db);
       resolve(db);
     };
-    req.onerror = () => reject(req.error);
+    req.onerror = () => fail(req.error);
   });
 }
 
 function attachShared(dbName: string, st: DbState, db: IDBDatabase): IDBDatabase {
-  db.onversionchange = () => {
-    try { db.close(); } catch { /* مغلق مسبقاً */ }
-    const s = states.get(dbName);
-    if (s && s.db === db) s.db = null;
-  };
+  wireLifecycle(db, dbName);
   st.db = db;
   return db;
 }
@@ -137,4 +174,17 @@ export function openSharedDatabase(dbName: string, upgradeStep: UpgradeStep): Pr
   })();
 
   return ensure;
+}
+
+/**
+ * هل اتصال قاعدة البيانات ميت (مغلق)؟ — تستهلكه الخدمات التي تخزّن وعدَ
+ * الاتصال مؤقتاً لإعادة الفتح تلقائياً بدل تكرار الأخطاء على اتصال ميت.
+ */
+export async function isConnectionDead(dbPromise: Promise<IDBDatabase>): Promise<boolean> {
+  try {
+    const db = await dbPromise;
+    return deadConnections.has(db);
+  } catch {
+    return true; // وعد مرفوض سابقاً = الاتصال لم ينجح أصلاً
+  }
 }

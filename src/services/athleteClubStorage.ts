@@ -1,6 +1,6 @@
 ﻿import { Athlete, Club, CategorySnapshot } from '../types/athletics';
 import { recycleBinService } from './recycleBinService';
-import { openSharedDatabase, SHARED_DB_NAME } from './idbCompat';
+import { openSharedDatabase, isConnectionDead, SHARED_DB_NAME } from './idbCompat';
 
 const DB_NAME = SHARED_DB_NAME;
 
@@ -28,6 +28,11 @@ class AthleteClubStorage {
   private async getDb(): Promise<IDBDatabase | null> {
     if (typeof indexedDB === 'undefined') {
       return null;
+    }
+
+    // إعادة فتح تلقائية إن مات الاتصال المخزّن (versionchange من تبويب آخر...)
+    if (this.dbPromise && await isConnectionDead(this.dbPromise)) {
+      this.dbPromise = null;
     }
 
     if (!this.dbPromise) {

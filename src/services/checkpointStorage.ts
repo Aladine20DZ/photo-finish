@@ -16,7 +16,7 @@ import {
   AthleticsJudge 
 } from '../types/athletics';
 
-import { openSharedDatabase, SHARED_DB_NAME } from './idbCompat';
+import { openSharedDatabase, isConnectionDead, SHARED_DB_NAME } from './idbCompat';
 
 const DB_NAME = SHARED_DB_NAME;
 
@@ -42,6 +42,11 @@ class CheckpointStorageService {
 
   /** فتح قاعدة البيانات مع إنشاء المخطط والفهارس أو الرجوع للذاكرة الحية إن لم يكن IndexedDB مدعوماً */
   private async open(): Promise<IDBDatabase | null> {
+    // إعادة فتح تلقائية إن مات الاتصال المخزّن (versionchange من تبويب آخر...)
+    if (this.db && (await isConnectionDead(Promise.resolve(this.db)))) {
+      this.db = null;
+      this.openPromise = null;
+    }
     if (this.db) return this.db;
     if (this.openPromise) return this.openPromise;
 
