@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* ربط متغير dark: بصنف .dark الذي يضبطه مبدّل الثيم داخل التطبيق (NavShell)
+   — قبل هذا الإصلاح كانت 444 استفاده dark: تتبع إعداد نظام التشغيل بدل الثيم المختار */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   /* ═════════════════════════════════════════════════════════════════
      نظام تصميم مضمار (Track Pro) بنمط World Athletics الدولي
@@ -140,6 +144,39 @@
     --ring: var(--accent);
   }
 
+  /* ═══ الثيم الميداني الشمسي (Sunlight) — تباين نهاري عالٍ قابل للقراءة تحت الشمس المباشرة ═══ */
+  .sunlight {
+    --bg: #FFFDF7;
+    --surface: #FFFFFF;
+    --surface-alt: #FFF8E8;
+    --border: #E7DCC0;
+    --border-strong: #1A1408;
+
+    --ink: #171204;
+    --ink-2: #4A3F20;
+    --ink-3: #857A55;
+    --ink-inverse: #FFFDF7;
+
+    --block: #171204;
+    --block-2: #2E2410;
+
+    --accent: #C22F17;
+    --accent-hover: #A02612;
+    --accent-soft: rgba(194, 47, 23, 0.12);
+
+    --success: #14652F;
+    --warning: #9A5B00;
+    --danger: #B3261E;
+    --info: #0B5CAD;
+
+    --shadow-1: 0 1px 3px rgba(23, 18, 4, 0.14);
+    --shadow-2: 0 4px 12px rgba(23, 18, 4, 0.18);
+
+    --primary: var(--block);
+    --primary-hover: var(--block-2);
+    --primary-soft: var(--surface-alt);
+  }
+
   /* خط مضمار المحلي Self-Hosted دون الحاجة لأي CDN خارجي */
   @font-face {
     font-family: 'IBM Plex Sans Arabic';
@@ -200,20 +237,41 @@
   }
 }
 
-/* تخصيص أشرطة التمرير لمظهر فخم ونظيف */
+/* أشرطة تمرير موحدة تعتمد Tokens الثيم الحالي (كانت معرّفة مرتين بقيم متناقضة) */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ink-3);
+}
+
+/* أدوات التمرير المستخدمة في الواجهات (كانت مستخدمة 22 مرة بلا تعريف — no-op صامت) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border);
 }
 
 /* ═════════════════════════════════════════════════════════════════
@@ -345,35 +403,49 @@
     font-variant-numeric: tabular-nums;
   }
 
-/* تخصيص أشرطة التمرير لمظهر فخم */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ═══ دعم المساحات الآمنة للهواتف ذات النوتش (viewport-fit=cover مفعّل في index.html) ═══ */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-px {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.25rem);
 }
 
-::-webkit-scrollbar-track {
-  background: #020617;
-}
-
-html.light ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
-}
-
-html.light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
-}
-
-html.light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* ═══ أنماط الطباعة الاحترافية (8 مواضع window.print() كانت تطبع خلفيات داكنة) ═══ */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    max-width: none !important;
+  }
+  nav, header, aside, .no-print {
+    display: none !important;
+  }
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+  }
+  tr, td, th {
+    page-break-inside: avoid;
+  }
+  [class*="bg-slate-"], [class*="bg-emerald-"], [class*="bg-gradient"] {
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+  [class*="text-slate-"], [class*="text-emerald-"] {
+    color: #000000 !important;
+  }
+  [class*="border-slate-"] {
+    border-color: #cbd5e1 !important;
+  }
 }
 
 /* تأثير التوهج للعلامات */
@@ -668,95 +740,11 @@ html.light .dark-athletic-card [class*="bg-slate-900"] {
   background-color: rgba(15, 23, 42, 0.85) !important;
 }
 
-/* ═════════════════════════════════════════════════════════════════
-   Admin Dashboard V2 & Glass Design System Utilities
-   ═════════════════════════════════════════════════════════════════ */
+/* ملاحظة: كانت هنا كتلة "Admin Dashboard V2" تُعرّف mesh-gradient-bg و glass-*
+   للمرة الثانية بقيم متناقضة مع التعريفات الأعلى — حُذفت نهائياً؛
+   المصدر الموحّد هو تعريفات Track Pro في أعلى الملف. */
 
-/* 1. خلفية داكنة فخمة متناسقة لمضمار ألعاب القوى */
-.mesh-gradient-bg {
-  background-color: #020617;
-  background-image: 
-    radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.06) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(15, 23, 42, 0.9) 0%, transparent 50%),
-    linear-gradient(180deg, #020617 0%, #090d16 100%);
-  min-height: 100vh;
-}
-
-[data-theme="light"] .mesh-gradient-bg,
-.light .mesh-gradient-bg {
-  background-color: #faf7f2;
-  background-image: none;
-  min-height: 100vh;
-}
-
-/* 2. بطاقات وألواح صلبة (Solid Panel & Cards) */
-.glass-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-1);
-  border-radius: var(--radius-md);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.glass-card-strong {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-2);
-  border-radius: var(--radius-lg);
-}
-
-.glass-card-interactive {
-  cursor: pointer;
-}
-.glass-card-interactive:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: var(--shadow-2);
-}
-
-/* 3. مدخلات وحقول صلبة (Solid Inputs) */
-.glass-input {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  color: var(--ink);
-  border-radius: var(--radius-sm);
-  transition: all 0.15s ease;
-}
-.glass-input:focus {
-  outline: none;
-  border-color: var(--block);
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.glass-input::placeholder {
-  color: var(--ink-3);
-}
-
-/* 4. جداول صلبة عالية الكثافة (Solid Track Table) */
-.glass-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-.glass-table th {
-  background: var(--block);
-  color: #FFFFFF;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-strong);
-}
-.glass-table td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--ink);
-  font-size: 0.875rem;
-}
-.glass-table tbody tr:hover {
-  background: var(--surface-alt);
-}
-
-/* 5. احترام تفضيل تقليل الحركة Prefers Reduced Motion */
+/* احترام تفضيل تقليل الحركة Prefers Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .glass-card-interactive:hover {
     transform: none !important;

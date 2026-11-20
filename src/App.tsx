@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Header } from './components/Header';
 import { RoleSelector } from './components/RoleSelector';
 import { StartPhoneView } from './components/StartPhoneView';
@@ -1668,9 +1669,11 @@ const AppRoot: React.FC = () => {
     try { return new URLSearchParams(window.location.search).has('admin'); } catch { return false; }
   });
   return (
-    <LeagueProvider>
-      {adminMode ? <AdminGate /> : <App />}
-    </LeagueProvider>
+    <ErrorBoundary>
+      <LeagueProvider>
+        {adminMode ? <AdminGate /> : <App />}
+      </LeagueProvider>
+    </ErrorBoundary>
   );
 };
 

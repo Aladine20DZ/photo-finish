@@ -272,6 +272,7 @@ export const NavShell: React.FC<NavShellProps> = ({
               onClick={cycleTheme}
               className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-300 hover:text-emerald-400 hover:border-emerald-800 transition-all cursor-pointer"
               title="تبديل النمط: ليلي / وضع الشمس عالي التباين للميدان / نهاري"
+              aria-label={`تبديل الثيم — الحالي: ${theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}`}
             >
               {theme === 'sunlight' ? <Sun className="w-3 h-3 text-amber-400" /> : theme === 'light' ? <Sunset className="w-3 h-3 text-orange-400" /> : <Moon className="w-3 h-3 text-slate-300" />}
               <span className="hidden md:inline">{theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}</span>
@@ -430,7 +431,7 @@ export const NavShell: React.FC<NavShellProps> = ({
         </div>
 
         {/* شريط التنقل للأجهزة المتوسطة والصغيرة (Mobile / Tablet Horizontal Tabs) */}
-        <div className="xl:hidden flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar border-t border-slate-900">
+        <div className="xl:hidden flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar border-t border-slate-900 pb-safe">
           {navItems.map((item) => {
             const active = currentTab === item.id;
             return (

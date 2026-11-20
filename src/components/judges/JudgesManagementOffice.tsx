@@ -1195,7 +1195,7 @@ export const JudgesManagementOffice: React.FC = () => {
 
               {/* Simulated High-Res QR code box */}
               <div className="w-48 h-48 mx-auto bg-white p-3 rounded-2xl flex flex-col items-center justify-center shadow-lg border border-slate-700">
-                <div className="grid grid-cols-6 gap-1 w-full h-full p-2 bg-slate-100 rounded-lg">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 w-full h-full p-2 bg-slate-100 rounded-lg">
                   {Array.from({ length: 36 }).map((_, i) => (
                     <div 
                       key={i} 

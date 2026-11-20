@@ -368,7 +368,7 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
             <div className="space-y-4">
               
               {/* ألسنة اختيار نوع الحساب */}
-              <div className="grid grid-cols-4 bg-slate-950 p-1 rounded-2xl border border-slate-800 gap-1 text-xs font-bold">
+              <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-950 p-1 rounded-2xl border border-slate-800 gap-1 text-xs font-bold">
                 {[
                   { id: 'league' as PortalType, label: 'الرابطات', icon: <Shield className="w-3.5 h-3.5" /> },
                   { id: 'coach' as PortalType, label: 'المدربون', icon: <Users className="w-3.5 h-3.5" /> },

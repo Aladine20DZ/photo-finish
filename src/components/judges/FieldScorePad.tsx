@@ -183,7 +183,7 @@ export const FieldScorePad: React.FC<FieldScorePadProps> = ({
         </div>
 
         {/* Fast Action Buttons: Foul, Pass, DNS, DNF */}
-        <div className="p-3 grid grid-cols-4 gap-2 bg-slate-900/90 border-b border-slate-800">
+        <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-900/90 border-b border-slate-800">
           <button
             type="button"
             onClick={() => handleActionType('foul')}

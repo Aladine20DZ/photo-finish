@@ -468,7 +468,7 @@ export const ChambreDappelView: React.FC<ChambreDappelViewProps> = ({
                 <label className="block text-slate-300 font-bold mb-1">
                   مسافة السباق (Distance):
                 </label>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {['60m', '100m', '200m', '400m', '800m', '1500m', '4x100m'].map(dist => (
                     <button
                       key={dist}

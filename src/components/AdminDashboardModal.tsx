@@ -280,7 +280,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                   {/* مدة الصلاحية */}
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-300">مدة صلاحية الترخيص:</label>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
                         { label: 'شهر واحد', m: 1 },
                         { label: 'سنة كاملة 🏆', m: 12 },

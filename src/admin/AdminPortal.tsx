@@ -960,7 +960,7 @@ export const AdminPortal: React.FC = () => {
                         {isCustomBulk ? `${customBulkInput} كود مخصص` : `${bulkCount} ${bulkCount === 1 ? 'كود فردي' : 'أكواد دفعة واحدة'}`}
                       </span>
                     </div>
-                    <div className="grid grid-cols-5 gap-1.5 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 text-xs">
                       {[1, 10, 50, 100].map(cnt => (
                         <button
                           key={cnt}

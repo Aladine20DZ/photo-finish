@@ -170,8 +170,8 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({ onClose }) => {
                     )}
 
                     {/* جدول النتائج */}
-                    <div className="rounded-xl border border-slate-800 overflow-hidden">
-                      <table className="w-full text-[11px]">
+                    <div className="rounded-xl border border-slate-800 overflow-x-auto">
+                      <table className="w-full min-w-[420px] text-[11px]">
                         <thead>
                           <tr className="bg-slate-800/70 text-slate-400">
                             <th className="px-2 py-1.5 text-right font-bold">الترتيب</th>
