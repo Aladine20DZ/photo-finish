@@ -285,7 +285,16 @@ export class SmartJudgeWorkspaceService {
   // 1. RESOLVE & LOAD EVENT COMPETITION FOR AN ASSIGNMENT
   // ════════════════════════════════════════════════════════════════════════════
 
-  public async loadEventForAssignment(assignment: JudgeAssignment): Promise<FieldEventCompetition> {
+  /**
+   * تحميل/إنشاء منافسة ميدانية لتكليف حكم.
+   * خيار defaultAthletes (إضافي آمن): يسمح للنمط المستقل Standalone بحقن
+   * عدائيه المحليين بدل البيانات التجريبية — يمنع تلوث النمط المستقل
+   * ببيانات تجريبية وفق مبدأ الرؤية «لا تستخدم بيانات وهمية في الإنتاج».
+   */
+  public async loadEventForAssignment(
+    assignment: JudgeAssignment,
+    options?: { defaultAthletes?: FieldAthleteScore[] }
+  ): Promise<FieldEventCompetition> {
     const compId = assignment.competitionId || competitionsService.getActiveCompetitionId();
     const disciplineId = assignment.disciplineId;
     const category = assignment.disciplineCategory || 'jumps_horizontal';
@@ -294,10 +303,13 @@ export class SmartJudgeWorkspaceService {
     let eventComp = await fieldEventService.getEventByCompetitionAndDiscipline(compId, disciplineId);
 
     if (!eventComp) {
-      // Pick seed athletes matching discipline type
+      // Pick seed athletes matching discipline type — أو العدائين المحقون من النمط المستقل
       let defaultAthletes = SEED_HORIZONTAL_ATHLETES;
       if (category === 'jumps_vertical') defaultAthletes = SEED_VERTICAL_ATHLETES;
       else if (category === 'throws') defaultAthletes = SEED_THROWS_ATHLETES;
+      if (options?.defaultAthletes && options.defaultAthletes.length > 0) {
+        defaultAthletes = options.defaultAthletes;
+      }
 
       eventComp = await fieldEventService.getOrCreateEvent({
         competitionId: compId,

@@ -40,6 +40,7 @@ import { CompetitionsEventsPage } from './components/public/CompetitionsEventsPa
 import { LeagueExecutiveSuite, LeagueSubTab } from './components/league/LeagueExecutiveSuite';
 import { CoachRegistrationWizard } from './components/coach/CoachRegistrationWizard';
 import { DutyCodeCheckIn } from './components/public/DutyCodeCheckIn';
+import { FieldSpaceEntry } from './components/FieldSpaceEntry';
 import { PortalAuthModal } from './components/auth/PortalAuthModal';
 import { LeagueGate } from './components/league/LeagueGate';
 import { CoachGate } from './components/coach/CoachGate';
@@ -1112,6 +1113,26 @@ export const App: React.FC = () => {
       payload: { settings: newSettings, runners: newRunners }
     });
   };
+
+  // ═══ فضاء ميدان التحكيم المستقل (?space=field) — القرار الأول في الرؤية المعمارية ═══
+  // فضاء كامل بلا NavShell، بنمطي دخول: كود المهمة الرسمي / العمل المستقل المعزول
+  const [fieldSpace] = useState<boolean>(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('space') === 'field' || p.get('space') === 'judging';
+    } catch {
+      return false;
+    }
+  });
+
+  // العرض المبكر للفضاء الميداني المستقل — بعد جميع الـ hooks وبعد أي منطق آخر
+  if (fieldSpace) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100" dir={dir}>
+        <FieldSpaceEntry />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black" dir={dir}>

@@ -25,27 +25,33 @@ import {
   judgesAssignmentService,
   JudgeActivityLog 
 } from '../../services/judgesAssignmentService';
-import { FieldEventCompetition } from '../../types/athletics';
+import { FieldEventCompetition, FieldAthleteScore } from '../../types/athletics';
 import { smartJudgeWorkspaceService } from '../../services/smartJudgeWorkspaceService';
 import { HorizontalJumpsWorkspace } from './HorizontalJumpsWorkspace';
 import { VerticalJumpsWorkspace } from './VerticalJumpsWorkspace';
 import { ThrowsWorkspace } from './ThrowsWorkspace';
 import { TrackCourseJudgeWorkspace } from './TrackCourseJudgeWorkspace';
 import { FieldModeWorkspace } from './FieldModeWorkspace';
+import { WindGaugeWorkspace } from './WindGaugeWorkspace';
+import { CompetitionSecretaryWorkspace } from './CompetitionSecretaryWorkspace';
 import { OfficialFederationHeader, OfficialFederationFooter } from '../athletics/OfficialFederationHeader';
+import { resolveWorkspaceForAssignment } from '../../services/workspaceRegistry';
 
 interface SmartJudgeWorkspaceProps {
   assignment: JudgeAssignment;
   onBackToDashboard?: () => void;
   otherAssignments?: JudgeAssignment[];
   onSwitchAssignment?: (assignment: JudgeAssignment) => void;
+  /** عدائون محقون من النمط المستقل (Standalone) — يمنع زرع البيانات التجريبية */
+  standaloneAthletes?: FieldAthleteScore[];
 }
 
 export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
   assignment,
   onBackToDashboard,
   otherAssignments = [],
-  onSwitchAssignment
+  onSwitchAssignment,
+  standaloneAthletes
 }) => {
   const [eventComp, setEventComp] = useState<FieldEventCompetition | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -55,14 +61,25 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
   const [showSwitchDropdown, setShowSwitchDropdown] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // توجيه مساحة العمل عبر السجل المركزي — المهمة هي التي تصنع الواجهة
+  const wsDescriptor = resolveWorkspaceForAssignment(assignment);
+  const wsKey = wsDescriptor.id;
+
   const isOnline = smartJudgeWorkspaceService.isOnline();
   const pendingCount = smartJudgeWorkspaceService.getPendingQueueCount();
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const comp = await smartJudgeWorkspaceService.loadEventForAssignment(assignment);
-      setEventComp(comp);
+      // مساحات الرياح والسكرتارية لا تحتاج منافسة ميدانية — يمنع زرع بيانات تجريبية
+      if (wsDescriptor.requiresEventCompetition) {
+        const comp = await smartJudgeWorkspaceService.loadEventForAssignment(assignment, {
+          defaultAthletes: standaloneAthletes
+        });
+        setEventComp(comp);
+      } else {
+        setEventComp(null);
+      }
       setAuditLogs(judgesAssignmentService.getJudgeActivityLogs(assignment.disciplineId, assignment.competitionId));
     } catch (err) {
       console.warn('Error loading event for assignment:', err);
@@ -106,7 +123,6 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
     window.print();
   };
 
-  const category = assignment.disciplineCategory || 'jumps_horizontal';
   const isOfficialLocked = eventComp?.status === 'official';
   const canCertify = assignment.permissions?.canCertify || assignment.task.includes('chief');
 
@@ -291,12 +307,30 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
           />
         </div>
 
-        {/* Discipline-Specific Workstation */}
-        {loading || !eventComp ? (
+        {/* Discipline-Specific Workstation — توزيع عبر السجل المركزي (PHASE 4) */}
+        {wsKey === 'wind_gauge' ? (
+          <WindGaugeWorkspace
+            assignment={assignment}
+            readOnly={isOfficialLocked}
+            onBackToDashboard={onBackToDashboard}
+          />
+        ) : wsKey === 'competition_secretary' ? (
+          <CompetitionSecretaryWorkspace
+            assignment={assignment}
+            readOnly={isOfficialLocked}
+            onBackToDashboard={onBackToDashboard}
+          />
+        ) : wsKey === 'checkpoint_station' ? (
+          <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-6">
+            <div className="text-center text-slate-300 font-bold mb-4">
+              نقطة مراقبة مسار السباق (Checkpoint Station)
+            </div>
+          </div>
+        ) : loading || !eventComp ? (
           <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-12 text-center text-slate-400 text-sm font-bold">
             جاري تهيئة مساحة العمل الميدانية ومطابقة قائمة الرياضيين...
           </div>
-        ) : category === 'jumps_horizontal' ? (
+        ) : wsKey === 'jumps_horizontal' ? (
           <HorizontalJumpsWorkspace
             competition={eventComp}
             assignment={assignment}
@@ -305,7 +339,7 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             onOpenFieldMode={() => setIsFieldMode(true)}
             onBackToDashboard={onBackToDashboard}
           />
-        ) : category === 'jumps_vertical' ? (
+        ) : wsKey === 'jumps_vertical' ? (
           <VerticalJumpsWorkspace
             competition={eventComp}
             assignment={assignment}
@@ -314,7 +348,7 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             onOpenFieldMode={() => setIsFieldMode(true)}
             onBackToDashboard={onBackToDashboard}
           />
-        ) : category === 'throws' ? (
+        ) : wsKey === 'throws' ? (
           <ThrowsWorkspace
             competition={eventComp}
             assignment={assignment}
@@ -323,7 +357,7 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
             onOpenFieldMode={() => setIsFieldMode(true)}
             onBackToDashboard={onBackToDashboard}
           />
-        ) : category === 'running' ? (
+        ) : wsKey === 'track_course' ? (
           <TrackCourseJudgeWorkspace
             assignment={assignment}
             competitionTitle={assignment.disciplineNameAr}
@@ -333,8 +367,11 @@ export const SmartJudgeWorkspace: React.FC<SmartJudgeWorkspaceProps> = ({
           />
         ) : (
           <div className="bg-[#101D35] border border-[#1E293B] rounded-3xl p-6">
-            <div className="text-center text-slate-300 font-bold mb-4">
-              نقطة مراقبة مسار السباق (Checkpoint Station)
+            <div className="text-center text-slate-300 font-bold mb-2">
+              {wsDescriptor.titleAr}
+            </div>
+            <div className="text-center text-slate-500 text-xs">
+              هذه المهمة تعمل عبر وحدتها الميدانية المخصصة — سيتم توجيهك إليها تلقائياً عند تفعيل كود المهمة.
             </div>
           </div>
         )}
