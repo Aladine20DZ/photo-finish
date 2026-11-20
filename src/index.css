@@ -671,6 +671,24 @@ html.sunlight [class*="bg-slate-800"] {
   background-color: #FFF8E8 !important;
 }
 
+/* أسطح البوابة العامة المبنية بقيم hex عشوائية (بورتفوليو LWAS الرسمي) */
+html.sunlight [class*="bg-[#070C16]"],
+html.sunlight [class*="bg-[#0B1220]"],
+html.sunlight [class*="bg-[#09101C]"],
+html.sunlight [class*="bg-[#09101D]"],
+html.sunlight [class*="bg-[#050912]"],
+html.sunlight [class*="bg-[#141413]"] {
+  background-color: #FFFDF7 !important;
+}
+
+/* تدرجات البطل (Hero) العشوائية — تُستبدل بخلفية نهارية صلبة */
+html.sunlight [class*="bg-gradient-to-b"][class*="from-[#0"],
+html.sunlight [class*="bg-gradient-to-br"][class*="from-[#0"],
+html.sunlight [class*="bg-gradient-to-tr"][class*="from-[#0"] {
+  background-image: none !important;
+  background-color: #FFFDF7 !important;
+}
+
 html.sunlight [class*="border-slate-800"],
 html.sunlight [class*="border-slate-700"],
 html.sunlight [class*="border-emerald-950"],
