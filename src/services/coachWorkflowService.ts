@@ -8,8 +8,9 @@ import {
 } from '../types/athletics';
 import { CategoryEngine } from './categoryEngine';
 
-const DB_NAME = 'athletics_competition_db_v1';
-const DB_VERSION = 3; // ترقية قاعدة البيانات لدعم مخازن المدربين وطلبات المشاركة وسجل تدقيق التسجيلات
+import { openSharedDatabase, SHARED_DB_NAME } from './idbCompat';
+
+const DB_NAME = SHARED_DB_NAME;
 
 const STORE_COACHES = 'coaches';
 const STORE_REGISTRATIONS = 'competition_registrations';
@@ -125,11 +126,8 @@ export class CoachWorkflowService {
     }
 
     if (!this.dbPromise) {
-      this.dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-        req.onupgradeneeded = (e) => {
-          const db = (e.target as IDBOpenDBRequest).result;
+      // فتح موحّد عبر idbCompat — يمنع انسداد الترقية بين الخدمات الأربع المشتركة
+      this.dbPromise = openSharedDatabase(DB_NAME, (db) => {
 
           if (!db.objectStoreNames.contains(STORE_COACHES)) {
             const coachStore = db.createObjectStore(STORE_COACHES, { keyPath: 'id' });
@@ -149,15 +147,9 @@ export class CoachWorkflowService {
             const auditStore = db.createObjectStore(STORE_REG_AUDIT, { keyPath: 'id' });
             auditStore.createIndex('registrationId', 'registrationId', { unique: false });
           }
-        };
-
-        req.onsuccess = async () => {
-          const db = req.result;
-          await this.seedInitialData(db);
-          resolve(db);
-        };
-
-        req.onerror = () => reject(req.error);
+      }).then(async (db) => {
+        await this.seedInitialData(db);
+        return db;
       });
     }
 

@@ -357,7 +357,17 @@ export const FieldSpaceEntry: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => { refreshWorkspaces(); setStandalonePanel(standalonePanel === 'manage' ? 'none' : 'detail'); if (!openWorkspaceId) setStandalonePanel(standalonePanel === 'manage' ? 'manage' : 'detail'); }}
+                onClick={() => {
+                  refreshWorkspaces();
+                  const target: StandalonePanel = standalonePanel === 'detail' && openWorkspaceId ? 'none' : 'detail';
+                  setStandalonePanel(target);
+                  // فتح أول مساحة تلقائياً عند غياب اختيار — وإلا وجّه المستخدم للإنشاء
+                  if (target === 'detail' && !openWorkspaceId) {
+                    const list = standaloneWorkspaceService.listWorkspaces();
+                    if (list.length > 0) setOpenWorkspaceId(list[0].id);
+                    else setStandalonePanel('manage');
+                  }
+                }}
                 className="judge-touch-button px-3 bg-slate-900 text-slate-200 border border-slate-700 hover:bg-slate-800 transition-colors text-sm"
               >
                 <ClipboardList className="w-4 h-4" aria-hidden="true" />

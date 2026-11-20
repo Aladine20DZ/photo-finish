@@ -1,8 +1,8 @@
 ﻿import { Athlete, Club, CategorySnapshot } from '../types/athletics';
 import { recycleBinService } from './recycleBinService';
+import { openSharedDatabase, SHARED_DB_NAME } from './idbCompat';
 
-const DB_NAME = 'athletics_competition_db_v1';
-const DB_VERSION = 2; // ترقية قاعدة البيانات لدعم مخازن العدائين والأندية واللقطات
+const DB_NAME = SHARED_DB_NAME;
 
 const STORE_ATHLETES = 'athletes';
 const STORE_CLUBS = 'clubs';
@@ -31,43 +31,31 @@ class AthleteClubStorage {
     }
 
     if (!this.dbPromise) {
-      this.dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
+      // فتح موحّد عبر idbCompat — يمنع انسداد الترقية بين الخدمات الأربع المشتركة
+      this.dbPromise = openSharedDatabase(DB_NAME, (db) => {
+        // 1. مخزن العدائين
+        if (!db.objectStoreNames.contains(STORE_ATHLETES)) {
+          const athleteStore = db.createObjectStore(STORE_ATHLETES, { keyPath: 'id' });
+          athleteStore.createIndex('licenseNumber', 'licenseNumber', { unique: true });
+          athleteStore.createIndex('clubId', 'clubId', { unique: false });
+          athleteStore.createIndex('lastName', 'lastName', { unique: false });
+        }
 
-        req.onupgradeneeded = (e) => {
-          const db = (e.target as IDBOpenDBRequest).result;
+        // 2. مخزن الأندية
+        if (!db.objectStoreNames.contains(STORE_CLUBS)) {
+          const clubStore = db.createObjectStore(STORE_CLUBS, { keyPath: 'id' });
+          clubStore.createIndex('code', 'code', { unique: true });
+          clubStore.createIndex('wilaya', 'wilaya', { unique: false });
+        }
 
-          // 1. مخزن العدائين
-          if (!db.objectStoreNames.contains(STORE_ATHLETES)) {
-            const athleteStore = db.createObjectStore(STORE_ATHLETES, { keyPath: 'id' });
-            athleteStore.createIndex('licenseNumber', 'licenseNumber', { unique: true });
-            athleteStore.createIndex('clubId', 'clubId', { unique: false });
-            athleteStore.createIndex('lastName', 'lastName', { unique: false });
-          }
-
-          // 2. مخزن الأندية
-          if (!db.objectStoreNames.contains(STORE_CLUBS)) {
-            const clubStore = db.createObjectStore(STORE_CLUBS, { keyPath: 'id' });
-            clubStore.createIndex('code', 'code', { unique: true });
-            clubStore.createIndex('wilaya', 'wilaya', { unique: false });
-          }
-
-          // 3. مخزن لقطات الفئات المجمدة
-          if (!db.objectStoreNames.contains(STORE_SNAPSHOTS)) {
-            db.createObjectStore(STORE_SNAPSHOTS, { keyPath: 'competitionId' });
-          }
-        };
-
-        req.onsuccess = async () => {
-          const db = req.result;
-          // تفعيل البذور التأسيسية إذا كانت القاعدة فارغة
-          await this.seedInitialData(db);
-          resolve(db);
-        };
-
-        req.onerror = () => {
-          reject(req.error);
-        };
+        // 3. مخزن لقطات الفئات المجمدة
+        if (!db.objectStoreNames.contains(STORE_SNAPSHOTS)) {
+          db.createObjectStore(STORE_SNAPSHOTS, { keyPath: 'competitionId' });
+        }
+      }).then(async (db) => {
+        // تفعيل البذور التأسيسية إذا كانت القاعدة فارغة
+        await this.seedInitialData(db);
+        return db;
       });
     }
 

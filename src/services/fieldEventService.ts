@@ -6,7 +6,9 @@ import {
   FieldEventType
 } from '../types/athletics';
 
-const DB_NAME = 'athletics_competition_db_v1';
+import { openSharedDatabase, SHARED_DB_NAME } from './idbCompat';
+
+const DB_NAME = SHARED_DB_NAME;
 const STORE_FIELD_EVENTS = 'field_event_competitions';
 
 export const INITIAL_FIELD_COMPETITIONS: FieldEventCompetition[] = [
@@ -192,20 +194,13 @@ export class FieldEventService {
     }
 
     if (!this.dbPromise) {
-      this.dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 4);
-
-        req.onupgradeneeded = (e) => {
-          const db = (e.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains(STORE_FIELD_EVENTS)) {
-            const store = db.createObjectStore(STORE_FIELD_EVENTS, { keyPath: 'id' });
-            store.createIndex('competitionId', 'competitionId', { unique: false });
-            store.createIndex('discipline', 'discipline', { unique: false });
-          }
-        };
-
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+      // فتح موحّد عبر idbCompat — يمنع انسداد الترقية بين الخدمات الأربع المشتركة
+      this.dbPromise = openSharedDatabase(DB_NAME, (db) => {
+        if (!db.objectStoreNames.contains(STORE_FIELD_EVENTS)) {
+          const store = db.createObjectStore(STORE_FIELD_EVENTS, { keyPath: 'id' });
+          store.createIndex('competitionId', 'competitionId', { unique: false });
+          store.createIndex('discipline', 'discipline', { unique: false });
+        }
       });
     }
 

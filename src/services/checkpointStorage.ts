@@ -16,8 +16,9 @@ import {
   AthleticsJudge 
 } from '../types/athletics';
 
-const DB_NAME = 'athletics_competition_db_v1';
-const DB_VERSION = 1;
+import { openSharedDatabase, SHARED_DB_NAME } from './idbCompat';
+
+const DB_NAME = SHARED_DB_NAME;
 
 // أسماء مخازن الكائنات (Object Stores)
 const STORE_COMPETITIONS = 'competitions';
@@ -44,79 +45,68 @@ class CheckpointStorageService {
     if (this.db) return this.db;
     if (this.openPromise) return this.openPromise;
 
-    this.openPromise = new Promise((resolve) => {
-      try {
-        if (typeof indexedDB === 'undefined') {
-          resolve(null);
-          return;
-        }
+    if (typeof indexedDB === 'undefined') {
+      return null;
+    }
 
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onupgradeneeded = () => {
-          const db = request.result;
-
-          // 1. مخزن المنافسات
-          if (!db.objectStoreNames.contains(STORE_COMPETITIONS)) {
-            const compStore = db.createObjectStore(STORE_COMPETITIONS, { keyPath: 'id' });
-            compStore.createIndex('date', 'date');
-            compStore.createIndex('status', 'status');
-          }
-
-          // 2. مخزن أحداث المرور (مع فهارس للبحث السريع والتأكد من التكرار)
-          if (!db.objectStoreNames.contains(STORE_PASSAGES)) {
-            const passStore = db.createObjectStore(STORE_PASSAGES, { keyPath: 'id' });
-            passStore.createIndex('competitionId', 'competitionId');
-            passStore.createIndex('checkpointId', 'checkpointId');
-            passStore.createIndex('bibNumber', 'bibNumber');
-            passStore.createIndex('lapNumber', 'lapNumber');
-            passStore.createIndex('timestamp', 'timestamp');
-            passStore.createIndex('syncStatus', 'syncStatus');
-            // فهرس مركب لمنع التكرار في نفس النقطة والحلقة
-            passStore.createIndex('comp_cp_lap_bib', ['competitionId', 'checkpointId', 'lapNumber', 'bibNumber']);
-          }
-
-          // 3. مخزن طلبات التصحيح والمراجعة
-          if (!db.objectStoreNames.contains(STORE_CORRECTIONS)) {
-            const corrStore = db.createObjectStore(STORE_CORRECTIONS, { keyPath: 'id' });
-            corrStore.createIndex('passageEventId', 'passageEventId');
-            corrStore.createIndex('status', 'status');
-          }
-
-          // 4. مخزن المخالفات
-          if (!db.objectStoreNames.contains(STORE_VIOLATIONS)) {
-            const violStore = db.createObjectStore(STORE_VIOLATIONS, { keyPath: 'id' });
-            violStore.createIndex('competitionId', 'competitionId');
-            violStore.createIndex('bibNumber', 'bibNumber');
-          }
-
-          // 5. مخزن الحكام
-          if (!db.objectStoreNames.contains(STORE_JUDGES)) {
-            const judgeStore = db.createObjectStore(STORE_JUDGES, { keyPath: 'id' });
-            judgeStore.createIndex('pinCode', 'pinCode');
-            judgeStore.createIndex('assignedCompetitionId', 'assignedCompetitionId');
-          }
-
-          // 6. مخزن طابور المزامنة المحلي
-          if (!db.objectStoreNames.contains(STORE_SYNC_QUEUE)) {
-            const syncStore = db.createObjectStore(STORE_SYNC_QUEUE, { keyPath: 'id' });
-            syncStore.createIndex('timestamp', 'timestamp');
-          }
-        };
-
-        request.onsuccess = () => {
-          this.db = request.result;
-          resolve(this.db);
-        };
-
-        request.onerror = () => {
-          console.warn('[checkpointStorage] تعذر فتح IndexedDB، الاعتماد على الذاكرة المحلية');
-          resolve(null);
-        };
-      } catch (err) {
-        resolve(null);
+    // فتح موحّد عبر idbCompat — يمنع انسداد الترقية بين الخدمات الأربع المشتركة
+    this.openPromise = openSharedDatabase(DB_NAME, (db: IDBDatabase) => {
+      // 1. مخزن المنافسات
+      if (!db.objectStoreNames.contains(STORE_COMPETITIONS)) {
+        const compStore = db.createObjectStore(STORE_COMPETITIONS, { keyPath: 'id' });
+        compStore.createIndex('date', 'date');
+        compStore.createIndex('status', 'status');
       }
-    });
+
+      // 2. مخزن أحداث المرور (مع فهارس للبحث السريع والتأكد من التكرار)
+      if (!db.objectStoreNames.contains(STORE_PASSAGES)) {
+        const passStore = db.createObjectStore(STORE_PASSAGES, { keyPath: 'id' });
+        passStore.createIndex('competitionId', 'competitionId');
+        passStore.createIndex('checkpointId', 'checkpointId');
+        passStore.createIndex('bibNumber', 'bibNumber');
+        passStore.createIndex('lapNumber', 'lapNumber');
+        passStore.createIndex('timestamp', 'timestamp');
+        passStore.createIndex('syncStatus', 'syncStatus');
+        // فهرس مركب لمنع التكرار في نفس النقطة والحلقة
+        passStore.createIndex('comp_cp_lap_bib', ['competitionId', 'checkpointId', 'lapNumber', 'bibNumber']);
+      }
+
+      // 3. مخزن طلبات التصحيح والمراجعة
+      if (!db.objectStoreNames.contains(STORE_CORRECTIONS)) {
+        const corrStore = db.createObjectStore(STORE_CORRECTIONS, { keyPath: 'id' });
+        corrStore.createIndex('passageEventId', 'passageEventId');
+        corrStore.createIndex('status', 'status');
+      }
+
+      // 4. مخزن المخالفات
+      if (!db.objectStoreNames.contains(STORE_VIOLATIONS)) {
+        const violStore = db.createObjectStore(STORE_VIOLATIONS, { keyPath: 'id' });
+        violStore.createIndex('competitionId', 'competitionId');
+        violStore.createIndex('bibNumber', 'bibNumber');
+      }
+
+      // 5. مخزن الحكام
+      if (!db.objectStoreNames.contains(STORE_JUDGES)) {
+        const judgeStore = db.createObjectStore(STORE_JUDGES, { keyPath: 'id' });
+        judgeStore.createIndex('pinCode', 'pinCode');
+        judgeStore.createIndex('assignedCompetitionId', 'assignedCompetitionId');
+      }
+
+      // 6. مخزن طابور المزامنة المحلي
+      if (!db.objectStoreNames.contains(STORE_SYNC_QUEUE)) {
+        const syncStore = db.createObjectStore(STORE_SYNC_QUEUE, { keyPath: 'id' });
+        syncStore.createIndex('timestamp', 'timestamp');
+      }
+    }).then(
+      (db) => {
+        this.db = db;
+        return this.db;
+      },
+      () => {
+        console.warn('[checkpointStorage] تعذر فتح IndexedDB، الاعتماد على الذاكرة المحلية');
+        return null;
+      }
+    );
 
     return this.openPromise;
   }
