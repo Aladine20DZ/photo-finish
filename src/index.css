@@ -671,13 +671,17 @@ html.sunlight [class*="bg-slate-800"] {
   background-color: #FFF8E8 !important;
 }
 
-/* أسطح البوابة العامة المبنية بقيم hex عشوائية (بورتفوليو LWAS الرسمي) */
+/* أسطح البوابة العامة المبنية بقيم hex عشوائية (بورتفوليو LWAS الرسمي) + لغة مساحات الحكام الكحلية */
 html.sunlight [class*="bg-[#070C16]"],
 html.sunlight [class*="bg-[#0B1220]"],
 html.sunlight [class*="bg-[#09101C]"],
 html.sunlight [class*="bg-[#09101D]"],
 html.sunlight [class*="bg-[#050912]"],
-html.sunlight [class*="bg-[#141413]"] {
+html.sunlight [class*="bg-[#141413]"],
+html.sunlight [class*="bg-[#101D35]"],
+html.sunlight [class*="bg-[#0B1426]"],
+html.sunlight [class*="bg-[#0B162B]"],
+html.sunlight [class*="hover:bg-[#16294a]"] {
   background-color: #FFFDF7 !important;
 }
 
@@ -692,7 +696,8 @@ html.sunlight [class*="bg-gradient-to-tr"][class*="from-[#0"] {
 html.sunlight [class*="border-slate-800"],
 html.sunlight [class*="border-slate-700"],
 html.sunlight [class*="border-emerald-950"],
-html.sunlight [class*="border-emerald-900"] {
+html.sunlight [class*="border-emerald-900"],
+html.sunlight [class*="border-[#1E293B]"] {
   border-color: #E7DCC0 !important;
 }
 
@@ -751,6 +756,17 @@ html.sunlight button[class*="from-emerald-"] *,
 html.sunlight a[class*="bg-emerald-"],
 html.sunlight a[class*="bg-emerald-"] * {
   color: #ffffff !important;
+}
+
+/* العناوين البيضاء داخل الأسطح الكحلية المحوّلة للنهار تتحول لحبر داكن
+   (بدونها تبقى بيضاء على كريمي — نص مخفي تماماً) */
+html.sunlight [class*="bg-[#101D35]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0B1426]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0B162B]"] [class*="text-white"],
+html.sunlight [class*="bg-[#101D35]"][class*="text-white"],
+html.sunlight [class*="bg-[#0B1426]"][class*="text-white"],
+html.sunlight [class*="bg-[#0B162B]"][class*="text-white"] {
+  color: #171204 !important;
 }
 
 html.sunlight button[class*="bg-amber-"],
