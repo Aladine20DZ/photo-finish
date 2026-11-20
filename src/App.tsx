@@ -49,6 +49,9 @@ import { DesignSystemShowcase, GlassLoginPage } from './components/design-system
 import { CompetitionEntriesAndResults } from './components/competitions/CompetitionEntriesAndResults';
 import { JudgesManagementOffice } from './components/judges/JudgesManagementOffice';
 import { DigitalCompetitionSheetsWorkspace } from './components/sheets/DigitalCompetitionSheetsWorkspace';
+import { SmartJudgeWorkspace } from './components/judges/SmartJudgeWorkspace';
+import { SmartJudgeDashboard } from './components/judges/SmartJudgeDashboard';
+import { judgesAssignmentService, JudgeAssignment, CertifiedJudge } from './services/judgesAssignmentService';
 import { LeagueProvider } from './context/LeagueContext';
 
 const DEFAULT_RUNNERS: Runner[] = [
@@ -191,6 +194,16 @@ export const App: React.FC = () => {
         if (tab === 'judges-office' || tab === 'judges' || tab === 'assignments') {
           return 'judges-office';
         }
+        if (tab === 'judge-workspace' || tab === 'workspace') {
+          return 'judge-workspace';
+        }
+        if (tab === 'judge-dashboard' || tab === 'dashboard') {
+          return 'judge-dashboard';
+        }
+        const duty = new URLSearchParams(window.location.search).get('duty') || new URLSearchParams(window.location.search).get('dutyCode');
+        if (duty) {
+          return 'judge-workspace';
+        }
         if (tab === 'sheets') {
           return 'sheets';
         }
@@ -203,6 +216,62 @@ export const App: React.FC = () => {
       }
     } catch {}
     return 'public';
+  });
+
+  const [activeJudgeAssignment, setActiveJudgeAssignment] = useState<JudgeAssignment | null>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const p = new URLSearchParams(window.location.search);
+        const duty = p.get('duty') || p.get('dutyCode');
+        if (duty) {
+          const verified = judgesAssignmentService.verifyDutyCode(duty);
+          if (verified.valid && verified.duty) {
+            return judgesAssignmentService.getAssignments().find(a => a.dutyCode === verified.duty?.dutyCode) || null;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  const [currentJudgeProfile, setCurrentJudgeProfile] = useState<CertifiedJudge | null>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const p = new URLSearchParams(window.location.search);
+        const judgeId = p.get('judgeId');
+        if (judgeId) {
+          return judgesAssignmentService.getJudgeById(judgeId) || null;
+        }
+        const duty = p.get('duty') || p.get('dutyCode');
+        if (duty) {
+          const verified = judgesAssignmentService.verifyDutyCode(duty);
+          if (verified.valid && verified.duty) {
+            return judgesAssignmentService.getJudgeById(verified.duty.judgeId) || null;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  const [judgeAssignmentsList, setJudgeAssignmentsList] = useState<JudgeAssignment[]>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const p = new URLSearchParams(window.location.search);
+        const judgeId = p.get('judgeId');
+        if (judgeId) {
+          return judgesAssignmentService.getAssignmentsForJudge(judgeId);
+        }
+        const duty = p.get('duty') || p.get('dutyCode');
+        if (duty) {
+          const verified = judgesAssignmentService.verifyDutyCode(duty);
+          if (verified.valid && verified.duty) {
+            return judgesAssignmentService.getAssignmentsForJudge(verified.duty.judgeId);
+          }
+        }
+      }
+    } catch {}
+    return [];
   });
   const [activeLeague] = useState<string>('الرابطة الولائية لألعاب القوى - سعيدة');
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
@@ -1175,6 +1244,38 @@ export const App: React.FC = () => {
           </div>
         )}
 
+        {!role && currentTab === 'judge-workspace' && activeJudgeAssignment && (
+          <SmartJudgeWorkspace
+            assignment={activeJudgeAssignment}
+            onBackToDashboard={() => {
+              if (judgeAssignmentsList.length > 1 && currentJudgeProfile) {
+                setCurrentTab('judge-dashboard');
+              } else {
+                setCurrentTab('judges-office');
+              }
+            }}
+            otherAssignments={judgeAssignmentsList}
+            onSwitchAssignment={(asg) => setActiveJudgeAssignment(asg)}
+          />
+        )}
+
+        {!role && currentTab === 'judge-dashboard' && currentJudgeProfile && (
+          <SmartJudgeDashboard
+            judge={currentJudgeProfile}
+            assignments={judgeAssignmentsList}
+            activeCompetition={currentCompetition as any}
+            onSelectAssignment={(asg) => {
+              setActiveJudgeAssignment(asg);
+              setCurrentTab('judge-workspace');
+            }}
+            onLogout={() => {
+              setCurrentJudgeProfile(null);
+              setActiveJudgeAssignment(null);
+              setCurrentTab('public');
+            }}
+          />
+        )}
+
         {!role && (currentTab === 'competitions' || currentTab === 'results') && (
           <CompetitionsEventsPage
             onBackToHome={() => setCurrentTab('public')}
@@ -1243,6 +1344,22 @@ export const App: React.FC = () => {
             {/* مدخل كود المهمة الرسمي للحكام ومساعدي المسابقات */}
             <DutyCodeCheckIn
               onUnlockTask={(task) => {
+                if (task.assignmentId || task.code) {
+                  const verified = judgesAssignmentService.verifyDutyCode(task.code);
+                  if (verified.valid && verified.duty) {
+                    const asg = judgesAssignmentService.getAssignments().find(a => a.dutyCode === verified.duty?.dutyCode);
+                    if (asg) {
+                      setActiveJudgeAssignment(asg);
+                      const jdg = judgesAssignmentService.getJudgeById(asg.judgeId);
+                      if (jdg) {
+                        setCurrentJudgeProfile(jdg);
+                        setJudgeAssignmentsList(judgesAssignmentService.getAssignmentsForJudge(jdg.id));
+                      }
+                      setCurrentTab('judge-workspace');
+                      return;
+                    }
+                  }
+                }
                 setRole(task.role);
               }}
               onEnterGeneralField={() => {

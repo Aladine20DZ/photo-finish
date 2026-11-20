@@ -125,6 +125,57 @@ export const INITIAL_FIELD_COMPETITIONS: FieldEventCompetition[] = [
     createdAt: Date.now() - 3600000,
     updatedAt: Date.now(),
   },
+  {
+    id: 'field_hj_final_2026',
+    competitionId: 'comp_algiers_2026',
+    name: 'نهائي الوثب العالي (High Jump) - أكابر رجال',
+    discipline: 'high_jump',
+    gender: 'M',
+    category: 'SENIOR',
+    venue: 'الميدان المركزي • قطاع الوثب العالي',
+    date: '2026-06-16',
+    scheduledTime: '17:00',
+    totalAttemptsAllowed: 6,
+    status: 'in_progress',
+    athletes: [
+      {
+        athleteId: 'ath_hj_01',
+        athleteName: 'محمد عبد الجليل',
+        bibNumber: 301,
+        clubName: 'وداد تلمسان',
+        order: 1,
+        attempts: [],
+        verticalTrials: [
+          { heightMeters: 1.95, cleared: true, attemptsCount: 1, trials: ['O'] },
+          { heightMeters: 2.00, cleared: true, attemptsCount: 2, trials: ['X', 'O'] },
+          { heightMeters: 2.05, cleared: false, attemptsCount: 3, trials: ['X', 'X', 'X'] }
+        ],
+        bestValidMeasurement: 2.00,
+        secondBestMeasurement: 0,
+        rank: 2,
+        status: 'active',
+      },
+      {
+        athleteId: 'ath_hj_02',
+        athleteName: 'سفيان بورقعة',
+        bibNumber: 305,
+        clubName: 'وفاق سطيف',
+        order: 2,
+        attempts: [],
+        verticalTrials: [
+          { heightMeters: 1.95, cleared: true, attemptsCount: 1, trials: ['O'] },
+          { heightMeters: 2.00, cleared: true, attemptsCount: 1, trials: ['O'] },
+          { heightMeters: 2.05, cleared: false, attemptsCount: 3, trials: ['X', 'X', 'X'] }
+        ],
+        bestValidMeasurement: 2.00,
+        secondBestMeasurement: 0,
+        rank: 1,
+        status: 'active',
+      },
+    ],
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now(),
+  },
 ];
 
 export class FieldEventService {
@@ -433,6 +484,77 @@ export class FieldEventService {
 
     await this.persistCompetition(updatedComp);
     return updatedComp;
+  }
+
+  public async getEventByCompetitionAndDiscipline(
+    competitionId: string,
+    discipline: string
+  ): Promise<FieldEventCompetition | null> {
+    const list = await this.listCompetitions();
+    const cleanDisc = discipline.toLowerCase().replace(/^disc_/, '');
+    return list.find(c => 
+      (c.competitionId === competitionId || c.id === competitionId) &&
+      (c.discipline.toLowerCase() === cleanDisc || c.id.includes(cleanDisc))
+    ) || null;
+  }
+
+  public async getOrCreateEvent(params: {
+    competitionId: string;
+    disciplineId: string;
+    name?: string;
+    disciplineType?: FieldEventType;
+    gender?: 'M' | 'F' | 'mixed';
+    category?: 'SENIOR' | 'U20' | 'U18' | 'U16';
+    venue?: string;
+    defaultAthletes?: FieldAthleteScore[];
+  }): Promise<FieldEventCompetition> {
+    const existing = await this.getEventByCompetitionAndDiscipline(params.competitionId, params.disciplineId);
+    if (existing) return existing;
+
+    const cleanDisc = (params.disciplineType || params.disciplineId.replace(/^disc_/, '')) as FieldEventType;
+    const newId = `field_${params.competitionId}_${cleanDisc}_${Date.now().toString(36)}`;
+
+    const newComp: FieldEventCompetition = {
+      id: newId,
+      competitionId: params.competitionId,
+      name: params.name || `مسابقة ${cleanDisc}`,
+      discipline: cleanDisc,
+      gender: params.gender || 'M',
+      category: params.category || 'SENIOR',
+      venue: params.venue || 'الميدان الرئيسي',
+      date: new Date().toISOString().split('T')[0],
+      scheduledTime: '09:00',
+      totalAttemptsAllowed: 6,
+      status: 'in_progress',
+      athletes: params.defaultAthletes || [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await this.persistCompetition(newComp);
+    return newComp;
+  }
+
+  public async certifyCompetition(
+    competitionIdOrEventId: string,
+    chiefJudgeId: string,
+    chiefJudgeName: string
+  ): Promise<FieldEventCompetition | null> {
+    const comp = await this.getCompetitionById(competitionIdOrEventId);
+    if (!comp) return null;
+
+    const certified: FieldEventCompetition = {
+      ...comp,
+      status: 'official',
+      chiefJudgeName: chiefJudgeName || 'الحكم العام المعتمد',
+      updatedAt: Date.now(),
+    };
+
+    await this.persistCompetition(certified);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pfp:event-certified', { detail: { id: comp.id, chiefJudgeId } }));
+    }
+    return certified;
   }
 
   public async persistCompetition(comp: FieldEventCompetition): Promise<void> {

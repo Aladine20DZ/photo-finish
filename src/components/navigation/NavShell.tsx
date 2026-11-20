@@ -40,6 +40,8 @@ export type NavTab =
   | 'entries'
   | 'sheets'
   | 'judges-office'
+  | 'judge-workspace'
+  | 'judge-dashboard'
   | 'planning'
   | 'league' 
   | 'coach' 

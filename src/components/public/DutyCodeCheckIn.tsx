@@ -18,6 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { PhoneRole } from '../../types/race';
+import { judgesAssignmentService, JudgeAssignment } from '../../services/judgesAssignmentService';
 
 export interface TaskAssignment {
   code: string;
@@ -29,6 +30,8 @@ export interface TaskAssignment {
   venue: string;
   checkedInAt: string;
   note?: string;
+  assignmentId?: string;
+  disciplineId?: string;
 }
 
 const PRESET_DEMO_TASKS: Record<string, TaskAssignment> = {
@@ -118,6 +121,39 @@ export const DutyCodeCheckIn: React.FC<DutyCodeCheckInProps> = ({ onUnlockTask, 
     setError(null);
 
     setTimeout(() => {
+      // 1. First check official certified assignments in judgesAssignmentService
+      const verification = judgesAssignmentService.verifyDutyCode(raw);
+      if (verification.valid && verification.duty) {
+        const d = verification.duty;
+        const roleMap: Record<string, PhoneRole> = {
+          starter: 'start',
+          recall_starter: 'start',
+          chief_finish_judge: 'finish',
+          finish_judge: 'finish',
+          photo_finish_operator: 'finish',
+          call_room_chief: 'chambre_dappel',
+          checkpoint: 'checkpoint_judge'
+        };
+        const assignedPhoneRole: PhoneRole = roleMap[d.task] || 'judge';
+
+        const officialTask: TaskAssignment = {
+          code: raw,
+          role: assignedPhoneRole,
+          roleTitleAr: `${d.judgeName} • ${d.role} (${d.disciplineNameAr || d.disciplineId})`,
+          leagueNameAr: 'الرابطة الولائية لألعاب القوى',
+          competitionTitleAr: 'المنافسة الميدانية النشطة',
+          station: d.venue || 'الميدان الرئيسي',
+          venue: d.venue || 'المضمار والميدان',
+          checkedInAt: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+          note: `تم تفعيل التكليف الميداني للتخصص (${d.disciplineNameAr || d.disciplineId}) بنجاح وفق المادة 18 و19.`,
+          assignmentId: d.assignmentId,
+          disciplineId: d.disciplineId
+        };
+        setTask(officialTask);
+        setLoading(false);
+        return;
+      }
+
       const match = PRESET_DEMO_TASKS[raw];
       if (match) {
         setTask(match);
@@ -136,10 +172,10 @@ export const DutyCodeCheckIn: React.FC<DutyCodeCheckInProps> = ({ onUnlockTask, 
         };
         setTask(genericTask);
       } else {
-        setError('كود المهمة غير صحيح. يرجى التأكد من الرمز المطبوع في بطاقة التكليف.');
+        setError(verification.error || 'كود المهمة غير صحيح. يرجى التأكد من الرمز المطبوع في بطاقة التكليف.');
       }
       setLoading(false);
-    }, 400);
+    }, 300);
   };
 
   return (

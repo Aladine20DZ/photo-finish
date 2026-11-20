@@ -12,6 +12,20 @@ import { recycleBinService } from './recycleBinService';
 export type JudgeGrade = 'international' | 'federal' | 'regional' | 'wilaya' | 'candidate';
 export type JudgeStatus = 'active' | 'suspended' | 'isolated';
 
+export type DisciplineCategoryType = 
+  | 'jumps_horizontal'  // الوثب الطويل، الوثب الثلاثي
+  | 'jumps_vertical'    // الوثب العالي، القفز بالزانة
+  | 'throws'            // دفع الجلة، رمي القرص، رمي المطرقة، رمي الرمح
+  | 'running'           // 100م، 200م، 400م، حواجز، تتابع، مسافات متوسطة وطويلة
+  | 'checkpoint';       // نقاط المراقبة، العدو الريفي، الطرق
+
+export interface JudgeAssignmentPermissions {
+  canRecord: boolean;
+  canEdit: boolean;
+  canCertify: boolean;
+  canDelete: boolean;
+}
+
 export type OfficialDutyTask = 
   | 'chief_judge'               // الحكم العام
   | 'deputy_chief_judge'        // مساعد الحكم العام
@@ -56,11 +70,18 @@ export interface JudgeAssignment {
   judgeGrade: JudgeGrade;
   disciplineId: string;
   disciplineNameAr: string;
+  disciplineCategory?: DisciplineCategoryType;
+  gender?: 'M' | 'F' | 'mixed';
+  categoryAge?: 'SENIOR' | 'U20' | 'U18' | 'U16';
   venue: string;
   task: OfficialDutyTask;
   taskTitleAr: string;
   assignmentRole?: string;
-  assignmentStatus?: string;
+  assignmentType?: 'chief' | 'assistant' | 'measurement' | 'recorder' | 'track' | 'finish' | 'start' | 'checkpoint';
+  assignedListId?: string;
+  assignedGroupId?: string;
+  permissions?: JudgeAssignmentPermissions;
+  assignmentStatus?: 'assigned' | 'active' | 'in_progress' | 'completed' | 'cancelled' | 'revoked';
   scheduledStartTime: string;
   scheduledEndTime: string;
   date: string;
@@ -70,6 +91,25 @@ export interface JudgeAssignment {
   assignedAt: string;
 }
 
+export interface JudgeActivityLog {
+  id: string;
+  leagueId?: string;
+  competitionId: string;
+  assignmentId?: string;
+  judgeId: string;
+  judgeName: string;
+  judgeRole: string;
+  disciplineId: string;
+  actionType: 'RECORD_ATTEMPT' | 'UPDATE_ATTEMPT' | 'CHANGE_HEIGHT' | 'CERTIFY_EVENT' | 'CONCURRENCY_LOCK';
+  athleteId?: string;
+  athleteBib?: number;
+  attemptNumber?: number;
+  previousValue?: string;
+  newValue?: string;
+  windReading?: number;
+  timestamp: number;
+}
+
 export interface CompetitionScopedDutyCode {
   dutyCode: string;
   judgeId: string;
@@ -77,8 +117,12 @@ export interface CompetitionScopedDutyCode {
   competitionId: string;
   assignmentId: string;
   disciplineId: string;
+  disciplineNameAr?: string;
+  disciplineCategory?: DisciplineCategoryType;
   venue: string;
   role: string;
+  task: OfficialDutyTask;
+  permissions?: JudgeAssignmentPermissions;
   validFrom: string;
   validTo: string;
   status: 'valid' | 'revoked' | 'expired';
@@ -231,6 +275,7 @@ const DEFAULT_ASSIGNMENTS: JudgeAssignment[] = [
     judgeGrade: 'international',
     disciplineId: 'disc_100m',
     disciplineNameAr: '100م نهائي رجال (FAT)',
+    disciplineCategory: 'running',
     venue: 'المضمار الرئيسي • خط النهاية',
     task: 'chief_judge',
     taskTitleAr: 'الحكم العام الفيدرالي (Chief Judge)',
@@ -240,7 +285,8 @@ const DEFAULT_ASSIGNMENTS: JudgeAssignment[] = [
     dutyCode: 'DUTY-ALG-CHIEF-100M',
     status: 'active',
     assignedBy: 'الإدارة المركزية للاتحاد الجزائري',
-    assignedAt: '2026-06-01T10:00:00Z'
+    assignedAt: '2026-06-01T10:00:00Z',
+    permissions: { canRecord: true, canEdit: true, canCertify: true, canDelete: true }
   },
   {
     id: 'asg_02',
@@ -250,6 +296,7 @@ const DEFAULT_ASSIGNMENTS: JudgeAssignment[] = [
     judgeGrade: 'federal',
     disciplineId: 'disc_100m',
     disciplineNameAr: '100م نهائي رجال (FAT)',
+    disciplineCategory: 'running',
     venue: 'المضمار الرئيسي • خط الانطلاق',
     task: 'starter',
     taskTitleAr: 'قاضي الانطلاق (Official Starter)',
@@ -259,7 +306,8 @@ const DEFAULT_ASSIGNMENTS: JudgeAssignment[] = [
     dutyCode: 'DUTY-ALG-START-100M',
     status: 'active',
     assignedBy: 'الإدارة المركزية للاتحاد الجزائري',
-    assignedAt: '2026-06-01T10:00:00Z'
+    assignedAt: '2026-06-01T10:00:00Z',
+    permissions: { canRecord: true, canEdit: false, canCertify: false, canDelete: false }
   },
   {
     id: 'asg_03',
@@ -269,6 +317,7 @@ const DEFAULT_ASSIGNMENTS: JudgeAssignment[] = [
     judgeGrade: 'federal',
     disciplineId: 'disc_100m',
     disciplineNameAr: '100م نهائي رجال (FAT)',
+    disciplineCategory: 'running',
     venue: 'برج التوقيت الإلكتروني • Photo Finish',
     task: 'photo_finish_operator',
     taskTitleAr: 'مشغل كاميرا Photo Finish المعتمد',
@@ -278,16 +327,107 @@ const DEFAULT_ASSIGNMENTS: JudgeAssignment[] = [
     dutyCode: 'DUTY-ALG-FINISH-PFP',
     status: 'active',
     assignedBy: 'الإدارة المركزية للاتحاد الجزائري',
-    assignedAt: '2026-06-01T10:00:00Z'
+    assignedAt: '2026-06-01T10:00:00Z',
+    permissions: { canRecord: true, canEdit: true, canCertify: false, canDelete: false }
+  },
+  {
+    id: 'asg_04',
+    competitionId: 'comp_algiers_2026',
+    judgeId: 'jdg_04',
+    judgeName: 'كريم زروقي',
+    judgeGrade: 'regional',
+    disciplineId: 'disc_long_jump',
+    disciplineNameAr: 'الوثب الطويل - أكابر رجال',
+    disciplineCategory: 'jumps_horizontal',
+    gender: 'M',
+    categoryAge: 'SENIOR',
+    venue: 'حفرة الوثب رقم 1',
+    task: 'field_judge_jumps',
+    taskTitleAr: 'قاضي مسابقات الوثب (Jumps Judge)',
+    scheduledStartTime: '09:00',
+    scheduledEndTime: '11:30',
+    date: '2026-06-15',
+    dutyCode: 'DUTY-ALG-LJ-ZERROUKI',
+    status: 'active',
+    assignedBy: 'الإدارة المركزية للاتحاد الجزائري',
+    assignedAt: '2026-06-01T10:00:00Z',
+    permissions: { canRecord: true, canEdit: true, canCertify: false, canDelete: false }
+  },
+  {
+    id: 'asg_05',
+    competitionId: 'comp_algiers_2026',
+    judgeId: 'jdg_05',
+    judgeName: 'سمير قادري',
+    judgeGrade: 'regional',
+    disciplineId: 'disc_high_jump',
+    disciplineNameAr: 'الوثب العالي - أكابر رجال',
+    disciplineCategory: 'jumps_vertical',
+    gender: 'M',
+    categoryAge: 'SENIOR',
+    venue: 'منطقة الوثب العالي • الميدان المركزي',
+    task: 'field_judge_jumps',
+    taskTitleAr: 'قاضي مسابقات الوثب (Jumps Judge)',
+    scheduledStartTime: '10:00',
+    scheduledEndTime: '12:30',
+    date: '2026-06-15',
+    dutyCode: 'DUTY-ALG-HJ-KADRI',
+    status: 'active',
+    assignedBy: 'الإدارة المركزية للاتحاد الجزائري',
+    assignedAt: '2026-06-01T10:00:00Z',
+    permissions: { canRecord: true, canEdit: true, canCertify: false, canDelete: false }
+  },
+  {
+    id: 'asg_06',
+    competitionId: 'comp_algiers_2026',
+    judgeId: 'jdg_06',
+    judgeName: 'نور الدين بومدين',
+    judgeGrade: 'wilaya',
+    disciplineId: 'disc_shot_put',
+    disciplineNameAr: 'دفع الجلة - أكابر رجال',
+    disciplineCategory: 'throws',
+    gender: 'M',
+    categoryAge: 'SENIOR',
+    venue: 'دائرة الرمي رقم 1',
+    task: 'field_judge_throws',
+    taskTitleAr: 'قاضي مسابقات الرمي (Throws Judge)',
+    scheduledStartTime: '14:00',
+    scheduledEndTime: '16:00',
+    date: '2026-06-15',
+    dutyCode: 'DUTY-ALG-SP-BOUMEDIENE',
+    status: 'active',
+    assignedBy: 'الإدارة المركزية للاتحاد الجزائري',
+    assignedAt: '2026-06-01T10:00:00Z',
+    permissions: { canRecord: true, canEdit: true, canCertify: false, canDelete: false }
   }
 ];
 
 const STORAGE_JUDGES_KEY = 'pfp_certified_judges_v2';
 const STORAGE_ASSIGNMENTS_KEY = 'pfp_judge_assignments_v2';
+const STORAGE_LOGS_KEY = 'pfp_judge_activity_logs_v1';
+
+export function resolveDisciplineCategory(disciplineId: string, nameAr?: string): DisciplineCategoryType {
+  const s = `${disciplineId} ${nameAr || ''}`.toLowerCase();
+  if (s.includes('high_jump') || s.includes('pole_vault') || s.includes('عالي') || s.includes('زانة') || s.includes('vertical')) {
+    return 'jumps_vertical';
+  }
+  if (s.includes('long_jump') || s.includes('triple_jump') || s.includes('طويل') || s.includes('ثلاثي') || s.includes('horizontal')) {
+    return 'jumps_horizontal';
+  }
+  if (s.includes('shot_put') || s.includes('discus') || s.includes('hammer') || s.includes('javelin') || 
+      s.includes('جلة') || s.includes('قرص') || s.includes('مطرقة') || s.includes('رمح') || s.includes('رمي') || s.includes('throws')) {
+    return 'throws';
+  }
+  if (s.includes('checkpoint') || s.includes('مراقبة') || s.includes('trail') || s.includes('cross') || s.includes('ضاحية')) {
+    return 'checkpoint';
+  }
+  return 'running';
+}
 
 export class JudgesAssignmentService {
   private inMemoryJudges: CertifiedJudge[] = [];
   private inMemoryAssignments: JudgeAssignment[] = [];
+  private inMemoryLogs: JudgeActivityLog[] = [];
+  private inMemoryLocks: Map<string, { judgeId: string; judgeName: string; expiresAt: number }> = new Map();
 
   constructor() {
     this.initStorage();
@@ -316,9 +456,15 @@ export class JudgesAssignmentService {
         this.inMemoryAssignments = [...DEFAULT_ASSIGNMENTS];
         localStorage.setItem(STORAGE_ASSIGNMENTS_KEY, JSON.stringify(DEFAULT_ASSIGNMENTS));
       }
+
+      const storedLogs = localStorage.getItem(STORAGE_LOGS_KEY);
+      if (storedLogs) {
+        this.inMemoryLogs = JSON.parse(storedLogs);
+      }
     } catch {
       this.inMemoryJudges = [...DEFAULT_JUDGES];
       this.inMemoryAssignments = [...DEFAULT_ASSIGNMENTS];
+      this.inMemoryLogs = [];
     }
   }
 
@@ -327,6 +473,7 @@ export class JudgesAssignmentService {
       try {
         localStorage.setItem(STORAGE_JUDGES_KEY, JSON.stringify(this.inMemoryJudges));
         localStorage.setItem(STORAGE_ASSIGNMENTS_KEY, JSON.stringify(this.inMemoryAssignments));
+        localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(this.inMemoryLogs.slice(0, 100)));
       } catch {}
     }
   }
@@ -550,6 +697,20 @@ export class JudgesAssignmentService {
   }
 
   /**
+   * Retrieves all active/assigned duties for a specific judge.
+   * If competitionId is supplied, filters for that competition only.
+   */
+  public getAssignmentsForJudge(judgeId: string, competitionId?: string): JudgeAssignment[] {
+    const compId = competitionId || competitionsService.getActiveCompetitionId();
+    return this.inMemoryAssignments.filter(a => 
+      a.judgeId === judgeId && 
+      (!compId || a.competitionId === compId) &&
+      a.status !== 'cancelled' && 
+      a.status !== 'revoked'
+    );
+  }
+
+  /**
    * Detect assignment conflicts:
    * 1. Time overlap for same judge
    * 2. Duplicate assignment in same discipline
@@ -656,7 +817,14 @@ export class JudgesAssignmentService {
     leagueId?: string;
     eventId?: string;
     assignmentRole?: string;
-    assignmentStatus?: string;
+    assignmentStatus?: 'assigned' | 'active' | 'in_progress' | 'completed' | 'cancelled' | 'revoked';
+    assignmentType?: 'chief' | 'assistant' | 'measurement' | 'recorder' | 'track' | 'finish' | 'start' | 'checkpoint';
+    assignedListId?: string;
+    assignedGroupId?: string;
+    permissions?: JudgeAssignmentPermissions;
+    disciplineCategory?: DisciplineCategoryType;
+    gender?: 'M' | 'F' | 'mixed';
+    categoryAge?: 'SENIOR' | 'U20' | 'U18' | 'U16';
     judgeId: string;
     disciplineId: string;
     disciplineNameAr: string;
@@ -686,6 +854,15 @@ export class JudgesAssignmentService {
 
     const dutyCode = `DUTY-${params.competitionId.slice(-4).toUpperCase()}-${judge.id.slice(-4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const defaultPermissions: JudgeAssignmentPermissions = params.permissions || {
+      canRecord: true,
+      canEdit: params.task !== 'recall_starter',
+      canCertify: params.task.includes('chief') || params.task === 'chief_judge',
+      canDelete: params.task.includes('chief') || params.task === 'chief_judge'
+    };
+
+    const resolvedCategory = params.disciplineCategory || resolveDisciplineCategory(params.disciplineId, params.disciplineNameAr);
+
     const assignment: JudgeAssignment = {
       id: `asg_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
       competitionId: params.competitionId,
@@ -696,10 +873,17 @@ export class JudgesAssignmentService {
       judgeGrade: judge.grade,
       disciplineId: params.disciplineId,
       disciplineNameAr: params.disciplineNameAr,
+      disciplineCategory: resolvedCategory,
+      gender: params.gender || 'M',
+      categoryAge: params.categoryAge || 'SENIOR',
       venue: params.venue,
       task: params.task,
       taskTitleAr: DUTY_TASKS_MAP[params.task]?.titleAr || 'حكم معتمد',
       assignmentRole: params.assignmentRole || DUTY_TASKS_MAP[params.task]?.titleAr || 'حكم معتمد',
+      assignmentType: params.assignmentType || (params.task.includes('chief') ? 'chief' : 'assistant'),
+      assignedListId: params.assignedListId,
+      assignedGroupId: params.assignedGroupId,
+      permissions: defaultPermissions,
       assignmentStatus: params.assignmentStatus || 'assigned',
       scheduledStartTime: params.startTime,
       scheduledEndTime: params.endTime,
@@ -871,6 +1055,8 @@ export class JudgesAssignmentService {
       };
     }
 
+    const resolvedCategory = asg.disciplineCategory || resolveDisciplineCategory(asg.disciplineId, asg.disciplineNameAr);
+
     return {
       valid: true,
       duty: {
@@ -880,8 +1066,17 @@ export class JudgesAssignmentService {
         competitionId: asg.competitionId,
         assignmentId: asg.id,
         disciplineId: asg.disciplineId,
+        disciplineNameAr: asg.disciplineNameAr,
+        disciplineCategory: resolvedCategory,
         venue: asg.venue,
         role: asg.task,
+        task: asg.task,
+        permissions: asg.permissions || {
+          canRecord: true,
+          canEdit: true,
+          canCertify: asg.task.includes('chief'),
+          canDelete: asg.task.includes('chief')
+        },
         validFrom: `${asg.date}T${asg.scheduledStartTime}:00`,
         validTo: `${asg.date}T${asg.scheduledEndTime}:00`,
         status: 'valid'
@@ -898,6 +1093,46 @@ export class JudgesAssignmentService {
     asg.status = 'active';
     this.persist();
     return newCode;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 5. MULTI-JUDGE COLLABORATION, LOGS & CONCURRENCY LOCKS
+  // ════════════════════════════════════════════════════════════════════════════
+
+  public logJudgeActivity(entry: Omit<JudgeActivityLog, 'id' | 'timestamp'>): JudgeActivityLog {
+    const log: JudgeActivityLog = {
+      ...entry,
+      id: `log_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: Date.now()
+    };
+    this.inMemoryLogs.unshift(log);
+    if (this.inMemoryLogs.length > 500) this.inMemoryLogs.pop();
+    this.persist();
+    return log;
+  }
+
+  public getJudgeActivityLogs(disciplineId?: string, competitionId?: string): JudgeActivityLog[] {
+    let list = this.inMemoryLogs;
+    if (competitionId) list = list.filter(l => l.competitionId === competitionId);
+    if (disciplineId) list = list.filter(l => l.disciplineId === disciplineId);
+    return list;
+  }
+
+  public acquireAttemptLock(key: string, judgeId: string, judgeName: string, ttlMs: number = 30000): { success: boolean; holder?: string } {
+    const now = Date.now();
+    const existing = this.inMemoryLocks.get(key);
+    if (existing && existing.expiresAt > now && existing.judgeId !== judgeId) {
+      return { success: false, holder: existing.judgeName };
+    }
+    this.inMemoryLocks.set(key, { judgeId, judgeName, expiresAt: now + ttlMs });
+    return { success: true };
+  }
+
+  public releaseAttemptLock(key: string, judgeId: string): void {
+    const existing = this.inMemoryLocks.get(key);
+    if (existing && existing.judgeId === judgeId) {
+      this.inMemoryLocks.delete(key);
+    }
   }
 }
 
