@@ -189,7 +189,7 @@ export const AdminPortal: React.FC = () => {
     return [
       {
         id: 'lic-1',
-        code: 'PFP2-CLB8-2712-POOL-SAMPLE-GENERATE-YOUR-OWN-CODE-VIA-ADMIN-GENERATOR',
+        code: 'عينة-سجل-قديم-ولّد-كودك-الفعلي-من-مولد-الإدارة-CLB8-2712',
         tier: 'CLB8',
         tierName: 'باقة الأندية المعتمدة (Pro Club)',
         clientName: 'نادي مولودية الجزائر لألعاب القوى',
@@ -201,7 +201,7 @@ export const AdminPortal: React.FC = () => {
       },
       {
         id: 'lic-2',
-        code: 'PFP2-ENTX-2806-POOL-SAMPLE-GENERATE-YOUR-OWN-CODE-VIA-ADMIN-GENERATOR',
+        code: 'عينة-سجل-قديم-ولّد-كودك-الفعلي-من-مولد-الإدارة-ENTX-2806',
         tier: 'ENTX',
         tierName: 'رخصة الاتحادات الرسمية (Enterprise)',
         clientName: 'الاتحاد الجزائري لألعاب القوى (FAA)',
@@ -500,7 +500,7 @@ export const AdminPortal: React.FC = () => {
 
   // محاكاة تفعيل كود 1*4 على هاتف معين في المحاكي
   const handleSimActivateOnPhone = (targetPhone: 'start' | 'finish' | 'judge' | 'chambre') => {
-    const code = generatedCode || 'PFP2-CLB8-2712-POOL-SAMPLE-GENERATE-YOUR-OWN-CODE-VIA-ADMIN-GENERATOR';
+    const code = generatedCode || 'عينة-سجل-قديم-ولّد-كودك-الفعلي-من-مولد-الإدارة-CLB8-2712';
     const isEnterprise = code.includes('ENTX');
 
     setSimPhones(prev => ({
