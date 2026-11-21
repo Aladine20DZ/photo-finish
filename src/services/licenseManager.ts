@@ -541,7 +541,7 @@ class LicenseManagerService {
 
     const token = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pf_admin_token') : null)
       || (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null)
-      || 'offline-standalone-admin-session';
+      || '';
 
     let generatedCode = '';
 
@@ -1068,7 +1068,7 @@ class LicenseManagerService {
     // محاولة التوليد عبر الخادم المركزي إن توفر
     if (typeof fetch !== 'undefined') {
       try {
-        const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+        const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
         const res = await fetch('/api/licensing/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
@@ -1125,7 +1125,7 @@ class LicenseManagerService {
   // ═══ التجديد المركزي (Renewal) ═══
   public async renewLicenseOnline(code: string, months: number): Promise<{ success: boolean; message: string; newExpiryDate?: string }> {
     try {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       const res = await fetch('/api/licensing/renew', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
@@ -1144,7 +1144,7 @@ class LicenseManagerService {
   // ═══ استعراض التراخيص والإحصائيات من الخادم ═══
   public async fetchRemoteLicenses(filters?: { status?: string; tier?: string; search?: string }): Promise<any[]> {
     try {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       const sp = new URLSearchParams();
       if (filters?.status) sp.set('status', filters.status);
       if (filters?.tier) sp.set('tier', filters.tier);
@@ -1162,7 +1162,7 @@ class LicenseManagerService {
 
   public async fetchRemoteStats(): Promise<any> {
     try {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       const res = await fetch('/api/licensing/stats', {
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
@@ -1177,7 +1177,7 @@ class LicenseManagerService {
   // ═══ إدارة وفك ارتباط الأجهزة (Device Unbinding) ═══
   public async fetchDeviceActivations(code: string): Promise<any[]> {
     try {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       const res = await fetch(`/api/licensing/activations?code=${encodeURIComponent(code)}`, {
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
@@ -1191,7 +1191,7 @@ class LicenseManagerService {
 
   public async unbindDeviceOnline(code: string, deviceId: string): Promise<{ success: boolean; message: string }> {
     try {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       const res = await fetch('/api/licensing/unbind-device', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },

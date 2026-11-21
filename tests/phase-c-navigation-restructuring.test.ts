@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loginTestLeague } from './helpers/leagueAuthHarness';
 import { portalAuthService, RegisteredLeague } from '../src/services/portalAuthService';
 
 describe('Phase C: Navigation Restructuring & Centralized League Bureau Suite', () => {
@@ -119,7 +120,7 @@ describe('Phase C: Navigation Restructuring & Centralized League Bureau Suite', 
       expect(portalAuthService.getSession('league')).toBeNull();
 
       // Login as official league using valid credentials
-      const loginRes = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const loginRes = await loginTestLeague();
       expect(loginRes.success).toBe(true);
       expect(loginRes.session).toBeDefined();
       expect(loginRes.session?.portal).toBe('league');

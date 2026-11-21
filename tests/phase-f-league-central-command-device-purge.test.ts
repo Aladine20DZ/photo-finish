@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loginTestLeague } from './helpers/leagueAuthHarness';
 import { portalAuthService } from '../src/services/portalAuthService';
 import { competitionsService } from '../src/services/competitionsService';
 import { devicePurgeArchiveService } from '../src/services/devicePurgeArchiveService';
@@ -89,7 +90,7 @@ describe('Phase F: League Central Command & Targeted Device Purge', () => {
   describe('2. Immutable Competition Archival Before Purge', () => {
     it('creates an immutable server-grade archive record when authenticated with league permissions', async () => {
       // 1. Authenticate league admin to get trusted session token
-      const leagueLogin = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const leagueLogin = await loginTestLeague();
       expect(leagueLogin.success).toBe(true);
       const token = leagueLogin.session?.token;
 

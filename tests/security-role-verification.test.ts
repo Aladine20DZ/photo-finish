@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loginTestLeague } from './helpers/leagueAuthHarness';
 import { portalAuthService } from '../src/services/portalAuthService';
 import { competitionsBureauService } from '../src/services/competitionsBureauService';
 import { devicePurgeArchiveService } from '../src/services/devicePurgeArchiveService';
@@ -74,9 +75,9 @@ describe('Server & Data Layer Authorization Guard (Anti-Role-Spoofing)', () => {
 
   it('accepts updateOperationInline when authenticated with a genuine signed session token', async () => {
     // Authentic login generates signed token
-    const loginRes = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+    const loginRes = await loginTestLeague();
     expect(loginRes.success).toBe(true);
-    expect(loginRes.session?.token).toMatch(/^PFPv1\.league\./);
+    expect(loginRes.session?.token).toMatch(/^PFPs1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
 
     const res = await competitionsBureauService.updateOperationInline(
       compId,
@@ -127,7 +128,7 @@ describe('Server & Data Layer Authorization Guard (Anti-Role-Spoofing)', () => {
       updatedAt: new Date().toISOString()
     });
 
-    const loginRes = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+    const loginRes = await loginTestLeague();
     expect(loginRes.success).toBe(true);
 
     const res = await devicePurgeArchiveService.finishAndArchiveCompetition('comp_auth_test', {

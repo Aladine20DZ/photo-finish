@@ -40,6 +40,16 @@ import('../server/licensingApi.js')
     console.warn('[PhotoFinishRelay] ⚠️ Licensing API unavailable:', e?.message || e);
   });
 
+let leagueAuthApi = null;
+import('../server/leagueAuthApi.js')
+  .then((mod) => {
+    leagueAuthApi = mod;
+    console.log('[PhotoFinishRelay] ✅ League Auth API ready (server-side scrypt + HMAC sessions)');
+  })
+  .catch((e) => {
+    console.warn('[PhotoFinishRelay] ⚠️ League Auth API unavailable:', e?.message || e);
+  });
+
 const PORT = process.env.PORT || 8080;
 
 // ═══ حالة الخادم ═══
@@ -205,6 +215,30 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+      }
+    });
+    return;
+  }
+
+  // 4-b. مصادقة الرابطات الخادمية (scrypt + جلسات موقعة HMAC)
+  if (leagueAuthApi && url.pathname.startsWith('/api/league/') && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { handleLeagueAuthRequest } = leagueAuthApi;
+        const parsed = JSON.parse(body || '{}');
+        const result = await handleLeagueAuthRequest({ pathname: url.pathname, method: 'POST', body: parsed, clientIp });
+        if (result) {
+          res.writeHead(result.status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result.json));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'League auth endpoint not found' }));
+        }
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'League auth handler error' }));
       }
     });
     return;

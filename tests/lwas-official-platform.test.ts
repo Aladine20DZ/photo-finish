@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loginTestLeague, loginLeagueWith, TEST_LEAGUE_PASSWORD } from './helpers/leagueAuthHarness';
 import { lwasService, LWAS_IDENTITY } from '../src/services/lwasService';
 import { portalAuthService } from '../src/services/portalAuthService';
 import { competitionsService } from '../src/services/competitionsService';
@@ -45,11 +46,11 @@ describe('SAIDA ATHLETICS LEAGUE (LWAS) — Official Digital Platform Suite', ()
     });
 
     it('authenticates using both saida_admin and lwas_admin credentials', async () => {
-      const resSaida = await portalAuthService.loginLeague('saida_admin', 'Saida@2026');
+      const resSaida = await loginTestLeague();
       expect(resSaida.success).toBe(true);
       expect(resSaida.session?.leagueId).toBe('lg_saida');
 
-      const resLwas = await portalAuthService.loginLeague('lwas_admin', 'Saida@2026');
+      const resLwas = await loginLeagueWith('lwas_admin', TEST_LEAGUE_PASSWORD);
       expect(resLwas.success).toBe(true);
       expect(resLwas.session?.leagueId).toBe('lg_saida');
     });

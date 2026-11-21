@@ -10,6 +10,7 @@ import * as security from "./server/security.js";
 import { handleSyncRequest } from "./server/syncApi.js";
 import { handleLicensingRequest } from "./server/licensingApi.js";
 import { getLicensingStore } from "./server/licensingStore.js";
+import { handleLeagueAuthRequest } from "./server/leagueAuthApi.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -409,6 +410,33 @@ function raceRelayPlugin(): Plugin {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, publicKeyBase64: security.getPublicKeyBase64() }));
         return;
+      }
+
+      // 5-b. مصادقة الرابطات الخادمية (scrypt + جلسات موقعة HMAC)
+      if (parsedUrl.pathname.startsWith('/api/league/')) {
+        const clientIpLeague = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+        if (req.method === 'POST') {
+          let rawLeague = '';
+          req.on('data', (chunk: any) => { rawLeague += chunk; });
+          req.on('end', async () => {
+            let body = null;
+            try { body = JSON.parse(rawLeague || '{}'); } catch { body = {}; }
+            try {
+              const result = await handleLeagueAuthRequest({ pathname: parsedUrl.pathname, method: 'POST', body, clientIp: clientIpLeague });
+              if (result) {
+                res.writeHead(result.status, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result.json));
+              } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: 'League auth endpoint not found' }));
+              }
+            } catch (e) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'League auth handler error' }));
+            }
+          });
+          return;
+        }
       }
 
       // 6. تسجيل دخول المدير الآمن (Rate-Limited Admin Login)

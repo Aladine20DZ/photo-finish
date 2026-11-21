@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loginTestLeague } from './helpers/leagueAuthHarness';
 import { unifiedExportService, UnifiedExportPayload } from '../src/services/unifiedExportService';
 import { competitionsBureauService, BureauJudgeOperation } from '../src/services/competitionsBureauService';
 import { portalAuthService } from '../src/services/portalAuthService';
@@ -166,7 +167,7 @@ describe('Stage 4: Competitions Bureau, Inline Editing & Unified Multi-Format Ex
     });
 
     it('allows inline edits when user role is LEAGUE_ADMIN or SUPER_ADMIN', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       const res = await competitionsBureauService.updateOperationInline(
         'comp_nat_01',
         'disc_100m_final',
@@ -181,7 +182,7 @@ describe('Stage 4: Competitions Bureau, Inline Editing & Unified Multi-Format Ex
     });
 
     it('records an audit trail entry logging who, when, old value, and new value', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       await competitionsBureauService.updateOperationInline(
         'comp_nat_01',
         'disc_100m_final',

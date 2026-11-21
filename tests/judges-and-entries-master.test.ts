@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loginTestLeague, loginLeagueWith, TEST_LEAGUE_PASSWORD } from './helpers/leagueAuthHarness';
 import { portalAuthService } from '../src/services/portalAuthService';
 import { competitionsService } from '../src/services/competitionsService';
 import { 
@@ -19,7 +20,7 @@ describe('PHOTO FINISH PRO AI — Master Judges, Assignments & Entries Suite', (
   describe('1. Login Screen League Auto-Detection (Section 3)', () => {
     it('automatically authenticates league executive without targetLeagueId selector', async () => {
       // Direct login with admin username only
-      const res = await portalAuthService.loginLeague('saida_admin', 'Saida@2026');
+      const res = await loginTestLeague();
       expect(res.success).toBe(true);
       expect(res.session).toBeDefined();
       expect(res.session?.role).toBe('league_admin');

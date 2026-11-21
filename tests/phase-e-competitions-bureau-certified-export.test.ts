@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loginTestLeague } from './helpers/leagueAuthHarness';
 import { 
   competitionsBureauService, 
   BureauDisciplineWithOps 
@@ -74,7 +75,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
 
     it('should successfully certify a discipline when authenticated as League Admin or Chief Judge', async () => {
       // Login as League Admin
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
       const session = auth.session;
 
@@ -107,7 +108,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
     });
 
     it('should allow reopening a certified discipline only with valid admin authorization and reason', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
       const session = auth.session;
 
@@ -142,7 +143,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
 
   describe('2. Inline Editing & Server Permission Control', () => {
     it('should reject inline cell update when rank or bib is invalid', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
       const session = auth.session;
 
@@ -159,7 +160,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
     });
 
     it('should successfully update cell inline and log change in audit trail', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
       const session = auth.session;
 
@@ -237,7 +238,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
 
   describe('4. Track Pro Design System & UI Integration', () => {
     it('should preserve discipline certification state across retrieval cycles', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
       const session = auth.session;
 
@@ -274,7 +275,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
     });
 
     it('should require a mandatory legal/technical reason when rejecting an operation', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
 
       const res = await competitionsBureauService.updateOperationLifecycleStatus(
@@ -290,7 +291,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
     });
 
     it('should successfully transition status to rejected with WA rule citation and track transition', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
 
       const reason = 'استبعاد لارتكاب انطلاقة خاطئة WA TR 16.8';
@@ -310,7 +311,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
     });
 
     it('should prevent inline editing when discipline is certified and locked', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
 
       // Certify discipline
@@ -336,7 +337,7 @@ describe('Phase E: Competitions Bureau & Certified Official Reports (المرح�
     });
 
     it('should increment revision when re-certifying a reopened discipline', async () => {
-      const auth = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const auth = await loginTestLeague();
       expect(auth.success).toBe(true);
 
       // First certification

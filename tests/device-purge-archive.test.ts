@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { loginTestLeague, loginLeagueWith, TEST_LEAGUE_PASSWORD } from './helpers/leagueAuthHarness';
 import { devicePurgeArchiveService } from '../src/services/devicePurgeArchiveService';
 import { checkpointStorage } from '../src/services/checkpointStorage';
 import { competitionsService } from '../src/services/competitionsService';
@@ -25,7 +26,7 @@ describe('Stage 6: Device Purge & Archive Engine Tests', () => {
     // Reset service state before each test
     devicePurgeArchiveService.resetServiceState();
     checkpointStorage.resetMemoryState();
-    await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+    await loginTestLeague();
 
     // Setup target competition
     await competitionsService.saveCompetition({

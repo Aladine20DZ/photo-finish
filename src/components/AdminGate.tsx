@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Crown, Lock, ArrowRight, LogOut, Eye, EyeOff, KeyRound, Cloud, ShieldCheck } from 'lucide-react';
+import { Crown, Lock, ArrowRight, LogOut, Eye, EyeOff, Cloud, ShieldCheck } from 'lucide-react';
 import { AdminPortal } from '../admin/AdminPortal';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { portalAuthService } from '../services/portalAuthService';
 
 // ═══ بوابة الدخول إلى ADMIN SUITE (لوحة مدير المنظومة) ═══
 // الوصول: أضف ?admin إلى رابط التطبيق ثم أدخل كلمة مرور المدير المعتمدة أو سجل الدخول بحساب Supabase.
-// المصادقة تتم عبر الخادم مع فحص معدل المحاولات (Rate Limiting) وتوقيع Ed25519.
-
-const SESSION_KEY = 'pf_admin_portal_unlocked_v1';
-const DEFAULT_DEV_ADMIN_PASS = 'Admin@PhotoFinish2026!';
+// الأمن (Stage 1):
+//  - المصادقة عبر الخادم حصراً (/api/admin/login — timing-safe + قفل 5/15د/IP) — بلا أي كلمات مرور
+//    افتراضية أو معروضة أو أزرار تعبئة، وبلا أي جلسة offline بلا خادم.
+//  - كلمة المرور تُضبط عبر متغير البيئة ADMIN_PORTAL_PASSWORD على الخادم حصراً.
 
 export const AdminGate: React.FC = () => {
   const [unlocked, setUnlocked] = useState<boolean>(() => {
@@ -23,6 +23,8 @@ export const AdminGate: React.FC = () => {
   const [shake, setShake] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const SESSION_KEY = 'pf_admin_portal_unlocked_v1';
+
   const handleKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const entered = input.trim();
@@ -32,48 +34,16 @@ export const AdminGate: React.FC = () => {
     setError('');
 
     try {
-      const resp = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: entered })
-      });
-
-      const data = await resp.json().catch(() => ({}));
-      const authToken = data.token || data.adminToken;
-
-      if (resp.status === 429) {
-        setError(data.error || 'تم تجاوز الحد الأقصى للمحاولات (5 محاولات). يرجى الانتظار 15 دقيقة.');
-        setShake(true);
-        setTimeout(() => setShake(false), 450);
-        return;
-      }
-
-      if (resp.ok && (data.success || data.ok) && authToken) {
-        try { 
-          sessionStorage.setItem(SESSION_KEY, '1');
-          sessionStorage.setItem('pf_admin_token', authToken);
-          await portalAuthService.loginAdmin(entered);
-        } catch { /* تخزين غير متاح */ }
+      // المصادقة عبر الخادم حصراً — الخدمة تتكفل بالطلب وتخزين الجلسة الموقعة
+      const result = await portalAuthService.loginAdmin(entered);
+      if (result.success) {
+        try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* تخزين غير متاح */ }
         setUnlocked(true);
       } else {
-        setError(data.error || 'بيانات الدخول غير صحيحة.');
+        setError(result.error || 'بيانات الدخول غير صحيحة.');
         setShake(true);
         setTimeout(() => setShake(false), 450);
       }
-    } catch {
-      // وضع العمل المستقل دون خادم في بيئة التطوير والاختبار حصراً
-      if (import.meta.env.DEV && entered === DEFAULT_DEV_ADMIN_PASS) {
-        try {
-          sessionStorage.setItem(SESSION_KEY, '1');
-          sessionStorage.setItem('pf_admin_token', 'offline-standalone-admin-session');
-          await portalAuthService.loginAdmin(entered);
-        } catch { /* تخزين غير متاح */ }
-        setUnlocked(true);
-        return;
-      }
-      setError('تعذر التحقق من بيانات الدخول، يرجى المحاولة لاحقاً.');
-      setShake(true);
-      setTimeout(() => setShake(false), 450);
     } finally {
       setLoading(false);
     }
@@ -123,8 +93,8 @@ export const AdminGate: React.FC = () => {
 
       try {
         sessionStorage.setItem(SESSION_KEY, '1');
-        sessionStorage.setItem('pf_admin_token', data.session?.access_token || 'supabase-admin-session');
-        await portalAuthService.loginAdmin(input.trim());
+        // جلسة إدارية من توكن Supabase الموثق (الأدوار تتحقق عبر RLS على الخادم)
+        portalAuthService.adoptAdminServerSession(data.session?.access_token || 'supabase-admin-session');
       } catch { /* تخزين غير متاح */ }
       setUnlocked(true);
     } catch {
@@ -282,23 +252,15 @@ export const AdminGate: React.FC = () => {
           </form>
         )}
 
-        {/* بطاقة إرشادية لكلمة المرور الرسمية */}
+        {/* إرشاد آمن: لا كلمات مرور معروضة ولا أزرار تعبئة — كلمة المرور من متغيرات بيئة الخادم حصراً */}
         {authMode === 'key' && (
           <div className="mt-5 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 leading-relaxed text-center">
             <div className="flex items-center justify-center gap-1.5 text-amber-400 font-bold mb-1.5">
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>كلمة مرور المدير المعتمدة:</span>
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>كلمة مرور المدير تُضبط عبر متغير البيئة ADMIN_PORTAL_PASSWORD على الخادم</span>
             </div>
-            <button
-              type="button"
-              onClick={() => { setInput(DEFAULT_DEV_ADMIN_PASS); setError(''); }}
-              className="text-amber-300 hover:text-amber-200 font-mono select-all bg-amber-950/40 hover:bg-amber-950/70 px-2.5 py-1 rounded-lg border border-amber-800/40 inline-flex items-center gap-1.5 font-bold transition-all cursor-pointer active:scale-95"
-              title="انقر لملء كلمة المرور تلقائياً"
-            >
-              {DEFAULT_DEV_ADMIN_PASS}
-            </button>
-            <p className="text-[10px] text-slate-500 mt-2">
-              يمكن تغييرها عبر متغير <span className="font-mono text-slate-400">ADMIN_PORTAL_PASSWORD</span> في ملف <span className="font-mono text-slate-400">.env</span>
+            <p className="text-[10px] text-slate-500 mt-1">
+              في التطوير المحلي: اطبعها من طرفية خادم التطوير عند الإقلاع.
             </p>
           </div>
         )}

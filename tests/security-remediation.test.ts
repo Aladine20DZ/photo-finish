@@ -102,9 +102,31 @@ describe('Stage 0: Security Remediation & Zero Hardcoded Secrets', () => {
         /PFP_ATHLETICS_OFFLINE_SECRET_2026_SECURE/,
         /PFP-ADMIN-2026/,
         /PFP-SECUREADMIN-2026/i,
+        // Stage 1: أسرار اكتشفت في التدقيق ومُسحت — يمنع اختبار عودتها
+        /Saida2026/,
+        /Admin@PhotoFinish2026!/,
+        /pfp_sec_session_k92/,
+        /offline-standalone-admin-session/,
+        /VITE_LICENSE_PRIVATE_KEY/,
+        /VITE_ADMIN_PORTAL_PASSWORD/
       ];
 
       const violations = scanDirectory(srcDir, forbidden);
+      expect(violations).toEqual([]);
+    }, 120000);
+
+    it('ensures no default admin passwords remain in server sources', () => {
+      const serverDir = path.resolve(__dirname, '../server');
+      const relayDir = path.resolve(__dirname, '../relay-server');
+      const forbidden = [
+        /Admin@PhotoFinish2026!/,
+        /offline-standalone-admin-session/,
+        /Saida2026/
+      ];
+      const violations = [
+        ...scanDirectory(serverDir, forbidden),
+        ...scanDirectory(relayDir, forbidden)
+      ];
       expect(violations).toEqual([]);
     }, 120000);
   });

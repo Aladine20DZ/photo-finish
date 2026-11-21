@@ -12,9 +12,13 @@ import { athleteClubStorage } from './athleteClubStorage';
 
 export type PortalType = 'league' | 'coach' | 'judge' | 'admin' | 'public';
 
-function computeSessionTokenSignature(portal: string, userId: string, issuedAt: string): string {
-  const secret = 'pfp_sec_session_k92@2026_athletics_core';
-  const data = `${portal}::${userId}::${issuedAt}::${secret}`;
+/**
+ * Stage 1 Security: توقيع الجلسات انتقل إلى الخادم (server/sessionTokens.js بـ HMAC + SESSION_SECRET).
+ * ما يبقى هنا (PFPv1) مجرد ملصق جلسة محلي غير سري لحكام الميدان والمدربين — لا يمنح أي صلاحية
+ * خادمية، والعمليات الخادمية تتحقق من رموز PFPs1 الموقعة خادمياً حصراً.
+ */
+function computeLocalSessionChecksum(portal: string, userId: string, issuedAt: string): string {
+  const data = `${portal}::${userId}::${issuedAt}`;
   let h1 = 0xdeadbeef ^ 0x811c9dc5;
   let h2 = 0x41c6ce57 ^ 0xcbf29ce4;
   for (let i = 0; i < data.length; i++) {
@@ -26,6 +30,83 @@ function computeSessionTokenSignature(portal: string, userId: string, issuedAt: 
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0).toString(16).padStart(8, '0')}`;
 }
+
+// ═══ بوابة مصادقة الرابطات (League Auth Gateway) ═══
+// الافتراضي: HTTP إلى الخادم (/api/league/*). الاختبارات تحقن بوابة تستهلك
+// المعالج الخادمي فعلياً (نفس scrypt والجلسات الموقعة).
+
+export interface LeagueAuthGatewayRequest {
+  username: string;
+  password: string;
+  targetLeagueId?: string;
+}
+
+export interface LeagueAuthGatewaySession {
+  token: string;
+  leagueId: string;
+  userId: string;
+  username: string;
+  role: string;
+  expiresAt?: number;
+}
+
+export interface LeagueAuthGatewayResult {
+  success: boolean;
+  session?: LeagueAuthGatewaySession;
+  error?: string;
+}
+
+export interface LeagueAuthGateway {
+  login(req: LeagueAuthGatewayRequest): Promise<LeagueAuthGatewayResult>;
+  register(req: { leagueId: string; username: string; email: string; password: string; aliases?: string[] }): Promise<LeagueAuthGatewayResult>;
+}
+
+function mapServerSession(data: any): LeagueAuthGatewayResult {
+  const session = data?.session;
+  if (!data?.ok || !session?.token) {
+    return { success: false, error: data?.error || 'فشل المصادقة الخادمية' };
+  }
+  return {
+    success: true,
+    session: {
+      token: String(session.token),
+      leagueId: String(session.leagueId || ''),
+      userId: String(session.userId || ''),
+      username: String(session.username || ''),
+      role: String(session.role || 'league_admin'),
+      expiresAt: Number(session.expiresAt) || undefined
+    }
+  };
+}
+
+const httpLeagueAuthGateway: LeagueAuthGateway = {
+  async login(req) {
+    try {
+      const resp = await fetch('/api/league/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req)
+      });
+      const data = await resp.json().catch(() => null);
+      return mapServerSession(data);
+    } catch {
+      return { success: false, error: 'تعذر الوصول إلى خادم المصادقة. تسجيل دخول الرابطات يتطلب اتصالاً بالخادم.' };
+    }
+  },
+  async register(req) {
+    try {
+      const resp = await fetch('/api/league/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req)
+      });
+      const data = await resp.json().catch(() => null);
+      return mapServerSession(data);
+    } catch {
+      return { success: false, error: 'تعذر الوصول إلى خادم المصادقة. إنشاء حساب الرابطة يتم عبر الخادم حصراً.' };
+    }
+  }
+};
 
 export interface SessionVerificationResult {
   valid: boolean;
@@ -67,7 +148,8 @@ export interface RegisteredLeague {
   phone: string;
   adminFullName: string;
   adminUsername: string;
-  adminPassword: string; // Stored securely locally
+  /** @deprecated Stage 1: كلمات مرور الرابطات تعيش على الخادم حصراً (scrypt) — هذا الحقل لا يُقرأ ولا يُقارن ولا يُخزَّن */
+  adminPassword?: string;
   createdAt: string;
   isActive: boolean;
   is_demo?: boolean;
@@ -94,7 +176,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 65 00 00 20',
     adminFullName: 'رئيس رابطة ألعاب القوى سعيدة (LWAS)',
     adminUsername: 'saida_admin',
-    adminPassword: 'Saida2026',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: true,
     is_demo: false,
@@ -114,7 +195,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 21 00 00 01',
     adminFullName: 'الاتحاد الجزائري لألعاب القوى',
     adminUsername: '',
-    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: false,
     is_demo: false,
@@ -133,7 +213,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 21 11 22 33',
     adminFullName: 'رابطة الجزائر',
     adminUsername: '',
-    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: false,
     is_demo: false,
@@ -152,7 +231,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 41 00 11 22',
     adminFullName: 'رابطة وهران',
     adminUsername: '',
-    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: false,
     is_demo: false,
@@ -171,7 +249,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 31 44 55 66',
     adminFullName: 'رابطة قسنطينة',
     adminUsername: '',
-    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: false,
     is_demo: false,
@@ -190,7 +267,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 36 77 88 99',
     adminFullName: 'رابطة سطيف',
     adminUsername: '',
-    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: false,
     is_demo: false,
@@ -209,7 +285,6 @@ const DEFAULT_OFFICIAL_LEAGUES: RegisteredLeague[] = [
     phone: '+213 27 00 11 22',
     adminFullName: 'رابطة الشلف',
     adminUsername: '',
-    adminPassword: '',
     createdAt: '2026-01-01T00:00:00Z',
     isActive: false,
     is_demo: false,
@@ -228,6 +303,7 @@ export class PortalAuthService {
   private listeners: (() => void)[] = [];
   private inMemoryLeagues: RegisteredLeague[] = [...DEFAULT_OFFICIAL_LEAGUES];
   private inMemorySessions: Record<string, PortalSession | null> = {};
+  private leagueAuthGateway: LeagueAuthGateway = httpLeagueAuthGateway;
 
   constructor() {
     this.ensureDefaultLeagues();
@@ -246,6 +322,28 @@ export class PortalAuthService {
     }
   }
 
+  /**
+   * حقن بوابة مصادقة للاختبارات فقط — تستهلك المعالج الخادمي الحقيقي.
+   * في الإنتاج تبقى البوابة HTTP الافتراضية؛ لا يوجد أي مسار مصادقة محلي بلا خادم.
+   */
+  public setLeagueAuthGatewayForTests(gateway: LeagueAuthGateway): void {
+    if (typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)) {
+      this.leagueAuthGateway = gateway;
+    } else if (typeof (globalThis as any).__vitest_worker__ !== 'undefined' || String((globalThis as any).VITEST ?? '') !== '') {
+      this.leagueAuthGateway = gateway;
+    }
+  }
+
+  /** ترحيل أمني: إزالة أي كلمات مرور مأخوذة قديماً من التخزين المحلي (Stage 1) */
+  private sanitizeLeagues(list: any[]): RegisteredLeague[] {
+    for (const l of list) {
+      if (l && typeof l === 'object' && 'adminPassword' in l) {
+        try { delete l.adminPassword; } catch { l.adminPassword = undefined; }
+      }
+    }
+    return list as RegisteredLeague[];
+  }
+
   private ensureDefaultLeagues(): void {
     if (typeof localStorage === 'undefined') return;
     try {
@@ -254,7 +352,7 @@ export class PortalAuthService {
         localStorage.setItem(LEAGUES_STORAGE_KEY, JSON.stringify(DEFAULT_OFFICIAL_LEAGUES));
         this.inMemoryLeagues = [...DEFAULT_OFFICIAL_LEAGUES];
       } else {
-        const parsed = JSON.parse(stored);
+        const parsed = this.sanitizeLeagues(JSON.parse(stored));
         if (Array.isArray(parsed) && parsed.length > 0) {
           const defaultIds = new Set(DEFAULT_OFFICIAL_LEAGUES.map(l => l.id));
           const customLeagues = parsed.filter((l: RegisteredLeague) => !defaultIds.has(l.id));
@@ -301,7 +399,7 @@ export class PortalAuthService {
       try {
         const stored = localStorage.getItem(LEAGUES_STORAGE_KEY);
         if (stored) {
-          const parsed = JSON.parse(stored);
+          const parsed = this.sanitizeLeagues(JSON.parse(stored));
           if (Array.isArray(parsed) && parsed.length > 0) {
             this.inMemoryLeagues = parsed;
             list = parsed;
@@ -376,7 +474,7 @@ export class PortalAuthService {
     try {
       const leagues = this.getAllLeagues();
 
-      // Check unique shortName & adminUsername
+      // فحص فريدية عرضية سريع في الواجهة (الفحص الملزم على الخادم عبر UNIQUE constraints)
       const cleanShort = data.shortName.trim().toUpperCase();
       const cleanUser = data.adminUsername.trim().toLowerCase();
       const cleanEmail = data.officialEmail.trim().toLowerCase();
@@ -389,6 +487,19 @@ export class PortalAuthService {
       }
 
       const id = `lg_${cleanShort.toLowerCase()}_${Date.now().toString(36)}`;
+
+      // Stage 1: الحساب وكلمة المرور ينشأن على الخادم حصراً (scrypt + جلسة موقعة)
+      const auth = await this.leagueAuthGateway.register({
+        leagueId: id,
+        username: cleanUser,
+        email: cleanEmail,
+        password: data.adminPassword
+      });
+      if (!auth.success || !auth.session) {
+        return { success: false, error: auth.error || 'تعذر إنشاء حساب الرابطة على الخادم.' };
+      }
+
+      // بيانات الرابطة العامة (بدون أي كلمة مرور) تبقى محفوظة محلياً للعرض
       const newLeague: RegisteredLeague = {
         id,
         name: data.name.trim(),
@@ -402,7 +513,6 @@ export class PortalAuthService {
         phone: data.phone.trim(),
         adminFullName: data.adminFullName.trim(),
         adminUsername: cleanUser,
-        adminPassword: data.adminPassword,
         createdAt: new Date().toISOString(),
         isActive: true
       };
@@ -413,8 +523,14 @@ export class PortalAuthService {
         localStorage.setItem(LEAGUES_STORAGE_KEY, JSON.stringify(updated));
       }
 
-      // Auto login the new league admin
-      await this.loginLeague(newLeague.adminUsername, newLeague.adminPassword, newLeague.id);
+      // جلسة تلقائية من الجلسة الموقعة خادمياً التي أعادها التسجيل
+      const session = this.buildLeagueSession(auth.session, newLeague);
+      this.logoutAll();
+      this.inMemorySessions['league'] = session;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LEAGUE_SESSION_KEY, JSON.stringify(session));
+        localStorage.setItem(MASTER_ACTIVE_SESSION_KEY, JSON.stringify(session));
+      }
 
       this.notify();
       return { success: true, league: newLeague };
@@ -457,18 +573,44 @@ export class PortalAuthService {
     }
   }
 
-  // ═══ توليد والتحقق من رموز الجلسات الموقعة رقمياً (Cryptographically Signed Session Tokens) ═══
+  // ═══ توليد والتحقق من رموز الجلسات ═══
+  // PFPv1: ملصق جلسة محلي (حكام/مدربون — بلا سر، لا يمنح صلاحيات خادمية)
+  // PFPs1: جلسة موقعة خادمياً HMAC (رابطات/مديرون — القيم داخلها موثوقة)
 
   public generateSessionToken(portal: PortalType, userId: string): string {
     const issuedAt = Date.now().toString();
-    const sig = computeSessionTokenSignature(portal, userId, issuedAt);
+    const sig = computeLocalSessionChecksum(portal, userId, issuedAt);
     return `PFPv1.${portal}.${userId}.${issuedAt}.${sig}`;
   }
 
-  public verifySessionToken(token?: string | null): { valid: boolean; portal?: PortalType; userId?: string; error?: string } {
+  public verifySessionToken(token?: string | null): { valid: boolean; portal?: PortalType; userId?: string; role?: string; leagueId?: string; serverIssued?: boolean; error?: string } {
     if (!token || typeof token !== 'string') {
       return { valid: false, error: 'رمز الجلسة مفقود' };
     }
+
+    // جلسة موقعة خادمياً: النزاهة مضمونة بالتوقيع الخادمي؛ هنا نتحقق من البنية والصلاحية الزمنية
+    if (token.startsWith('PFPs1.')) {
+      const parts = token.split('.');
+      if (parts.length !== 3) return { valid: false, error: 'تنسيق رمز الجلسة الخادمية غير صالح' };
+      try {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (!payload?.exp || Date.now() > Number(payload.exp)) {
+          return { valid: false, error: 'انتهت صلاحية رمز الجلسة' };
+        }
+        return {
+          valid: true,
+          portal: payload.portal as PortalType,
+          userId: payload.userId,
+          role: payload.role,
+          leagueId: payload.leagueId,
+          serverIssued: true
+        };
+      } catch {
+        return { valid: false, error: 'حمولة رمز الجلسة الخادمية غير صالحة' };
+      }
+    }
+
+    // ملصق جلسة محلي PFPv1 (حكام/مدربون)
     const parts = token.split('.');
     if (parts.length !== 5 || parts[0] !== 'PFPv1') {
       return { valid: false, error: 'تنسيق رمز الجلسة غير صالح' };
@@ -483,7 +625,7 @@ export class PortalAuthService {
     if (now - issued > 7 * 24 * 60 * 60 * 1000) {
       return { valid: false, error: 'انتهت صلاحية رمز الجلسة' };
     }
-    const expectedSig = computeSessionTokenSignature(portal, userId, issuedAt);
+    const expectedSig = computeLocalSessionChecksum(portal, userId, issuedAt);
     if (sig !== expectedSig) {
       return { valid: false, error: 'توقيع رمز الجلسة غير صالح أو تم التلاعب به' };
     }
@@ -493,7 +635,6 @@ export class PortalAuthService {
   public verifySession(sessionOrToken?: PortalSession | string | null): SessionVerificationResult {
     let token: string | undefined;
     let expectedPortal: PortalType | undefined;
-    let expectedRole: string | undefined;
     let leagueId: string | undefined;
     let username: string | undefined;
 
@@ -504,7 +645,6 @@ export class PortalAuthService {
       }
       token = active.token;
       expectedPortal = active.portal;
-      expectedRole = active.role;
       leagueId = active.leagueId;
       username = active.username;
     } else if (typeof sessionOrToken === 'string') {
@@ -512,7 +652,6 @@ export class PortalAuthService {
     } else {
       token = sessionOrToken.token;
       expectedPortal = sessionOrToken.portal;
-      expectedRole = sessionOrToken.role;
       leagueId = sessionOrToken.leagueId;
       username = sessionOrToken.username;
     }
@@ -527,11 +666,21 @@ export class PortalAuthService {
     }
 
     const portal = tokenVerification.portal!;
-    const role = expectedRole || (
-      portal === 'admin' ? 'super_admin' :
-      portal === 'league' ? 'league_admin' :
-      portal === 'coach' ? 'club_coach' : 'chief_judge'
-    );
+    // Stage 1: الدور للجلسات الخادمية يأتي من الحمولة الموقعة حصراً —
+    // الوسيط الممرّر من الواجهة (sessionOrToken.role) لا يُعتمد أبداً في القرار.
+    let role: string;
+    if (tokenVerification.serverIssued) {
+      role = tokenVerification.role || (
+        portal === 'admin' ? 'super_admin' :
+        portal === 'league' ? 'league_admin' : 'chief_judge'
+      );
+    } else {
+      // بوابة league/admin تتطلب جلسة موقعة خادمياً حصراً — الملصق المحلي لا يكفي
+      if (portal === 'league' || portal === 'admin') {
+        return { valid: false, error: 'بوابة الرابطة/الإدارة تتطلب جلسة موقعة خادمياً (PFPs1)' };
+      }
+      role = portal === 'coach' ? 'club_coach' : 'chief_judge';
+    }
 
     return {
       valid: true,
@@ -539,73 +688,49 @@ export class PortalAuthService {
       role,
       userId: tokenVerification.userId,
       username,
-      leagueId
+      leagueId: tokenVerification.serverIssued ? tokenVerification.leagueId : leagueId
+    };
+  }
+
+  /** بناء جلسة الواجهة من جلسة خادمية موقعة + بيانات الرابطة المحلية (للعرض فقط) */
+  private buildLeagueSession(serverSession: LeagueAuthGatewaySession, league?: RegisteredLeague): PortalSession {
+    return {
+      userId: serverSession.userId || `usr_league_${(league?.shortName || 'x').toLowerCase()}`,
+      username: league?.adminUsername || serverSession.username,
+      fullName: league?.adminFullName || league?.name || 'مدير الرابطة',
+      email: league?.officialEmail || '',
+      portal: 'league',
+      role: 'league_admin',
+      leagueId: serverSession.leagueId || league?.id,
+      leagueName: league?.name,
+      leagueShort: league?.shortName,
+      token: serverSession.token,
+      loggedInAt: new Date().toISOString()
     };
   }
 
   public async loginLeague(username: string, pass: string, targetLeagueId?: string): Promise<{ success: boolean; session?: PortalSession; error?: string }> {
-    const leagues = this.getAllLeagues();
     const cleanUser = username.trim().toLowerCase();
+    if (!cleanUser || !pass) {
+      return { success: false, error: 'اسم المستخدم وكلمة المرور مطلوبان.' };
+    }
 
-    // 1. Direct match on username, official email, or Saida alias
-    let match = leagues.find(l => {
-      if (!l.isActive || !l.adminPassword) return false;
-      const isSaidaAlias = 
-        l.id === 'lg_saida' && 
-        (cleanUser === 'saida_admin' || 
-         cleanUser === 'saida' || 
-         cleanUser === 'saida@athletic.dz' || 
-         cleanUser === 'lwas' || 
-         cleanUser === 'lwas_admin' || 
-         cleanUser === 'lwassaida20' ||
-         cleanUser === 'lwassaida20@gmail.com');
-      const userMatches = 
-        (l.adminUsername && l.adminUsername.toLowerCase() === cleanUser) || 
-        (l.officialEmail && l.officialEmail.toLowerCase() === cleanUser) ||
-        isSaidaAlias;
-      if (!userMatches) return false;
-      if (targetLeagueId && l.id !== targetLeagueId) return false;
-      return true;
+    // Stage 1: المصادقة عبر الخادم حصراً — لا مقارنة كلمات مرور في الواجهة إطلاقاً
+    const auth = await this.leagueAuthGateway.login({
+      username: cleanUser,
+      password: pass,
+      targetLeagueId
     });
-
-    // 2. Fallback match on short code or league ID
-    if (!match && !targetLeagueId) {
-      match = leagues.find(l => 
-        l.isActive && 
-        l.adminPassword &&
-        (l.shortName.toLowerCase() === cleanUser || l.id.toLowerCase() === cleanUser)
-      );
+    if (!auth.success || !auth.session) {
+      return { success: false, error: auth.error || 'بيانات الدخول غير صحيحة.' };
     }
 
-    if (!match) {
-      return { success: false, error: 'اسم المستخدم أو البريد الإلكتروني للرابطة غير موجود.' };
-    }
+    // بيانات العرض من السجل المحلي (الاسم/الشعار) — ليست قراراً أمنياً
+    const leagues = this.getAllLeagues(true);
+    const league = leagues.find(l => l.id === auth.session!.leagueId)
+      || (targetLeagueId ? leagues.find(l => l.id === targetLeagueId) : undefined);
 
-    const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
-    const passMatches = 
-      match.adminPassword === pass || 
-      (match.id === 'lg_saida' && (pass === 'Saida2026' || pass === 'Saida@2026')) ||
-      (isDev && pass === 'League@2026');
-    if (!passMatches) {
-      return { success: false, error: 'كلمة المرور غير صحيحة.' };
-    }
-
-    const userId = `usr_league_${match.shortName.toLowerCase()}`;
-    const token = this.generateSessionToken('league', userId);
-
-    const session: PortalSession = {
-      userId,
-      username: match.adminUsername,
-      fullName: match.adminFullName,
-      email: match.officialEmail,
-      portal: 'league',
-      role: 'league_admin',
-      leagueId: match.id,
-      leagueName: match.name,
-      leagueShort: match.shortName,
-      token,
-      loggedInAt: new Date().toISOString()
-    };
+    const session = this.buildLeagueSession(auth.session, league);
 
     // Enforce Single Active Account: clean previous sessions
     this.logoutAll();
@@ -739,29 +864,47 @@ export class PortalAuthService {
     return { success: true, session };
   }
 
+  /**
+   * Stage 1: مصادقة المدير عبر الخادم حصراً (POST /api/admin/login — timing-safe + rate limit).
+   * لا مقارنة كلمات مرور في الواجهة ولا أي قيمة افتراضية.
+   */
   public async loginAdmin(password: string): Promise<{ success: boolean; session?: PortalSession; error?: string }> {
-    const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
-    const envAdminPass = typeof process !== 'undefined' && process.env?.ADMIN_PORTAL_PASSWORD 
-      ? process.env.ADMIN_PORTAL_PASSWORD 
-      : (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_PORTAL_PASSWORD ? import.meta.env.VITE_ADMIN_PORTAL_PASSWORD : '');
+    try {
+      const resp = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      const data = await resp.json().catch(() => ({}));
+      const adminToken = data.token || data.adminToken;
 
-    const validAdminPass = envAdminPass || (isDev ? 'Admin@PhotoFinish2026!' : '');
-
-    if (!validAdminPass || password !== validAdminPass) {
-      return { success: false, error: 'كلمة مرور الإدارة العامة غير صحيحة.' };
+      if (resp.status === 429) {
+        return { success: false, error: data.error || 'تم تجاوز الحد الأقصى للمحاولات. انتظر 15 دقيقة.' };
+      }
+      if (!resp.ok || !data.success || !adminToken) {
+        return { success: false, error: data.error || 'كلمة مرور الإدارة غير صحيحة.' };
+      }
+      return this.adoptAdminServerSession(String(adminToken));
+    } catch {
+      return { success: false, error: 'تعذر الوصول إلى خادم المصادقة — دخول المدير يتطلب الخادم.' };
     }
+  }
 
-    const userId = 'usr_super_admin';
-    const token = this.generateSessionToken('admin', userId);
+  /** تبنّي جلسة إدارية موقعة خادمياً (تُستدعى بعد نجاح /api/admin/login) */
+  public adoptAdminServerSession(serverToken: string): { success: boolean; session?: PortalSession; error?: string } {
+    if (!serverToken) return { success: false, error: 'توكن الخادم مفقود.' };
+
+    const verification = this.verifySessionToken(serverToken);
+    const role = verification.valid && verification.role ? verification.role : 'super_admin';
 
     const session: PortalSession = {
-      userId,
+      userId: verification.valid ? verification.userId || 'usr_super_admin' : 'usr_super_admin',
       username: 'super_admin',
       fullName: 'مدير المنصة الشامل (Super Administrator)',
       email: 'admin@photofinish.ai',
       portal: 'admin',
-      role: 'super_admin',
-      token,
+      role: role === 'league_admin' ? 'league_admin' : 'super_admin',
+      token: serverToken,
       loggedInAt: new Date().toISOString()
     };
 
@@ -771,6 +914,11 @@ export class PortalAuthService {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
       localStorage.setItem(MASTER_ACTIVE_SESSION_KEY, JSON.stringify(session));
+      // توكن الخادم الموقّع متاح للخدمات الإدارية (licenseManager/pricingService)
+      try { localStorage.setItem('pfp_admin_session_token', serverToken); } catch { /* */ }
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      try { sessionStorage.setItem('pf_admin_token', serverToken); } catch { /* */ }
     }
     this.notify();
     return { success: true, session };
@@ -782,7 +930,13 @@ export class PortalAuthService {
       if (portal === 'league') localStorage.removeItem(LEAGUE_SESSION_KEY);
       else if (portal === 'coach') localStorage.removeItem(COACH_SESSION_KEY);
       else if (portal === 'judge') localStorage.removeItem(JUDGE_SESSION_KEY);
-      else if (portal === 'admin') localStorage.removeItem(ADMIN_SESSION_KEY);
+      else if (portal === 'admin') {
+        localStorage.removeItem(ADMIN_SESSION_KEY);
+        localStorage.removeItem('pfp_admin_session_token');
+      }
+    }
+    if (portal === 'admin' && typeof sessionStorage !== 'undefined') {
+      try { sessionStorage.removeItem('pf_admin_token'); } catch { /* */ }
     }
     this.notify();
   }

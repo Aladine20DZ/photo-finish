@@ -19,6 +19,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loginTestLeague } from './helpers/leagueAuthHarness';
 import { portalAuthService } from '../src/services/portalAuthService';
 import { competitionsService, NationalCompetition } from '../src/services/competitionsService';
 import { planningBureauService } from '../src/services/planningBureauService';
@@ -49,7 +50,7 @@ describe('Phase G: Final System Audit & End-to-End League Master Verification', 
   describe('1. Complete End-to-End Lifecycle: League -> Planning -> Judging -> Certification -> Archive -> Purge', () => {
     it('executes full federation workflow seamlessly with 100% data integrity and auditability', async () => {
       // Step A: League Admin Authentication
-      const loginRes = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const loginRes = await loginTestLeague();
       expect(loginRes.success).toBe(true);
       const leagueSession = loginRes.session!;
       expect(leagueSession.portal).toBe('league');
@@ -314,7 +315,7 @@ describe('Phase G: Final System Audit & End-to-End League Master Verification', 
     });
 
     it('blocks finish competition and returns pending disciplines list when uncertified disciplines exist', async () => {
-      const loginRes = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const loginRes = await loginTestLeague();
       const token = loginRes.session!.token;
 
       // Check canFinish
@@ -336,7 +337,7 @@ describe('Phase G: Final System Audit & End-to-End League Master Verification', 
     });
 
     it('allows resolving disciplines via rejection or certification, enabling final completion once all are resolved', async () => {
-      const loginRes = await portalAuthService.loginLeague('saida_admin', 'Saida@2026', 'lg_saida');
+      const loginRes = await loginTestLeague();
       const token = loginRes.session!.token;
 
       const disciplines = await competitionsBureauService.getCompetitionDisciplinesWithOperations(compPendingTestId);

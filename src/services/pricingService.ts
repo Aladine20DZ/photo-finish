@@ -252,7 +252,7 @@ class PricingService {
     this.saveSettings({ ...this._settings, customPackages: updated });
 
     if (typeof fetch !== 'undefined') {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       fetch('/api/licensing/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
@@ -269,7 +269,7 @@ class PricingService {
 
     const targetPkg = updated.find(p => p.id === id);
     if (targetPkg && typeof fetch !== 'undefined') {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       fetch('/api/licensing/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
@@ -283,7 +283,7 @@ class PricingService {
     this.saveSettings({ ...this._settings, customPackages: updated });
 
     if (typeof fetch !== 'undefined') {
-      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || 'offline-standalone-admin-session';
+      const adminToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('pfp_admin_session_token') : null) || '';
       fetch(`/api/licensing/plans?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${adminToken}` }

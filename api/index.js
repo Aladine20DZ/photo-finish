@@ -12,6 +12,7 @@ import { handleSyncRequest } from '../server/syncApi.js';
 import { handleLicensingRequest } from '../server/licensingApi.js';
 import * as security from '../server/security.js';
 import { getOrCreateRoomSession } from '../server/syncSessions.js';
+import { handleLeagueAuthRequest } from '../server/leagueAuthApi.js';
 
 // ═══ CORS مقيّد: ALLOWED_ORIGIN قائمة نطاقات مفصولة بفواصل (أو * للسماح الصريح) ═══
 export function resolveCorsOrigin(req) {
@@ -90,6 +91,12 @@ export default async function handler(req, res) {
         notificationId: `notif_${Date.now()}`,
         sentAt: new Date().toISOString()
       });
+    }
+
+    // 1.5 مصادقة الرابطات الخادمية (scrypt على الخادم + جلسات موقعة HMAC)
+    if (pathname.startsWith('/api/league/')) {
+      const result = await handleLeagueAuthRequest({ pathname, method, body: req.body, clientIp });
+      if (result) return res.status(result.status).json(result.json);
     }
 
     // 2. تسجيل دخول المدير الإداري (مقيّد بالمعدل — بلا أي قيمة افتراضية في الإنتاج)

@@ -26,8 +26,8 @@ export const DEFAULT_LICENSE_PUBLIC_KEY = 'QKXMTkpN9uC57U/O4G+N/9pUHyS3AgFOvrupy
 // ملاحظة أمنية حرجة: حُذف المفتاح الخاص المضمّن سابقاً من حزمة الواجهة —
 // المفاتيح الخاصة لا تُشحن أبداً في الباندل الأمامي. توقيع التراخيص Ed25519 يتوفر عبر:
 //   1) الخادم /api/admin/generate-license (المصدر الأساسي)
-//   2) متغير بيئة VITE_LICENSE_PRIVATE_KEY وقت البناء (بيئة موثوقة فقط)
-//   3) حقن وقت التشغيل setTrustedPrivateKeyBase64 (مولد التراخيص الخادمي أو الاختبار)
+//   2) حقن وقت التشغيل في الاختبارات حصراً (setTrustedPrivateKeyBase64) — لا متغيرات بناء للمفاتيح الخاصة في الواجهة إطلاقاً
+//   3) توليد التراخيص في الإنتاج عبر الخادم حصراً (server/security.js)
 // أما المولد المحلي PFP1 فلا يحتاج مفتاحاً خاصاً إطلاقاً (بصمة SHA-256 مبنية على المفتاح العام)
 
 export const ED25519_PUBLIC_KEY_BASE64: string =
@@ -359,9 +359,11 @@ export async function generateEd25519LicenseCode(params: {
     throw new Error('محرك التوقيع والتشفير غير متاح');
   }
 
-  const privKeyBase64 = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LICENSE_PRIVATE_KEY) || cachedPrivKeyBase64;
+  // Stage 1 Security: المفتاح الخاص لا يُضمَّن في حزمة المتصفح أبداً (صفر متغيرات بناء للمفاتيح الخاصة).
+  // التوقيع خادمي عبر /api/admin/generate-license؛ مسار الحقن هنا لبيئات الاختبار حصراً.
+  const privKeyBase64 = cachedPrivKeyBase64;
   if (!privKeyBase64) {
-    throw new Error('لا يوجد مفتاح خاص Ed25519 متاح لتوليد التراخيص محلياً — شغّل الخادم أو اضبط VITE_LICENSE_PRIVATE_KEY أو استخدم المولد المدمج PFP1');
+    throw new Error('توليد التراخيص يتم عبر الخادم (سجّل دخول المدير أولاً) — لا مفاتيح خاصة في حزمة الواجهة.');
   }
 
   const pkcs8Header = new Uint8Array([
