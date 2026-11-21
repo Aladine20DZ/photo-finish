@@ -20,6 +20,9 @@ try {
   DatabaseSync = null;
 }
 
+// خلفية Supabase/Postgres (تُستعمل فقط عند توفر مفاتيح الخادم — انظر createSyncStore)
+import { SupabaseSyncStore } from './syncStoreSupabase.js';
+
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS sync_messages (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,7 +121,7 @@ export class SyncStore {
    * إدخال دفعة رسائل مع إلغاء التكرار حسب (room, _msgId).
    * @returns {{accepted: string[], duplicates: string[]}}
    */
-  ingest(room, messages) {
+  async ingest(room, messages) {
     const accepted = [];
     const duplicates = [];
     const now = Date.now();
@@ -161,7 +164,7 @@ export class SyncStore {
   }
 
   /** استرجاع الرسائل بعد تسلسل معين (لتعويض فجوة الانقطاع) */
-  replay(room, sinceSeq = 0, limit = 500) {
+  async replay(room, sinceSeq = 0, limit = 500) {
     const cap = Math.min(Math.max(1, limit), 2000);
     if (this.usingSqlite) {
       return this.stReplay.all(String(room), Number(sinceSeq) || 0, cap)
@@ -179,7 +182,7 @@ export class SyncStore {
       }));
   }
 
-  latestSeq(room) {
+  async latestSeq(room) {
     if (this.usingSqlite) {
       const row = this.stLatestSeq.get(String(room));
       return row?.maxSeq || 0;
@@ -191,7 +194,7 @@ export class SyncStore {
     return max;
   }
 
-  messageCount(room) {
+  async messageCount(room) {
     if (this.usingSqlite) {
       const row = this.stCount.get(String(room));
       return row?.n || 0;
@@ -200,7 +203,7 @@ export class SyncStore {
   }
 
   /** توثيق سجل تدقيق خادمي (يدعم الدفعات) */
-  appendAudit(room, entries) {
+  async appendAudit(room, entries) {
     const now = Date.now();
     for (const e of (Array.isArray(entries) ? entries : [])) {
       const id = String(e?.id || `srv_${now}_${Math.random().toString(36).slice(2, 8)}`);
@@ -225,7 +228,7 @@ export class SyncStore {
     }
   }
 
-  listAudit(room, limit = 100) {
+  async listAudit(room, limit = 100) {
     const cap = Math.min(Math.max(1, limit), 1000);
     if (this.usingSqlite) {
       return this.stAuditList.all(String(room), cap);
@@ -237,7 +240,7 @@ export class SyncStore {
   }
 
   /** لقطة نسخة احتياطية (JSON كامل) */
-  saveSnapshot(room, kind, dataObj, messageCount) {
+  async saveSnapshot(room, kind, dataObj, messageCount) {
     const createdAt = Date.now();
     const data = JSON.stringify(dataObj);
     if (this.usingSqlite) {
@@ -249,7 +252,7 @@ export class SyncStore {
     return { id, createdAt };
   }
 
-  listSnapshots(room) {
+  async listSnapshots(room) {
     if (this.usingSqlite) return this.stSnapshotList.all(String(room));
     return this.memorySnapshots
       .filter(s => s.room === String(room))
@@ -257,7 +260,7 @@ export class SyncStore {
       .map(({ data, ...meta }) => meta);
   }
 
-  getSnapshot(id) {
+  async getSnapshot(id) {
     if (this.usingSqlite) {
       const row = this.stSnapshotGet.get(Number(id));
       return row ? { ...row, data: safeParse(row.data) } : null;
@@ -266,7 +269,7 @@ export class SyncStore {
     return found ? { ...found, data: safeParse(found.data) } : null;
   }
 
-  stats() {
+  async stats() {
     return {
       engine: this.usingSqlite ? 'node:sqlite' : 'memory-fallback',
       rooms: this._knownRooms().map(room => ({
@@ -277,7 +280,7 @@ export class SyncStore {
     };
   }
 
-  _knownRooms() {
+  async _knownRooms() {
     if (this.usingSqlite) {
       const rows = this.db.prepare(`SELECT DISTINCT room FROM sync_messages LIMIT 200`).all();
       return rows.map(r => r.room);
@@ -285,7 +288,7 @@ export class SyncStore {
     return [...new Set(this.memoryMessages.map(m => m.room))];
   }
 
-  close() {
+  async close() {
     if (this.usingSqlite && this.db) {
       try { this.db.close(); } catch { /* */ }
     }
@@ -296,8 +299,19 @@ function safeParse(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
 
-/** مصنع افتراضي: ملف على القرص في الإنتاج، ذاكرة في الاختبارات */
+/** مصنع افتراضي: Supabase/Postgres في السحابة (Vercel لا يحتفظ بالملفات)، SQLite على العقد الدائمة، الذاكرة في الاختبارات */
 export function createSyncStore({ dbPath } = {}) {
+  // 1) Supabase عند توفر مفاتيح الخادم حصراً (لا تُقرأ أبداً من الواجهة)
+  const sbUrl = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+  const sbKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (sbUrl && sbKey) {
+    try {
+      // المُنشئ متزامن: createClient لا يفتح اتصالاً شبكياً عند الإنشاء
+      return new SupabaseSyncStore();
+    } catch (e) {
+      console.warn('[SyncStore] تعذر تهيئة Supabase، التحويل إلى SQLite/الذاكرة:', e?.message || e);
+    }
+  }
   const resolved = dbPath
     || process.env.PFP_DB_PATH
     || (process.env.PFP_SYNC_MEMORY === '1' ? ':memory:' : null);

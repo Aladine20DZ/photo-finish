@@ -90,9 +90,19 @@ function getWsActiveRoles(room) {
 
 // ═══ خادم HTTP (فحص الصحة + أمان وتراخيص Ed25519 + مزامنة offline-first) ═══
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // CORS مقيّد بـ ALLOWED_ORIGIN (قائمة مفصولة بفواصل، أو * للسماح الصريح) — بلا مطابقة = بلا ترويسات CORS
+  {
+    const allowed = String(process.env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
+    let corsOrigin = null;
+    if (allowed.includes('*')) corsOrigin = '*';
+    else if (allowed.length > 0 && allowed.includes(String(req.headers.origin || ''))) corsOrigin = String(req.headers.origin || '');
+    if (corsOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+  }
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -204,9 +214,8 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/admin/generate-license' && req.method === 'POST') {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    const isOfflineDevToken = token === 'offline-standalone-admin-session';
-    const isDev = process.env.NODE_ENV !== 'production';
-    if (!security.verifyAdminToken(token) && !isOfflineDevToken && !isDev) {
+    // الأمن: بوابة توكن المدير الخادمي حصراً — لا أي تجاوزات تطوير في الإطلاق
+    if (!security.verifyAdminToken(token)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid admin token' }));
       return;

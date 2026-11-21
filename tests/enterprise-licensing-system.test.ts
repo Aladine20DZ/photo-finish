@@ -5,11 +5,26 @@ import * as security from '../server/security.js';
 import { licenseManager } from '../src/services/licenseManager';
 import { verifyEd25519LicenseCode, setTrustedPublicKeyBase64 } from '../src/services/securityService';
 
+/**
+ * Stage 1 Security: بوابة المدير عبر توكن خادمي حقيقي حصراً.
+ * الرمز السحري القديم 'offline-standalone-admin-session' أُزيل من الخوادم
+ * وأصبح يُرفض بـ401 — انظر tests/stage1-security-hardening.test.ts
+ */
+process.env.ADMIN_PORTAL_PASSWORD = 'Stage1TestAdmin#2026!';
+
+async function getAdminToken(): Promise<string> {
+  const res = security.verifyAdminLogin('Stage1TestAdmin#2026!', 'test-runner-ip');
+  if (!res.success || !res.adminToken) throw new Error('فشل إصدار توكن المدير للاختبار');
+  return res.adminToken;
+}
+
 describe('Enterprise Licensing & Subscription System (Master Prompt Verification)', () => {
   let store: any;
+  let adminToken: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     store = getLicensingStore();
+    adminToken = await getAdminToken();
     setTrustedPublicKeyBase64(security.getPublicKeyBase64());
   });
 
@@ -52,7 +67,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
         searchParams: new URLSearchParams(),
         method: 'POST',
         body: newPlanPayload,
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
 
       expect(res.status).toBe(200);
@@ -67,7 +82,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
         searchParams: new URLSearchParams(),
         method: 'POST',
         body: { id: createdId, name: 'باقة الأكاديميات الصيفية المحدثة', priceDZD: 14000 },
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
       expect(updateRes.status).toBe(200);
       expect(updateRes.json.plan.name).toBe('باقة الأكاديميات الصيفية المحدثة');
@@ -78,7 +93,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
         pathname: `/api/licensing/plans/${createdId}`,
         searchParams: new URLSearchParams(),
         method: 'DELETE',
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
       expect(delRes.status).toBe(200);
       expect(delRes.json.success).toBe(true);
@@ -101,7 +116,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
           count: 1,
           clientName: 'الاتحاد الوطني لألعاب القوى'
         },
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
 
       expect(res.status).toBe(200);
@@ -128,7 +143,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
           count: 10,
           clientName: 'رابطة سعيدة الولائية'
         },
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
 
       expect(res.status).toBe(200);
@@ -158,7 +173,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
         searchParams: new URLSearchParams(),
         method: 'POST',
         body: { tier: 'ENTX', expCode: '2712', devHash: 'POOL', count: 1, clientName: 'سباق الماراثون' },
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
       const code = genRes.json.licenseCode;
 
@@ -237,7 +252,7 @@ describe('Enterprise Licensing & Subscription System (Master Prompt Verification
         searchParams: new URLSearchParams(),
         method: 'POST',
         body: { code, months: 12 },
-        authHeader: 'offline-standalone-admin-session'
+        authHeader: adminToken
       });
 
       expect(renewRes.status).toBe(200);

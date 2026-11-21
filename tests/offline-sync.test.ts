@@ -30,54 +30,54 @@ describe('Server-side idempotency ledger (SyncStore)', () => {
     store = new SyncStore({ dbPath: ':memory:' });
   });
 
-  it('accepts each message id exactly once across repeated ingests', () => {
+  it('accepts each message id exactly once across repeated ingests', async () => {
     const batch = [makeMsg(1), makeMsg(2), makeMsg(3)];
 
-    const r1 = store.ingest('R-OUTAGE', batch);
+    const r1 = await store.ingest('R-OUTAGE', batch);
     expect(r1.accepted).toHaveLength(3);
     expect(r1.duplicates).toHaveLength(0);
 
     // نفس الدفعة تُرسل 4 مرات أخرى (إعادة محاولات بعد انقطاع متكرر)
     for (let round = 0; round < 4; round++) {
-      const r = store.ingest('R-OUTAGE', batch);
+      const r = await store.ingest('R-OUTAGE', batch);
       expect(r.accepted).toHaveLength(0);
       expect(r.duplicates).toHaveLength(3);
     }
 
-    expect(store.messageCount('R-OUTAGE')).toBe(3);
+    expect(await store.messageCount('R-OUTAGE')).toBe(3);
   });
 
-  it('replays missing gap in strict order after reconnection', () => {
+  it('replays missing gap in strict order after reconnection', async () => {
     const batch = Array.from({ length: 25 }, (_, i) => makeMsg(i));
-    store.ingest('R-OUTAGE', batch);
+    await store.ingest('R-OUTAGE', batch);
 
-    const latest = store.latestSeq('R-OUTAGE');
+    const latest = await store.latestSeq('R-OUTAGE');
     expect(latest).toBe(25);
 
     // جهاز فاته كل شيء منذ البداية
-    const full = store.replay('R-OUTAGE', 0);
+    const full = await store.replay('R-OUTAGE', 0);
     expect(full).toHaveLength(25);
     expect(full.map(m => m.seq)).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
 
     // جهاز فاته آخر 10 رسائل فقط
-    const partial = store.replay('R-OUTAGE', 15);
+    const partial = await store.replay('R-OUTAGE', 15);
     expect(partial).toHaveLength(10);
     expect(partial[0].seq).toBe(16);
   });
 
-  it('keeps rooms isolated', () => {
-    store.ingest('ROOM-A', [makeMsg(1)]);
-    store.ingest('ROOM-B', [makeMsg(2)]);
-    expect(store.messageCount('ROOM-A')).toBe(1);
-    expect(store.messageCount('ROOM-B')).toBe(1);
-    expect(store.replay('ROOM-A', 0).every(m => m.room === 'ROOM-A')).toBe(true);
+  it('keeps rooms isolated', async () => {
+    await store.ingest('ROOM-A', [makeMsg(1)]);
+    await store.ingest('ROOM-B', [makeMsg(2)]);
+    expect(await store.messageCount('ROOM-A')).toBe(1);
+    expect(await store.messageCount('ROOM-B')).toBe(1);
+    expect((await store.replay('ROOM-A', 0)).every(m => m.room === 'ROOM-A')).toBe(true);
   });
 
-  it('rejects messages without idempotency keys (cannot guarantee zero-duplicate)', () => {
-    const r = store.ingest('R-OUTAGE', [{ type: 'LANE_FINISH', _senderRole: 'finish' }]);
+  it('rejects messages without idempotency keys (cannot guarantee zero-duplicate)', async () => {
+    const r = await store.ingest('R-OUTAGE', [{ type: 'LANE_FINISH', _senderRole: 'finish' }]);
     expect(r.accepted).toHaveLength(0);
     expect(r.duplicates).toHaveLength(0);
-    expect(store.messageCount('R-OUTAGE')).toBe(0);
+    expect(await store.messageCount('R-OUTAGE')).toBe(0);
   });
 });
 

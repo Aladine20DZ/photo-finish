@@ -74,18 +74,35 @@ const privateKeyObject = crypto.createPrivateKey({
   type: 'pkcs8'
 });
 
-// كلمة مرور المدير: تأخذ من متغير البيئة ADMIN_PORTAL_PASSWORD، مع قيمة افتراضية آمنة للتطوير والمعاينة
+// ═══ كلمة مرور المدير (Zero Default Passwords Policy) ═══
+// المصدر الوحيد المعتمد: متغير البيئة ADMIN_PORTAL_PASSWORD.
+// - الإنتاج: غياب المتغير = لا كلمة مرور إطلاقاً (verifyAdminLogin يعيد 503) — لا قيمة افتراضية أبداً.
+// - التطوير: تُولّد كلمة عشوائية قوية لكل إقلاع وتُطبع مرة واحدة في طرفية خادم التطوير حصراً.
+let devEphemeralAdminPassword = '';
+
+export function isProductionEnvironment() {
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
 export function resolveAdminPassword() {
   const fromEnv = String(process.env.ADMIN_PORTAL_PASSWORD || '').trim();
   if (fromEnv) return fromEnv;
-  return 'Admin@PhotoFinish2026!';
+  if (isProductionEnvironment()) return null; // صفر قيم افتراضية في الإنتاج
+  if (!devEphemeralAdminPassword) {
+    devEphemeralAdminPassword = crypto.randomBytes(18).toString('base64url');
+    console.warn('══════════════════════════════════════════════════════════');
+    console.warn('[Security] ADMIN_PORTAL_PASSWORD غير مضبوط — كلمة مرور مؤقتة لجلسة التطوير الحالية فقط:');
+    console.warn(`    ${devEphemeralAdminPassword}`);
+    console.warn('تتغير مع كل إقلاع. للقيمة الدائمة اضبط ADMIN_PORTAL_PASSWORD في .env');
+    console.warn('══════════════════════════════════════════════════════════');
+  }
+  return devEphemeralAdminPassword;
 }
 
 export function getValidPasswords() {
-  return [resolveAdminPassword()];
+  const p = resolveAdminPassword();
+  return p ? [p] : [];
 }
-
-export const VALID_PASSWORDS = [resolveAdminPassword()];
 
 // ═══ حماية محاولات تسجيل الدخول (Rate Limiting) ═══
 const loginAttempts = new Map(); // ip -> { count: number, resetAt: number }
@@ -126,6 +143,14 @@ export function verifyAdminLogin(password, clientIp = '127.0.0.1') {
 
   // مقارنة آمنة ضد هجمات التوقيت مع كلمة مرور المدير
   const targetPassword = resolveAdminPassword();
+  if (!targetPassword) {
+    // الإنتاج بلا تهيئة = رفض صريح لا كلمة مرور افتراضية
+    return {
+      success: false,
+      status: 503,
+      error: 'الخادم غير مهيأ: يجب ضبط ADMIN_PORTAL_PASSWORD في متغيرات بيئة الخادم قبل تسجيل الدخول.'
+    };
+  }
   const cleanInput = String(password || '').trim();
   const inputBuffer = Buffer.from(cleanInput);
   const targetBuffer = Buffer.from(targetPassword);

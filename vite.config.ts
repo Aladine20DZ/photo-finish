@@ -434,9 +434,8 @@ function raceRelayPlugin(): Plugin {
       if (parsedUrl.pathname === '/api/admin/generate-license' && req.method === 'POST') {
         const authHeader = (req.headers['authorization'] || '').toString();
         const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-        const isOfflineDevToken = token === 'offline-standalone-admin-session';
-        const isDev = process.env.NODE_ENV !== 'production';
-        if (!security.verifyAdminToken(token) && !isOfflineDevToken && !isDev) {
+        // الأمن: بوابة توكن المدير الخادمي حصراً — حتى في التطوير (سجّل دخولك من AdminGate أولاً)
+        if (!security.verifyAdminToken(token)) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid admin token' }));
           return;
@@ -532,45 +531,60 @@ function raceRelayPlugin(): Plugin {
           parsedUrl.pathname.startsWith('/api/backup/') ||
           parsedUrl.pathname === '/api/audit') {
         const isPost = req.method === 'POST';
+        const clientIpSync = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
         if (!isPost) {
-          const result = handleSyncRequest({
+          handleSyncRequest({
             pathname: parsedUrl.pathname,
             searchParams: parsedUrl.searchParams,
             method: req.method || 'GET',
             body: null,
             getOrCreateSession,
-            verifyAdminToken: (t: string) => security.verifyAdminToken(t)
+            verifyAdminToken: (t: string) => security.verifyAdminToken(t),
+            clientIp: clientIpSync
+          }).then((result) => {
+            if (result) {
+              res.writeHead(result.status, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(result.json));
+            } else {
+              res.writeHead(404, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+            }
+          }).catch(() => {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Sync handler error' }));
           });
-          if (result) {
-            res.writeHead(result.status, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(result.json));
-            return;
-          }
+          return;
         } else {
           let raw = '';
           req.on('data', (chunk: any) => { raw += chunk; });
-          req.on('end', () => {
+          req.on('end', async () => {
             let parsedBody: any = null;
             try { parsedBody = JSON.parse(raw || '{}'); } catch (e) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
               return;
             }
-            const result = handleSyncRequest({
-              pathname: parsedUrl.pathname,
-              searchParams: parsedUrl.searchParams,
-              method: 'POST',
-              body: parsedBody,
-              getOrCreateSession,
-              verifyAdminToken: (t: string) => security.verifyAdminToken(t)
-            });
-            if (result) {
-              res.writeHead(result.status, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify(result.json));
-              return;
+            try {
+              const result = await handleSyncRequest({
+                pathname: parsedUrl.pathname,
+                searchParams: parsedUrl.searchParams,
+                method: 'POST',
+                body: parsedBody,
+                getOrCreateSession,
+                verifyAdminToken: (t: string) => security.verifyAdminToken(t),
+                clientIp: clientIpSync
+              });
+              if (result) {
+                res.writeHead(result.status, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result.json));
+                return;
+              }
+              res.writeHead(404, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+            } catch (e) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: false, error: 'Sync handler error' }));
             }
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Not found' }));
           });
           return;
         }
@@ -642,10 +656,10 @@ function raceRelayPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  // Zero Default Passwords: كلمة مرور المدير تأتي من البيئة/.env حصراً؛
+  // غيابها في التطوير يولّد عشوائية لكل إقلاع (تُطبع في طرفية الخادم بواسطة server/security.js).
   if (env.ADMIN_PORTAL_PASSWORD) {
     process.env.ADMIN_PORTAL_PASSWORD = env.ADMIN_PORTAL_PASSWORD;
-  } else if (!process.env.ADMIN_PORTAL_PASSWORD) {
-    process.env.ADMIN_PORTAL_PASSWORD = 'Admin@PhotoFinish2026!';
   }
 
   return {

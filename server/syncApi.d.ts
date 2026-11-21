@@ -4,11 +4,16 @@ export interface SyncRequestResult {
 }
 
 export function getSyncStore(): unknown;
+
+/**
+ * معالج المزامنة الموحد (async: يدعم SQLite/Supabase/الذاكرة وجلسات الغرف الدائمة)
+ */
 export function handleSyncRequest(params: {
   pathname: string;
   searchParams: URLSearchParams;
   method: string;
   body: any;
-  getOrCreateSession: (room: string) => string;
+  getOrCreateSession: (room: string) => string | Promise<string>;
   verifyAdminToken: (token: string) => boolean;
-}): SyncRequestResult | null;
+  clientIp?: string;
+}): Promise<SyncRequestResult | null>;

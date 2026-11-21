@@ -3,14 +3,25 @@
  * ==============================================================================
  * يعالج جميع استدعاءات /api/... عند النشر على Vercel السحابي:
  * - التحقق والتوقيع بالمفتاح العام Ed25519
- * - تسجيل دخول المدير الإداري
- * - إدارة الباقات والتراخيص المركزية
- * - مزامنة السباقات والمستندات
+ * - تسجيل دخول المدير الإداري (مقيّد بمعدل المحاولات، بلا أي كلمة مرور افتراضية)
+ * - إدارة الباقات والتراخيص المركزية (بوابة توكن المدير حصراً)
+ * - مزامنة السباقات والمستندات (جلسات غرف دائمة عبر Supabase عند توفر المفاتيح)
  */
 
-import * as security from '../server/security.js';
 import { handleSyncRequest } from '../server/syncApi.js';
 import { handleLicensingRequest } from '../server/licensingApi.js';
+import * as security from '../server/security.js';
+import { getOrCreateRoomSession } from '../server/syncSessions.js';
+
+// ═══ CORS مقيّد: ALLOWED_ORIGIN قائمة نطاقات مفصولة بفواصل (أو * للسماح الصريح) ═══
+export function resolveCorsOrigin(req) {
+  const raw = String(process.env.ALLOWED_ORIGIN || '');
+  const allowed = raw.split(',').map(s => s.trim()).filter(Boolean);
+  if (allowed.length === 0) return null; // بلا تهيئة = بلا CORS عابر للنطاقات
+  if (allowed.includes('*')) return '*';
+  const origin = String(req.headers.origin || '');
+  return allowed.includes(origin) ? origin : null;
+}
 
 export default async function handler(req, res) {
   const host = req.headers.host || 'localhost';
@@ -22,10 +33,14 @@ export default async function handler(req, res) {
   const authHeader = req.headers.authorization || '';
   const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket?.remoteAddress || '127.0.0.1';
 
-  // ضبط ترويسات CORS الموحدة
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE, PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // ضبط ترويسات CORS — لا ترويسات CORS للنطاقات غير المصرّح بها
+  const corsOrigin = resolveCorsOrigin(req);
+  if (corsOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE, PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
 
   if (method === 'OPTIONS') {
     return res.status(200).end();
@@ -77,7 +92,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. تسجيل دخول المدير الإداري
+    // 2. تسجيل دخول المدير الإداري (مقيّد بالمعدل — بلا أي قيمة افتراضية في الإنتاج)
     if (pathname === '/api/admin/login' && method === 'POST') {
       const { password } = req.body || {};
       const result = security.verifyAdminLogin(password, clientIp);
@@ -97,12 +112,10 @@ export default async function handler(req, res) {
       if (result) return res.status(result.status).json(result.json);
     }
 
-    // 4. توليد التراخيص القديم (التوافق الخلفي)
+    // 4. توليد التراخيص القديم (التوافق الخلفي) — بوابة توكن المدير حصراً
     if (pathname === '/api/admin/generate-license' && method === 'POST') {
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-      const isOfflineDevToken = token === 'offline-standalone-admin-session';
-      const isDev = process.env.NODE_ENV !== 'production';
-      if (!security.verifyAdminToken(token) && !isOfflineDevToken && !isDev) {
+      if (!security.verifyAdminToken(token)) {
         return res.status(401).json({ ok: false, error: 'Unauthorized: Invalid admin token' });
       }
       const { tier, expCode, expiryCode, devHash } = req.body || {};
@@ -110,15 +123,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, licenseCode: code, code });
     }
 
-    // 5. المزامنة والنسخ الاحتياطي
+    // 5. المزامنة والنسخ الاحتياطي — جلسات الغرف دائمة عبر Supabase عند توفر المفاتيح
     if (pathname.startsWith('/api/sync/') || pathname.startsWith('/api/backup/') || pathname === '/api/audit') {
-      const result = handleSyncRequest({
+      const syncRoom = String((req.body && req.body.room) || searchParams.get('room') || '').trim().toUpperCase();
+      const roomSession = await getOrCreateRoomSession(syncRoom || 'GLOBAL');
+      const result = await handleSyncRequest({
         pathname,
         searchParams,
         method,
         body: req.body,
-        getOrCreateSession: () => 'vercel-session',
-        verifyAdminToken: (t) => security.verifyAdminToken(t)
+        getOrCreateSession: () => roomSession,
+        verifyAdminToken: (t) => security.verifyAdminToken(t),
+        clientIp
       });
       if (result) return res.status(result.status).json(result.json);
     }

@@ -10,10 +10,30 @@
 import { getLicensingStore } from './licensingStore.js';
 import * as security from './security.js';
 
+// ═══ تحديد معدل التفعيل (Rate Limiting) — تخمين أكواد التراخيص غير مقبول ═══
+const activateAttempts = new Map(); // ip -> { count, resetAt }
+const ACTIVATE_LIMIT = 30;                  // محاولة كحد أقصى لكل IP
+const ACTIVATE_WINDOW_MS = 60 * 60 * 1000;  // خلال كل ساعة
+
+function checkActivationRateLimit(clientIp) {
+  const now = Date.now();
+  const rec = activateAttempts.get(clientIp) || { count: 0, resetAt: now + ACTIVATE_WINDOW_MS };
+  if (now > rec.resetAt) { rec.count = 0; rec.resetAt = now + ACTIVATE_WINDOW_MS; }
+  rec.count += 1;
+  activateAttempts.set(clientIp, rec);
+  return {
+    allowed: rec.count <= ACTIVATE_LIMIT,
+    retryAfterMin: Math.max(1, Math.ceil((rec.resetAt - now) / 60000))
+  };
+}
+
 export async function handleLicensingRequest({ pathname, searchParams, method, body, authHeader, clientIp = '127.0.0.1' }) {
   const store = getLicensingStore();
   const token = (authHeader || '').toString().startsWith('Bearer ') ? (authHeader || '').toString().slice(7) : (authHeader || '').toString();
-  const isAdmin = security.verifyAdminToken(token) || token === 'offline-standalone-admin-session' || process.env.NODE_ENV !== 'production';
+  // الأمن: بوابة المدير عبر التوكن الخادمي الموقّع حصراً — لا أي تجاوزات إطلاقاً
+  // (ثغرتا الرمز السحري وتجاوز NODE_ENV أُزيلتا نهائياً في المرحلة 1؛
+  //  يمنع اختبار stage1-security-hardening عودتهما).
+  const isAdmin = security.verifyAdminToken(token);
 
   // ── 1. جلب قائمة الباقات (Public / Admin) ──
   if (pathname === '/api/licensing/plans' && method === 'GET') {
@@ -122,6 +142,12 @@ export async function handleLicensingRequest({ pathname, searchParams, method, b
 
     if (!rawCode) return { status: 400, json: { ok: false, error: 'يرجى إدخال كود الترخيص أولاً.' } };
     if (!deviceId) return { status: 400, json: { ok: false, error: 'معرف الجهاز مطلوب للتفعيل.' } };
+
+    // 0-bis. تحديد معدل المحاولات: منع تخمين الأكواد (خصوصاً مع مطابقة التشابه)
+    const rl = checkActivationRateLimit(clientIp);
+    if (!rl.allowed) {
+      return { status: 429, json: { ok: false, error: `تم تجاوز حد محاولات التفعيل المسموح. أعد المحاولة بعد ${rl.retryAfterMin} دقيقة تقريباً.` } };
+    }
 
     // 0. تسوية الكود والتسامح مع تحويل حالة الأحرف أو التباسات OCR عبر مخزن التراخيص
     const allLicenses = store.listLicenses();

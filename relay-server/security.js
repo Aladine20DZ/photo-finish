@@ -72,10 +72,20 @@ const privateKeyObject = crypto.createPrivateKey({
 // كلمة مرور المدير: تأخذ حصراً من متغير البيئة ADMIN_PORTAL_PASSWORD.
 // NOTE أمني (Zero Backdoors Policy): لا توجد أي كلمات مرور افتراضية في المستودع.
 // إذا لم تُضبط عبر البيئة، يولّد الخادم كلمة عشوائية قوية عند الإقلاع ويطبعها مرة واحدة.
+function isProductionEnvironment() {
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
+let devEphemeralAdminPassword = '';
 function resolveAdminPassword() {
   const fromEnv = String(process.env.ADMIN_PORTAL_PASSWORD || '').trim();
   if (fromEnv) return fromEnv;
-  return 'Admin@PhotoFinish2026!';
+  if (isProductionEnvironment()) return null; // صفر قيم افتراضية في الإنتاج — يتطلب ADMIN_PORTAL_PASSWORD
+  if (!devEphemeralAdminPassword) {
+    devEphemeralAdminPassword = crypto.randomBytes(18).toString('base64url');
+    console.warn('[Security] ADMIN_PORTAL_PASSWORD غير مضبوط — كلمة مرور مؤقتة لجلسة التطوير الحالية فقط:', devEphemeralAdminPassword);
+  }
+  return devEphemeralAdminPassword;
 }
 const ADMIN_PASSWORD = resolveAdminPassword();
 
@@ -114,7 +124,15 @@ function verifyAdminLogin(password, clientIp = '127.0.0.1') {
     };
   }
 
-  // مقارنة آمنة ضد هجمات التوقيت مع كلمة مرور المدير الوحيدة (من البيئة أو مولّدة)
+  // مقارنة آمنة ضد هجمات التوقيت مع كلمة مرور المدير الوحيدة (من البيئة أو مولّدة للتطوير)
+  if (!ADMIN_PASSWORD) {
+    // الإنتاج بلا تهيئة = رفض صريح لا كلمة مرور افتراضية
+    return {
+      success: false,
+      status: 503,
+      error: 'الخادم غير مهيأ: يجب ضبط ADMIN_PORTAL_PASSWORD في متغيرات بيئة الخادم قبل تسجيل الدخول.'
+    };
+  }
   const cleanInput = String(password || '').trim();
   const inputBuffer = Buffer.from(cleanInput);
   const targetBuffer = Buffer.from(ADMIN_PASSWORD);

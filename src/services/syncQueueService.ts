@@ -75,9 +75,33 @@ class SyncQueueService {
 
   private pullCallback: ((msg: NetworkPeerMessage) => void) | null = null;
   private listeners = new Set<() => void>();
+  private lastBootstrapAt = 0;
 
   public roomCode = 'RACE-2026';
   public sessionToken = '';
+
+  /**
+   * التوكين إلزامي خادمياً (Stage 1): إذا لم يصل التوكين من قناة WS/SSE
+   * نجلبه من /api/session قبل أول تدفق/استرجاع (محاولة كل 30 ثانية كحد أقصى).
+   */
+  private async ensureSessionToken(): Promise<void> {
+    if (this.sessionToken) return;
+    const now = Date.now();
+    if (now - this.lastBootstrapAt < 30_000) return;
+    this.lastBootstrapAt = now;
+    try {
+      const res = await fetch(`${this.apiBase}/api/session?room=${encodeURIComponent(this.roomCode)}`);
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        const token = String((data as any)?.sessionToken || '');
+        if (token) {
+          this.sessionToken = token;
+          this.lastBootstrapAt = 0;
+          this.notify();
+        }
+      }
+    } catch { /* الخادم غير متاح — تُعاد المحاولة عند التدفق القادم */ }
+  }
 
   constructor() {
     this.initStorage();
@@ -230,6 +254,7 @@ class SyncQueueService {
     if (this.memQueue.length === 0) return { ok: true, accepted: 0, duplicates: 0 };
     if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
 
+    await this.ensureSessionToken();
     this.flushing = true;
     let totalAccepted = 0;
     let totalDuplicates = 0;
@@ -298,7 +323,7 @@ class SyncQueueService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           room: this.roomCode,
-          sessionToken: this.sessionToken || undefined,
+          sessionToken: this.sessionToken,
           messages: batch.map(b => b.payload),
         }),
       });
@@ -323,6 +348,7 @@ class SyncQueueService {
     if (this.transportOverride && !force) {
       // في الاختبارات يُستدعى صراحة
     }
+    await this.ensureSessionToken();
     try {
       let fetched = 0;
       let since = this.lastServerSeq;
