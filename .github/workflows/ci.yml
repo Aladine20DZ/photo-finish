@@ -50,10 +50,22 @@ jobs:
 
       - name: Post-Build Secret Leakage Check
         run: |
-          echo "🔍 Verifying built bundle does not contain leaked private keys..."
-          # Scans bundle for private key keywords or signing secrets
-          if grep -E 'ydyqLd\+QflMzl6NTdma1ZUq6BidICTTaxpunjhoLRkA|BEGIN PRIVATE KEY' dist/index.html; then
-            echo "❌ SECURITY FAILURE: Private signing key leaked into frontend bundle!"
+          echo "🔍 Verifying the production bundle is free of private keys, passwords, session secrets, and provider tokens..."
+          # المرحلة 1: فحص موسّع — لا بصمة مفتاح مسرب في ملف CI نفسه، ولا أي سر معروف يدخل الحزمة
+          if grep -E 'BEGIN PRIVATE KEY|BEGIN RSA PRIVATE KEY' dist/index.html; then
+            echo "❌ SECURITY FAILURE: Private key material leaked into frontend bundle!"
             exit 1
           fi
-          echo "✅ Production bundle passed zero-secret verification."
+          if grep -E 'Admin@PhotoFinish2026|Saida2026|pfp_sec_session_k92|offline-standalone-admin-session' dist/index.html; then
+            echo "❌ SECURITY FAILURE: Known credential literal leaked into frontend bundle!"
+            exit 1
+          fi
+          if grep -E 'ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|VITE_LICENSE_PRIVATE_KEY|VITE_ADMIN_PORTAL_PASSWORD' dist/index.html; then
+            echo "❌ SECURITY FAILURE: Provider token or secret env reference leaked into frontend bundle!"
+            exit 1
+          fi
+          if grep -E 'PFP2-[A-Z0-9]{4}-[0-9]{4}-(POOL|GLBL|GLOBAL)' dist/index.html; then
+            echo "❌ SECURITY FAILURE: License code material leaked into frontend bundle!"
+            exit 1
+          fi
+          echo "✅ Production bundle passed zero-secret verification (keys, passwords, session secrets, tokens, license codes)."

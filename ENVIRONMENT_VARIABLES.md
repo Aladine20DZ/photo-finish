@@ -31,8 +31,10 @@
 | `VITE_FIREBASE_MESSAGING_SENDER_ID`| String | للإشعارات | `102938475610` | رقم تعريف مرسل رسائل FCM |
 | `VITE_FIREBASE_APP_ID` | String | للإشعارات | `1:102938475610:web:abc` | معرف تطبيق الويب المسجل في Firebase |
 | `VITE_FIREBASE_VAPID_KEY` | String (B64) | للإشعارات | `BNx7...` | مفتاح VAPID العام لاشتراك Web Push |
-| `VITE_DEFAULT_LEAGUE_PASSWORD` | String | للإنتاج | `SecureLeaguePass2026!` | كلمة مرور أولية لمشرف الرابطة |
-| `VITE_SESSION_SECRET` | String (Hash) | نعم | `sha256_random_string` | توقيع وتشفير جلسات التخزين المحلي |
+
+> **المرحلة 1 (أمني):** لا يوجد أي سر تحت بادئة `VITE_` إطلاقاً — حُذفت
+> `VITE_DEFAULT_LEAGUE_PASSWORD` و`VITE_SESSION_SECRET` و`VITE_ADMIN_PORTAL_PASSWORD`
+> نهائياً من المنظومة. كلمات مرور الرابطات تعيش على الخادم (scrypt) والجلسات تُوقّع خادمياً.
 
 ---
 
@@ -40,10 +42,12 @@
 
 | اسم المتغير | المنصة | درجة السرية | مثال | الوصف |
 |---|---|---|---|---|
-| `ADMIN_PORTAL_PASSWORD` | Vercel | سرية حرجة 🔴 | `ComplexP@ssw0rd2026!` | كلمة مرور الدخول للوحة التحكم المركزية |
+| `ADMIN_PORTAL_PASSWORD` | Vercel & Render | سرية حرجة 🔴 | (بلا أي قيمة افتراضية — الإنتاج يرفض الدخول بـ503 بدوها) | كلمة مرور دخول لوحة الإدارة (timing-safe + قفل 5/15د/IP) |
+| `SESSION_SECRET` | Vercel & Render | سرية حرجة 🔴 | `openssl rand -base64 48` | سر توقيع جلسات الرابطات/المديرين (HMAC PFPs1) — إلزامي في الإنتاج |
+| `SUPABASE_URL` | Vercel & Render | عامة 🟢 | `https://xyz.supabase.co` | نقطة اتصال الخادم بمشروع Supabase (مع مفتاح الخدمة يفعّل مخازن Postgres الدائمة) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel | سرية قصوى 🔴 | `eyJhbGciOiJI...` | يتجاوز RLS للعمليات الإدارية الخادمة |
-| `LICENSE_PRIVATE_KEY_BASE64` | Vercel | سرية قصوى 🔴 | `ydyqLd+Qfl...` | المفتاح الخاص لتوقيع تراخيص Ed25519 |
-| `LICENSE_PUBLIC_KEY_BASE64` | Vercel & Render | عامة 🟢 | `QKXMTkpN9u...` | المفتاح العام المعتمد للتحقق من التوقيع |
+| `LICENSE_PRIVATE_KEY_BASE64` | Vercel & Render | سرية قصوى 🔴 | `…base64_pkcs8_seed…` (بصمة فقط، لا مثال حقيقي) | المفتاح الخاص لتوقيع تراخيص Ed25519 — ولّده عبر `node scripts/rotate-license-keys.mjs` |
+| `LICENSE_PUBLIC_KEY_BASE64` | Vercel & Render | عامة 🟢 | مثال حقيقي محذوف — ضع مفتاحك بعد التدوير | المفتاح العام المعتمد للتحقق من التوقيع (القيمة القديمة المنشورة مفسوحة) |
 | `FIREBASE_SERVICE_ACCOUNT_KEY`| Vercel | سرية قصوى 🔴 | `{"type":"service_account"...}`| اعتماد خادم Firebase لإرسال الإشعارات |
 | `ALLOWED_ORIGIN` | Render & Vercel | متوسطة 🟡 | `https://photo-finish.vercel.app`| تقييد اتصالات CORS و WebSocket |
 | `PORT` | Render | تشغيلية 🟢 | `8080` | منفذ تشغيل خدمة خادم الترحيل |
@@ -60,5 +64,5 @@
 
 ### 4.2 على Render:
 1. اذهب إلى **Dashboard > photo-finish-relay > Environment**.
-2. أضف `PORT=8080` و `NODE_ENV=production` و `ALLOWED_ORIGIN`.
-3. لا يحتاج خادم الترحيل إلى مفاتيح قاعدة البيانات المركزية لأنه يعمل كوسيط لنقل الرسائل المشفرة بين الهواتف فقط دون فك تشفير البيانات الرياضية.
+2. أضف `PORT=8080` و `NODE_ENV=production` و `ALLOWED_ORIGIN` و `ADMIN_PORTAL_PASSWORD` و `SESSION_SECRET` و مفاتيح الترخيص (render.yaml يطلبهما كمتغيرات sync:false).
+3. خادم الترحيل يصبح الآن حاملاً لمصادقة الرابطات ومخازن SQLite الدائمة — كلمات مروره تأتي من البيئة حصراً ولا قيم افتراضية له.

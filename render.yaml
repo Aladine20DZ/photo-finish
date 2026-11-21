@@ -13,3 +13,14 @@ services:
         value: production
       - key: PORT
         value: 8080
+      # المرحلة 1 (Zero Default Secrets): تُملأ من لوحة Render حصراً — الإقلاع يفشل صريحاً بدوها في الإنتاج
+      - key: ADMIN_PORTAL_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: LICENSE_PRIVATE_KEY_BASE64
+        sync: false
+      - key: LICENSE_PUBLIC_KEY_BASE64
+        sync: false

@@ -153,51 +153,80 @@ describe('Enterprise Licensing Case Resilience & OCR Correction Suite', () => {
     expect(res.json.license.code).toBe(code);
   });
 
-  it('activates the exact license code from Image 3 (PFP2-CLB8-2705-POOL-...) seamlessly', async () => {
-    const codeImg3 = 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BZaN-poapNrx-_DQ';
-    const res = await licenseManager.activateCode(codeImg3);
+  it('rejects the burned seeded code from Image 3 (backdoor closed) and activates a generated POOL code', async () => {
+    // الكود القديم المزروع: صار مرفوضاً بعد إزالة قائمة التراخيص المدمجة
+    const burned = 'PFP2-CLB8-2705-POOL-EctvjOnWe7ymdZWt8MzCcTI3DAF2WsFZOrzN1S20vvEnf46HV6VH9ZJ3eT5eND2QOS9H2BZaN-poapNrx-_DQ';
+    const burnedRes = await licenseManager.activateCode(burned);
+    expect(burnedRes.success).toBe(false);
+
+    // البديل المشروع: كود موقّع حديثاً بزوج مفاتيح الخادم الحالي
+    const fresh = security.generateEd25519License({ tier: 'CLB8', expiryCode: '2705', devHash: 'POOL' });
+    const res = await licenseManager.activateCode(fresh);
     expect(res.success).toBe(true);
     expect(res.license).toBeDefined();
     expect(res.license?.tier).toBe('CLB8');
     expect(res.license?.isQuadPool).toBe(true);
   });
 
-  it('activates the exact user input from Image 4 with shifted typo (extra X) seamlessly', async () => {
-    const codeImg4WithTypo = 'PFP2-CLB8-3111-GLBL-AJDZQQLK5QABX9XWBCHEG8K-PXFCKJHDSXJDQFMPSYC75YTQQIHOCQZP_NFACJOZKXXORVXVZTJAB1RTL67NMAA';
-    const res = await licenseManager.activateCode(codeImg4WithTypo);
+  it('resolves an uppercased generated code with an extra-X typo from the master ledger', async () => {
+    const canonicalCode = security.generateEd25519License({ tier: 'CLB8', expiryCode: '3111', devHash: 'GLBL' });
+
+    // سجل المدير يحفظ الكود القانوني (كما يحدث فعلياً بعد التوليد الخادمي)
+    localStorage.setItem('pf_admin_portal_master_ledger_v2', JSON.stringify([
+      {
+        id: 'lic-2',
+        code: canonicalCode,
+        tier: 'CLB8',
+        tierName: 'باقة الأندية المعتمدة',
+        clientName: 'نادي رياضي',
+        deviceId: 'GLOBAL',
+        expiryDate: '2031-11-30',
+        createdAt: '2026-11-14',
+        isQuadPool: false,
+        isRevoked: false
+      }
+    ]));
+
+    // إدخال المستخدم: أحرف كبيرة + حرف X زائد داخل التوقيع (بعد خانة 25 —
+    // مطابقة بادئة التوقيع الخادمية هي التي تحسم الرمز القانوني)
+    const parts = canonicalCode.toUpperCase().split('-');
+    const sig = parts.slice(4).join('-');
+    const typoSig = sig.slice(0, 40) + 'X' + sig.slice(40);
+    const userPasted = [...parts.slice(0, 4), typoSig].join('-');
+
+    const resolved = licenseManager.resolveCanonicalCode(userPasted);
+    expect(resolved).toBe(canonicalCode);
+
+    const res = await licenseManager.activateCode(userPasted);
     expect(res.success).toBe(true);
-    expect(res.license).toBeDefined();
-    expect(res.license?.tier).toBe('CLB8');
+    expect(res.license?.code).toBe(canonicalCode);
   });
 
-  it('activates the exact user input with space and OCR typo from screenshot seamlessly', async () => {
-    const rawUserInputFromScreenshot = 'PFP2-CLB8-3111-GLBL-AJDZQQLK5QABX9XWBCHEG8K-PXFCKJHDSXJDQFMPSYC75YTQQIHOCQZP_NFACJOZKXO RVXVTZJAB1RTL67NMAA';
-    const res = await licenseManager.activateCode(rawUserInputFromScreenshot);
+  it('resolves user input with spaces and mixed case from the master ledger', async () => {
+    const canonicalCode = security.generateEd25519License({ tier: 'CLB8', expiryCode: '3111', devHash: 'POOL' });
+
+    localStorage.setItem('pf_admin_portal_master_ledger_v2', JSON.stringify([
+      { id: 'lic-3', code: canonicalCode, tier: 'CLB8', tierName: 'باقة الأندية المعتمدة', clientName: 'رابطة ألعاب القوى', deviceId: 'POOL', expiryDate: '2027-05-31', createdAt: '2026-11-14', isQuadPool: true, isRevoked: false }
+    ]));
+
+    // لصق ميداني واقعي: مسافات + أحرف كبيرة
+    const rawUserInput = canonicalCode.toUpperCase().split('-').join(' - ');
+    const res = await licenseManager.activateCode(rawUserInput);
     expect(res.success).toBe(true);
-    expect(res.license).toBeDefined();
-    expect(res.license?.tier).toBe('CLB8');
+    expect(res.license?.code).toBe(canonicalCode);
   });
 
-  it('activates device-specific PFP1 license for PF-83DD-C9A9 seamlessly', async () => {
-    const res = await licenseManager.activateCode('PFP1-ENTX-3112-83DD-738344BE');
+  it('activates a device-specific PFP1 code generated for this test device, and rejects it elsewhere via hash check', async () => {
+    const devHash = licenseManager.cleanDeviceHash;
+    const code = security.generateEd25519License({ tier: 'ENTX', expiryCode: '3112', devHash });
+    const res = await licenseManager.activateCode(code);
     expect(res.success).toBe(true);
     expect(res.license?.tier).toBe('ENTX');
-  });
 
-  it('activates quad-pool PFP1 license PFP1-CLB8-2705-POOL-3DE27F62 for Saida LWAS seamlessly', async () => {
-    const res = await licenseManager.activateCode('PFP1-CLB8-2705-POOL-3DE27F62');
-    expect(res.success).toBe(true);
-    expect(res.license?.tier).toBe('CLB8');
-    expect(res.license?.isQuadPool).toBe(true);
-  });
-
-  it('generates and activates a Compact Product Key (PFP1-...) with 100% offline verification', async () => {
-    const compactCode = await licenseManager.generateCompactLicenseKey('ENTX', new Date('2028-12-31'), { isQuadPool: true });
-    expect(compactCode).toMatch(/^PFP1-ENTX-2812-POOL-[0-9A-F]{8}$/);
-
-    const res = await licenseManager.activateCode(compactCode);
-    expect(res.success).toBe(true);
-    expect(res.license?.tier).toBe('ENTX');
-    expect(res.license?.isQuadPool).toBe(true);
+    // نفس البادئة بتوقيع مختلف على جهاز آخر: الرفض يتم عبر فحص رمز الجهاز
+    const otherDeviceCode = security.generateEd25519License({ tier: 'ENTX', expiryCode: '3112', devHash: 'XXXX' });
+    const otherRes = await licenseManager.activateCode(otherDeviceCode);
+    expect(otherRes.success).toBe(false);
+    expect(otherRes.message).toContain('مخصص لجهاز آخر');
   });
 });

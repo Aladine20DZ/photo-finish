@@ -44,6 +44,12 @@ service-account*.json
 firebase-admin*.json
 package_clean.ps1
 
+# 4-b. المرحلة 1: مفاتيح التراخيص في أي مكان (الجذر، relay-server، data/) + النسخ الاحتياطية
+license-keys.json
+**/license-keys.json
+backups/
+.pfp-dev/
+
 # 5. Logs & Diagnostic Traces
 logs/
 *.log
