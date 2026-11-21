@@ -762,6 +762,23 @@ html.sunlight a[class*="bg-emerald-"] * {
   color: #ffffff !important;
 }
 
+/* العناوين البيضاء داخل الأسطح الكحلية المحوّلة للنهار تتحول لحبر داكن
+   (بدونها تبقى بيضاء على كريمي — نص مخفي تماماً) */
+html.sunlight [class*="bg-[#101D35]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0B1426]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0B162B]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0E172A]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0A101D]"] [class*="text-white"],
+html.sunlight [class*="bg-[#1E1B2E]"] [class*="text-white"],
+html.sunlight [class*="bg-[#101D35]"][class*="text-white"],
+html.sunlight [class*="bg-[#0B1426]"][class*="text-white"],
+html.sunlight [class*="bg-[#0B162B]"][class*="text-white"],
+html.sunlight [class*="bg-[#0E172A]"][class*="text-white"],
+html.sunlight [class*="bg-[#0A101D]"][class*="text-white"],
+html.sunlight [class*="bg-[#1E1B2E]"][class*="text-white"] {
+  color: #171204 !important;
+}
+
 /* شارات التراكب الداكنة (فوق الرسوم التوضيحية) تبقى داكنة ونصوصها فاتحة —
    بدون هذا يتحول النص لحبر داكن على شارة سوداء = مخفي تماماً */
 html.sunlight [class*="bg-black/70"] [class*="text-slate-"],
@@ -778,23 +795,6 @@ html.sunlight [class*="bg-black/80"] [class*="text-white"],
 html.sunlight [class*="bg-black/70"][class*="text-white"],
 html.sunlight [class*="bg-black/80"][class*="text-white"] {
   color: #ffffff !important;
-}
-
-/* العناوين البيضاء داخل الأسطح الكحلية المحوّلة للنهار تتحول لحبر داكن
-   (بدونها تبقى بيضاء على كريمي — نص مخفي تماماً) */
-html.sunlight [class*="bg-[#101D35]"] [class*="text-white"],
-html.sunlight [class*="bg-[#0B1426]"] [class*="text-white"],
-html.sunlight [class*="bg-[#0B162B]"] [class*="text-white"],
-html.sunlight [class*="bg-[#0E172A]"] [class*="text-white"],
-html.sunlight [class*="bg-[#0A101D]"] [class*="text-white"],
-html.sunlight [class*="bg-[#1E1B2E]"] [class*="text-white"],
-html.sunlight [class*="bg-[#101D35]"][class*="text-white"],
-html.sunlight [class*="bg-[#0B1426]"][class*="text-white"],
-html.sunlight [class*="bg-[#0B162B]"][class*="text-white"],
-html.sunlight [class*="bg-[#0E172A]"][class*="text-white"],
-html.sunlight [class*="bg-[#0A101D]"][class*="text-white"],
-html.sunlight [class*="bg-[#1E1B2E]"][class*="text-white"] {
-  color: #171204 !important;
 }
 
 html.sunlight button[class*="bg-amber-"],
