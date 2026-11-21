@@ -762,6 +762,15 @@ html.sunlight a[class*="bg-emerald-"] * {
   color: #ffffff !important;
 }
 
+/* شارات التراكب الداكنة (فوق الرسوم التوضيحية) تبقى داكنة ونصوصها فاتحة —
+   بدون هذا يتحول النص لحبر داكن على شارة سوداء = مخفي تماماً */
+html.sunlight [class*="bg-black/70"] [class*="text-slate-"],
+html.sunlight [class*="bg-black/80"] [class*="text-slate-"],
+html.sunlight [class*="bg-black/70"][class*="text-slate-"],
+html.sunlight [class*="bg-black/80"][class*="text-slate-"] {
+  color: #E7DCC0 !important;
+}
+
 /* العناوين البيضاء داخل الأسطح الكحلية المحوّلة للنهار تتحول لحبر داكن
    (بدونها تبقى بيضاء على كريمي — نص مخفي تماماً) */
 html.sunlight [class*="bg-[#101D35]"] [class*="text-white"],
