@@ -681,7 +681,11 @@ html.sunlight [class*="bg-[#141413]"],
 html.sunlight [class*="bg-[#101D35]"],
 html.sunlight [class*="bg-[#0B1426]"],
 html.sunlight [class*="bg-[#0B162B]"],
-html.sunlight [class*="hover:bg-[#16294a]"] {
+html.sunlight [class*="bg-[#0E172A]"],
+html.sunlight [class*="bg-[#0A101D]"],
+html.sunlight [class*="bg-[#1E1B2E]"],
+html.sunlight [class*="hover:bg-[#16294a]"],
+html.sunlight [class*="hover:bg-[#1E293B]"] {
   background-color: #FFFDF7 !important;
 }
 
@@ -763,9 +767,15 @@ html.sunlight a[class*="bg-emerald-"] * {
 html.sunlight [class*="bg-[#101D35]"] [class*="text-white"],
 html.sunlight [class*="bg-[#0B1426]"] [class*="text-white"],
 html.sunlight [class*="bg-[#0B162B]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0E172A]"] [class*="text-white"],
+html.sunlight [class*="bg-[#0A101D]"] [class*="text-white"],
+html.sunlight [class*="bg-[#1E1B2E]"] [class*="text-white"],
 html.sunlight [class*="bg-[#101D35]"][class*="text-white"],
 html.sunlight [class*="bg-[#0B1426]"][class*="text-white"],
-html.sunlight [class*="bg-[#0B162B]"][class*="text-white"] {
+html.sunlight [class*="bg-[#0B162B]"][class*="text-white"],
+html.sunlight [class*="bg-[#0E172A]"][class*="text-white"],
+html.sunlight [class*="bg-[#0A101D]"][class*="text-white"],
+html.sunlight [class*="bg-[#1E1B2E]"][class*="text-white"] {
   color: #171204 !important;
 }
 
