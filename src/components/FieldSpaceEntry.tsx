@@ -201,6 +201,11 @@ export const FieldSpaceEntry: React.FC = () => {
 
   /** بدء التحكيم على تخصص من مساحة عمل مستقلة — عدائون محليون، عزل كامل */
   const startStandaloneTask = useCallback(async (ws: StandaloneWorkspace, disciplineId: string, judgeName: string, task: OfficialDutyTask) => {
+    // حاجز عزل: مساحة بلا عدائين ستُنشئ حدثاً فارغاً — نطلب التجهيز أولاً بدل الزرع التجريبي
+    if (ws.athletes.length === 0) {
+      setNotice('المساحة بلا عدائين — أضف عداءً واحداً على الأقل من قسم المشاركين قبل بدء التحكيم.');
+      return;
+    }
     setBusy(true);
     try {
       const asg = standaloneWorkspaceService.buildLocalAssignment(ws, disciplineId, judgeName, task);

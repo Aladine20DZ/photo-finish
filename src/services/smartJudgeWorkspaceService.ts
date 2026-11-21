@@ -303,10 +303,14 @@ export class SmartJudgeWorkspaceService {
     let eventComp = await fieldEventService.getEventByCompetitionAndDiscipline(compId, disciplineId);
 
     if (!eventComp) {
+      // العزل بالتصميم: تكليفات النمط المستقل لا تُبذر عدائين تجريبيين أبداً —
+      // حتى عند غياب الحقن أو فراغ قائمته (مساحة بلا عدائين = مساحة فارغة صادقة)
+      const isStandalone = assignment.assignmentRole === 'standalone' || compId.startsWith('STW-');
+
       // Pick seed athletes matching discipline type — أو العدائين المحقون من النمط المستقل
-      let defaultAthletes = SEED_HORIZONTAL_ATHLETES;
-      if (category === 'jumps_vertical') defaultAthletes = SEED_VERTICAL_ATHLETES;
-      else if (category === 'throws') defaultAthletes = SEED_THROWS_ATHLETES;
+      let defaultAthletes = isStandalone ? [] : SEED_HORIZONTAL_ATHLETES;
+      if (!isStandalone && category === 'jumps_vertical') defaultAthletes = SEED_VERTICAL_ATHLETES;
+      else if (!isStandalone && category === 'throws') defaultAthletes = SEED_THROWS_ATHLETES;
       if (options?.defaultAthletes && options.defaultAthletes.length > 0) {
         defaultAthletes = options.defaultAthletes;
       }
