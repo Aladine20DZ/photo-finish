@@ -61,7 +61,6 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children, initia
       phone: '+213 48 51 00 20',
       adminFullName: 'رئيس الرابطة الولائية',
       adminUsername: 'saida2026',
-      adminPassword: '',
       createdAt: '2026-01-01T00:00:00Z',
       isActive: true,
       presidentName: 'رئيس الرابطة الولائية',
@@ -69,6 +68,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children, initia
     };
   });
 
+  // Stage 1: هذا الدور للعرض والتنقل في الواجهة حصراً — العمليات الحساسة تتحقق
+  // من الجلسة الموقعة خادمياً (PFPs1) عبر portalAuthService.verifySession.
   const [currentUserRole, setCurrentUserRole] = useState<ExecutiveUserRole>(() => {
     const session = portalAuthService.getActiveSession();
     if (!session) return 'read_only';
