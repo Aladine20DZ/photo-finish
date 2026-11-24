@@ -167,7 +167,14 @@ export class UnifiedExportService {
   <meta charset="UTF-8">
   <title>الوثيقة الرسمية - ${header.competitionName}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Amiri:wght@400;700&display=swap');
+    /* خط Cairo ذاتي الاستضافة (الوثائق تُفتح من نفس الأصل عبر window.open — المسار النسبي يعمل) */
+    @font-face {
+      font-family: 'Cairo';
+      font-style: normal;
+      font-weight: 200 1000;
+      font-display: swap;
+      src: url('/fonts/cairo-arabic.woff2') format('woff2'), url('/fonts/cairo-latin.woff2') format('woff2');
+    }
     
     @page {
       size: A4 portrait;

@@ -50,7 +50,21 @@ export class DocumentGeneratorService {
   <meta charset="UTF-8">
   <title>شهادة تتويج رسمية - ${data.athleteName}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Chakra+Petch:wght@700&display=swap');
+    /* خطوط ذاتية الاستضافة — Cairo + Chakra Petch (صفر CDN، تعمل دون شبكة) */
+    @font-face {
+      font-family: 'Cairo';
+      font-style: normal;
+      font-weight: 200 1000;
+      font-display: swap;
+      src: url('/fonts/cairo-arabic.woff2') format('woff2'), url('/fonts/cairo-latin.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Chakra Petch';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('/fonts/chakra-petch-700-latin.woff2') format('woff2');
+    }
     body {
       font-family: 'Cairo', sans-serif;
       background: #f8fafc;
