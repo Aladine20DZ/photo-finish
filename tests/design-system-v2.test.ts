@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { DESIGN_TOKENS, getStoredThemeMode, setThemeMode, cycleThemeMode, THEME_META, type ThemeMode } from '../src/components/design-system/tokens';
+import { JUDGE_THEME } from '../src/components/judges/design-tokens';
 
 describe('Design System Track Pro (World Athletics Style) Tokens & Components', () => {
   beforeEach(() => {
@@ -77,6 +78,18 @@ describe('Design System Track Pro (World Athletics Style) Tokens & Components', 
     expect(cycleThemeMode('light')).toBe('dark');
     const sample: ThemeMode = 'sunlight';
     expect(sample).toBe('sunlight');
+  });
+
+  it('bridges the judge field palette to canonical CSS variables (no scattered hex definitions in components)', () => {
+    const values = Object.values(JUDGE_THEME.colors);
+    expect(values.length).toBeGreaterThanOrEqual(18);
+    values.forEach(v => expect(v).toMatch(/^var\(--field-/));
+    const cssContent = fs.readFileSync(path.resolve(__dirname, '../src/index.css'), 'utf-8');
+    expect(cssContent).toContain('--field-navy: #101D35');
+    expect(cssContent).toContain('--field-blue: #1677E8');
+    expect(cssContent).toContain('--field-green: #13A879');
+    expect(cssContent).toContain('--field-red: #EF4444');
+    expect(cssContent).toContain('--field-white: #FFFFFF');
   });
 
   it('exposes all design system components including Card, RankBadge, StatusPill, PageHeader', async () => {

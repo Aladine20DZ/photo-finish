@@ -1,38 +1,34 @@
 /**
  * PHOTO FINISH PRO — SMART JUDGE WORKSPACE DESIGN TOKENS
  * Official Athletic Field & Competition Interface Styling
- * Conforms to Master Specification:
- * - Deep Navy: #101D35
- * - Primary Blue: #1677E8
- * - Success Green: #13A879
- * - Background Light: #F2F5F9
- * - White: #FFFFFF
- * - Warning Amber: #F59E0B
- * - Danger / Foul Red: #EF4444
+ *
+ * جسر كنسي (المرحلة 2): كل القيم تشير إلى متغيرات CSS المعرفة في src/index.css
+ * حصراً (--field-*) — تعريف واحد للمصدر، بلا قيم سداسية متناثرة في المكونات.
+ * القيم الاحتياطية داخل var() تطابق التعريف الكنسي للسلامة خارج DOM.
  *
  * Strict Rule: Solid surfaces only for full contrast outdoors.
  */
 
 export const JUDGE_THEME = {
   colors: {
-    deepNavy: '#101D35',
-    navySurface: '#0E172A',
-    navyBorder: '#1E293B',
-    primaryBlue: '#1677E8',
-    primaryBlueHover: '#1260BD',
-    primaryBlueSoft: 'rgba(22, 119, 232, 0.12)',
-    successGreen: '#13A879',
-    successGreenHover: '#0E8962',
-    successGreenSoft: 'rgba(19, 168, 121, 0.15)',
-    backgroundLight: '#F2F5F9',
-    white: '#FFFFFF',
-    amberWarning: '#F59E0B',
-    amberSoft: 'rgba(245, 158, 11, 0.15)',
-    dangerRed: '#EF4444',
-    dangerSoft: 'rgba(239, 68, 68, 0.15)',
-    textSlate: '#94A3B8',
-    textMuted: '#64748B',
-    borderSlate: '#334155',
+    deepNavy: 'var(--field-navy, #101D35)',
+    navySurface: 'var(--field-navy-surface, #0E172A)',
+    navyBorder: 'var(--field-navy-border, #1E293B)',
+    primaryBlue: 'var(--field-blue, #1677E8)',
+    primaryBlueHover: 'var(--field-blue-hover, #1260BD)',
+    primaryBlueSoft: 'var(--field-blue-soft, rgba(22, 119, 232, 0.12))',
+    successGreen: 'var(--field-green, #13A879)',
+    successGreenHover: 'var(--field-green-hover, #0E8962)',
+    successGreenSoft: 'var(--field-green-soft, rgba(19, 168, 121, 0.15))',
+    backgroundLight: 'var(--field-bg-light, #F2F5F9)',
+    white: 'var(--field-white, #FFFFFF)',
+    amberWarning: 'var(--field-amber, #F59E0B)',
+    amberSoft: 'var(--field-amber-soft, rgba(245, 158, 11, 0.15))',
+    dangerRed: 'var(--field-red, #EF4444)',
+    dangerSoft: 'var(--field-red-soft, rgba(239, 68, 68, 0.15))',
+    textSlate: 'var(--field-text-slate, #94A3B8)',
+    textMuted: 'var(--field-text-muted, #64748B)',
+    borderSlate: 'var(--field-border-slate, #334155)',
   },
   typography: {
     fontFamily: 'Cairo, "IBM Plex Sans Arabic", system-ui, -apple-system, sans-serif',

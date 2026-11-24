@@ -177,6 +177,30 @@
     --primary-soft: var(--surface-alt);
   }
 
+  /* ═══ متغيرات الميدان الكنسية — المصدر الوحيد لقيم واجهات التحكيم ═══
+     واجهات الميدان تستهلكها عبر var(--field-*, fallback) في design-tokens.ts
+     — تعريف واحد هنا، بلا قيم سداسية متناثرة في المكونات */
+  :root {
+    --field-navy: #101D35;
+    --field-navy-surface: #0E172A;
+    --field-navy-border: #1E293B;
+    --field-blue: #1677E8;
+    --field-blue-hover: #1260BD;
+    --field-blue-soft: rgba(22, 119, 232, 0.12);
+    --field-green: #13A879;
+    --field-green-hover: #0E8962;
+    --field-green-soft: rgba(19, 168, 121, 0.15);
+    --field-bg-light: #F2F5F9;
+    --field-white: #FFFFFF;
+    --field-amber: #F59E0B;
+    --field-amber-soft: rgba(245, 158, 11, 0.15);
+    --field-red: #EF4444;
+    --field-red-soft: rgba(239, 68, 68, 0.15);
+    --field-text-slate: #94A3B8;
+    --field-text-muted: #64748B;
+    --field-border-slate: #334155;
+  }
+
   /* ═══ خطوط مضمار ذاتية الاستضافة — صفر CDN خارجي (عقد Offline الميداني) ═══
      Cairo (متغير 200-1000 × 3 مجموعات فرعية) + Chakra Petch (500/700 × 4 مجموعات)
      الملفات في public/fonts/*.woff2 — تعمل دون شبكة نهائياً */
