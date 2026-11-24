@@ -30,6 +30,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useTranslation } from '../../services/i18nService';
+import { getStoredThemeMode, setThemeMode, cycleThemeMode, THEME_META, type ThemeMode } from '../design-system/tokens';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { portalAuthService, PortalType, PortalSession } from '../../services/portalAuthService';
 import { competitionsService, NationalCompetition } from '../../services/competitionsService';
@@ -108,28 +109,18 @@ export const NavShell: React.FC<NavShellProps> = ({
     };
   }, []);
 
-  const [theme, setTheme] = useState<'dark' | 'sunlight' | 'light'>(() => {
-    try {
-      return (localStorage.getItem('photo_finish_theme') as any) || 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
+  // الثيم عبر الواجهة الكنسية الموحدة في tokens.ts (ليلي / ميداني شمسي / نهاري)
+  const [theme, setTheme] = useState<ThemeMode>(() => getStoredThemeMode());
 
   useEffect(() => {
-    try {
-      const root = document.documentElement;
-      root.classList.remove('sunlight', 'light', 'dark');
-      if (theme === 'sunlight') root.classList.add('sunlight');
-      else if (theme === 'light') root.classList.add('light');
-      else root.classList.add('dark');
-      localStorage.setItem('photo_finish_theme', theme);
-    } catch {}
+    setThemeMode(theme);
   }, [theme]);
 
   const cycleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'sunlight' : prev === 'sunlight' ? 'light' : 'dark');
+    setTheme(prev => cycleThemeMode(prev));
   };
+
+  const themeMeta = THEME_META.find(m => m.mode === theme) ?? THEME_META[0];
 
   // تحديث التوقيت الملائم للملعب
   useEffect(() => {
@@ -272,10 +263,10 @@ export const NavShell: React.FC<NavShellProps> = ({
               onClick={cycleTheme}
               className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-300 hover:text-emerald-400 hover:border-emerald-800 transition-all cursor-pointer"
               title="تبديل النمط: ليلي / وضع الشمس عالي التباين للميدان / نهاري"
-              aria-label={`تبديل الثيم — الحالي: ${theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}`}
+              aria-label={`تبديل الثيم — الحالي: ${themeMeta.labelAr}`}
             >
               {theme === 'sunlight' ? <Sun className="w-3 h-3 text-amber-400" /> : theme === 'light' ? <Sunset className="w-3 h-3 text-orange-400" /> : <Moon className="w-3 h-3 text-slate-300" />}
-              <span className="hidden md:inline">{theme === 'sunlight' ? 'ميداني شمسي' : theme === 'light' ? 'نهاري' : 'ليلي'}</span>
+              <span className="hidden md:inline">{themeMeta.labelAr}</span>
             </button>
 
             {/* زر الدخول المباشر بكود المهمة */}

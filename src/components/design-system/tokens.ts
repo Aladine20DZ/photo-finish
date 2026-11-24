@@ -106,29 +106,45 @@ export const DESIGN_TOKENS = {
   shadow: 'var(--shadow-1, none)',
 } as const;
 
-export type ThemeMode = 'dark' | 'light';
+/**
+ * الواجهة الكنسية للثيم — ثلاثي موحّد (ليلي / ميداني شمسي / نهاري).
+ * المصدر الوحيد للحقيقة: index.html (سكربت FOUC) وNavShell والتصميمات الأخرى
+ * كلها تستهلك القيم والصنف على documentElement من هنا حصراً.
+ */
+export type ThemeMode = 'dark' | 'sunlight' | 'light';
+
+/** الافتراضي الكنسي — يطابق سكربت FOUC في index.html */
+export const DEFAULT_THEME_MODE: ThemeMode = 'dark';
+
+/** البيانات الوصفية للثيمات بالترتيب الدوري المعتمد */
+export const THEME_META: ReadonlyArray<{ mode: ThemeMode; labelAr: string; next: ThemeMode }> = Object.freeze([
+  { mode: 'dark', labelAr: 'ليلي', next: 'sunlight' },
+  { mode: 'sunlight', labelAr: 'ميداني شمسي', next: 'light' },
+  { mode: 'light', labelAr: 'نهاري', next: 'dark' },
+]);
+
+const THEME_CLASS: Record<ThemeMode, string> = { dark: 'dark', sunlight: 'sunlight', light: 'light' };
 
 export const setThemeMode = (mode: ThemeMode): void => {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   root.setAttribute('data-theme', mode);
-  if (mode === 'light') {
-    root.classList.add('light');
-    root.classList.remove('dark');
-  } else {
-    root.classList.add('dark');
-    root.classList.remove('light');
-  }
+  (Object.keys(THEME_CLASS) as ThemeMode[]).forEach(m => root.classList.remove(THEME_CLASS[m]));
+  root.classList.add(THEME_CLASS[mode]);
   try {
     localStorage.setItem('photo_finish_theme', mode);
   } catch {}
 };
 
 export const getStoredThemeMode = (): ThemeMode => {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return DEFAULT_THEME_MODE;
   try {
     const saved = localStorage.getItem('photo_finish_theme');
-    if (saved === 'light' || saved === 'dark') return saved;
+    if (saved === 'light' || saved === 'dark' || saved === 'sunlight') return saved;
   } catch {}
-  return 'light';
+  return DEFAULT_THEME_MODE;
 };
+
+/** الدوران الكنسي بين الثيمات الثلاثة */
+export const cycleThemeMode = (current: ThemeMode): ThemeMode =>
+  THEME_META.find(t => t.mode === current)?.next ?? DEFAULT_THEME_MODE;

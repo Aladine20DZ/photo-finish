@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { DESIGN_TOKENS, getStoredThemeMode, setThemeMode } from '../src/components/design-system/tokens';
+import { DESIGN_TOKENS, getStoredThemeMode, setThemeMode, cycleThemeMode, THEME_META, type ThemeMode } from '../src/components/design-system/tokens';
 
 describe('Design System Track Pro (World Athletics Style) Tokens & Components', () => {
   beforeEach(() => {
@@ -62,12 +62,21 @@ describe('Design System Track Pro (World Athletics Style) Tokens & Components', 
     expect(cssContent).toContain('--border-strong: #0A0A0A');
   });
 
-  it('handles light (default) and dark themes correctly in World Athletics style', () => {
+  it('unifies the canonical tri-mode theme interface (night/solar/day) with the FOUC contract', () => {
+    // الافتراضي الكنسي = dark — يطابق سكربت FOUC في index.html وNavShell
+    expect(getStoredThemeMode()).toBe('dark');
+    setThemeMode('sunlight');
+    expect(getStoredThemeMode()).toBe('sunlight');
+    setThemeMode('light');
     expect(getStoredThemeMode()).toBe('light');
     setThemeMode('dark');
     expect(getStoredThemeMode()).toBe('dark');
-    setThemeMode('light');
-    expect(getStoredThemeMode()).toBe('light');
+    expect(THEME_META.map(m => m.mode)).toEqual(['dark', 'sunlight', 'light']);
+    expect(cycleThemeMode('dark')).toBe('sunlight');
+    expect(cycleThemeMode('sunlight')).toBe('light');
+    expect(cycleThemeMode('light')).toBe('dark');
+    const sample: ThemeMode = 'sunlight';
+    expect(sample).toBe('sunlight');
   });
 
   it('exposes all design system components including Card, RankBadge, StatusPill, PageHeader', async () => {
