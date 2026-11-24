@@ -59,6 +59,98 @@ export const DICTIONARY: Translations = {
     en: 'Admin & Licenses'
   },
 
+  // Navigation Shell — الشريط الرئيسي وشريط الحياة (المرحلة 2)
+  nav_home: {
+    ar: 'الرئيسية',
+    fr: 'Accueil',
+    en: 'Home'
+  },
+  nav_sheets: {
+    ar: 'أوراق النتائج الرقمية',
+    fr: 'Feuilles de Résultats Numériques',
+    en: 'Digital Result Sheets'
+  },
+  nav_results: {
+    ar: 'النتائج المعتمدة',
+    fr: 'Résultats Homologués',
+    en: 'Certified Results'
+  },
+  nav_competitions: {
+    ar: 'المنافسات والرزنامة',
+    fr: 'Compétitions & Calendrier',
+    en: 'Competitions & Calendar'
+  },
+  nav_entries: {
+    ar: 'النوادي والرياضيون',
+    fr: 'Clubs & Athlètes',
+    en: 'Clubs & Athletes'
+  },
+  nav_judge_workspace: {
+    ar: 'مساحة الحكم الميداني',
+    fr: 'Espace Juge de Terrain',
+    en: 'Field Judge Workspace'
+  },
+  nav_league_admin: {
+    ar: 'إدارة الرابطة',
+    fr: 'Administration Ligue',
+    en: 'League Administration'
+  },
+  status_cloud_connected: {
+    ar: 'السحابة متصلة',
+    fr: 'Cloud Connecté',
+    en: 'Cloud Connected'
+  },
+  status_offline_local: {
+    ar: 'أوفلاين محلي',
+    fr: 'Hors-Ligne Local',
+    en: 'Offline Local'
+  },
+  action_manual_timing: {
+    ar: 'توقيت يدوي',
+    fr: 'Chrono Manuel',
+    en: 'Manual Timing'
+  },
+  action_duty_code: {
+    ar: 'كود المهمة 🔑',
+    fr: 'Code de Mission 🔑',
+    en: 'Duty Code 🔑'
+  },
+  action_portals_login: {
+    ar: 'دخول البوابات 🔐',
+    fr: 'Connexion Portails 🔐',
+    en: 'Portal Sign-In 🔐'
+  },
+  action_enter_field: {
+    ar: 'دخول الميدان والتحكيم',
+    fr: 'Entrer Terrain & Juge',
+    en: 'Enter Field & Judging'
+  },
+  label_league_account: {
+    ar: 'حساب الرابطة:',
+    fr: 'Compte Ligue :',
+    en: 'League Account:'
+  },
+  theme_night: {
+    ar: 'ليلي',
+    fr: 'Nuit',
+    en: 'Night'
+  },
+  theme_solar: {
+    ar: 'ميداني شمسي',
+    fr: 'Terrain Solaire',
+    en: 'Solar Field'
+  },
+  theme_day: {
+    ar: 'نهاري',
+    fr: 'Jour',
+    en: 'Day'
+  },
+  comps_selector: {
+    ar: 'اختر المنافسة النشطة:',
+    fr: 'Choisir la compétition active :',
+    en: 'Select active competition:'
+  },
+
   // Status & Sync
   status_online: {
     ar: 'سحابة Supabase متصلة',

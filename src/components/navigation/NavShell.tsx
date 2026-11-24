@@ -67,7 +67,7 @@ export const NavShell: React.FC<NavShellProps> = ({
   onOpenAuthModal,
   onOpenManualTiming
 }) => {
-  const { lang, setLanguage } = useTranslation();
+  const { lang, setLanguage, t } = useTranslation();
   const isCloudOnline = isSupabaseConfigured();
   const [leagueSession, setLeagueSession] = useState<PortalSession | null>(() => portalAuthService.getSession('league'));
   const [coachSession, setCoachSession] = useState<PortalSession | null>(() => portalAuthService.getSession('coach'));
@@ -135,13 +135,13 @@ export const NavShell: React.FC<NavShellProps> = ({
 
   // عناصر شريط التنقل الرئيسي للواجهة العامة: الرئيسية، أوراق النتائج الرقمية، النتائج المعتمدة، المنافسات والرزنامة، النوادي والرياضيون، إدارة الرابطة
   const navItems: { id: NavTab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'public', label: 'الرئيسية', icon: <Globe className="w-4 h-4" /> },
-    { id: 'sheets', label: 'أوراق النتائج الرقمية', icon: <FileSpreadsheet className="w-4 h-4 text-emerald-400" />, badge: 'FAA' },
-    { id: 'results', label: 'النتائج المعتمدة', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
-    { id: 'competitions', label: 'المنافسات والرزنامة', icon: <Calendar className="w-4 h-4 text-emerald-400" /> },
-    { id: 'entries', label: 'النوادي والرياضيون', icon: <FileSpreadsheet className="w-4 h-4 text-cyan-400" /> },
-    { id: 'judge-dashboard', label: 'مساحة الحكم الميداني', icon: <Award className="w-4 h-4 text-amber-400" />, badge: 'PRO' },
-    { id: 'league', label: 'إدارة الرابطة', icon: <Shield className="w-4 h-4 text-teal-400" /> },
+    { id: 'public', label: t('nav_home', 'الرئيسية'), icon: <Globe className="w-4 h-4" /> },
+    { id: 'sheets', label: t('nav_sheets', 'أوراق النتائج الرقمية'), icon: <FileSpreadsheet className="w-4 h-4 text-emerald-400" />, badge: 'FAA' },
+    { id: 'results', label: t('nav_results', 'النتائج المعتمدة'), icon: <Trophy className="w-4 h-4 text-amber-400" /> },
+    { id: 'competitions', label: t('nav_competitions', 'المنافسات والرزنامة'), icon: <Calendar className="w-4 h-4 text-emerald-400" /> },
+    { id: 'entries', label: t('nav_entries', 'النوادي والرياضيون'), icon: <FileSpreadsheet className="w-4 h-4 text-cyan-400" /> },
+    { id: 'judge-dashboard', label: t('nav_judge_workspace', 'مساحة الحكم الميداني'), icon: <Award className="w-4 h-4 text-amber-400" />, badge: 'PRO' },
+    { id: 'league', label: t('nav_league_admin', 'إدارة الرابطة'), icon: <Shield className="w-4 h-4 text-teal-400" /> },
   ];
 
   return (
@@ -155,7 +155,7 @@ export const NavShell: React.FC<NavShellProps> = ({
           <div className="flex items-center gap-3 truncate">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[10px] font-black shrink-0 shadow-sm animate-pulse">
               <span className="w-2 h-2 rounded-full bg-rose-500 shadow-rose-500/80 shadow" />
-              <span>مباشر 🔴</span>
+              <span>{t('live_badge', 'مباشر 🔴')}</span>
             </div>
             
             <div className="relative hidden sm:flex items-center gap-2 text-slate-300 truncate">
@@ -179,7 +179,7 @@ export const NavShell: React.FC<NavShellProps> = ({
               {showCompSelector && (
                 <div className="absolute top-full right-0 mt-1 w-80 bg-slate-950 border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
                   <div className="flex items-center justify-between px-2 py-1 text-[10px] font-black text-amber-400 border-b border-slate-800">
-                    <span>اختر المنافسة النشطة:</span>
+                    <span>{t('comps_selector', 'اختر المنافسة النشطة:')}</span>
                     <span className="text-slate-400">{availableComps.length} منافسات</span>
                   </div>
                   <div className="max-h-60 overflow-y-auto space-y-1">
@@ -236,12 +236,12 @@ export const NavShell: React.FC<NavShellProps> = ({
               {isCloudOnline ? (
                 <>
                   <Cloud className="w-3 h-3 text-emerald-400" />
-                  <span className="hidden sm:inline">السحابة متصلة</span>
+                  <span className="hidden sm:inline">{t('status_cloud_connected', 'السحابة متصلة')}</span>
                 </>
               ) : (
                 <>
                   <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-                  <span className="hidden sm:inline">أوفلاين محلي</span>
+                  <span className="hidden sm:inline">{t('status_offline_local', 'أوفلاين محلي')}</span>
                 </>
               )}
             </div>
@@ -254,7 +254,7 @@ export const NavShell: React.FC<NavShellProps> = ({
                 title="فتح وحدة التوقيت اليدوي للأروقة والمسافات"
               >
                 <Timer className="w-3 h-3 text-teal-400" />
-                <span className="hidden sm:inline">توقيت يدوي</span>
+                <span className="hidden sm:inline">{t('action_manual_timing', 'توقيت يدوي')}</span>
               </button>
             )}
             
@@ -266,7 +266,7 @@ export const NavShell: React.FC<NavShellProps> = ({
               aria-label={`تبديل الثيم — الحالي: ${themeMeta.labelAr}`}
             >
               {theme === 'sunlight' ? <Sun className="w-3 h-3 text-amber-400" /> : theme === 'light' ? <Sunset className="w-3 h-3 text-orange-400" /> : <Moon className="w-3 h-3 text-slate-300" />}
-              <span className="hidden md:inline">{themeMeta.labelAr}</span>
+              <span className="hidden md:inline">{t(theme === 'sunlight' ? 'theme_solar' : theme === 'light' ? 'theme_day' : 'theme_night', themeMeta.labelAr)}</span>
             </button>
 
             {/* زر الدخول المباشر بكود المهمة */}
@@ -276,7 +276,7 @@ export const NavShell: React.FC<NavShellProps> = ({
               title="دخول الحكام بكود التكليف الرسمي"
             >
               <ScanLine className="w-3 h-3 text-emerald-400" />
-              <span>كود المهمة 🔑</span>
+              <span>{t('action_duty_code', 'كود المهمة 🔑')}</span>
             </button>
 
             {/* زر تسجيل الدخول وتبديل حساب البوابات */}
@@ -291,7 +291,7 @@ export const NavShell: React.FC<NavShellProps> = ({
                   ? `🏛️ ${leagueSession.leagueShort || 'الرابطة'}` 
                   : coachSession 
                   ? `🏃 ${coachSession.clubName?.split(' ')[0] || 'المدرب'}` 
-                  : 'دخول البوابات 🔐'}
+                  : t('action_portals_login', 'دخول البوابات 🔐')}
               </span>
             </button>
 
@@ -404,7 +404,7 @@ export const NavShell: React.FC<NavShellProps> = ({
                 title="لوحة تحكم حساب الرابطة"
               >
                 <Shield className="w-4 h-4 text-emerald-400" />
-                <span className="hidden sm:inline">حساب الرابطة:</span>
+                <span className="hidden sm:inline">{t('label_league_account', 'حساب الرابطة:')}</span>
                 <span className="font-black text-white">{leagueSession.leagueShort || 'الرابطة'}</span>
               </button>
             )}
@@ -414,7 +414,7 @@ export const NavShell: React.FC<NavShellProps> = ({
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 hover:text-black font-black text-xs shadow-lg shadow-emerald-950/80 hover:shadow-emerald-500/30 transition-all border border-emerald-400/50 group cursor-pointer"
             >
               <Timer className="w-4 h-4 text-slate-950 group-hover:scale-110 transition-transform" />
-              <span className="tracking-wide">دخول الميدان والتحكيم</span>
+              <span className="tracking-wide">{t('action_enter_field', 'دخول الميدان والتحكيم')}</span>
               <ArrowRight className="w-3.5 h-3.5 text-slate-950/80 group-hover:translate-x-[-2px] transition-transform" />
             </button>
           </div>
