@@ -451,13 +451,14 @@ describe('PHOTO FINISH PRO — Smart Judge Workspace UI & Workstations (5 Screen
   });
 
   // 17 & 18: Design System Tokens & All 5 Screens Verification
-  it('17 & 18: verifies official design tokens (Deep Navy #101D35, Primary Blue #1677E8, Green #13A879)', () => {
-    expect(JUDGE_THEME.colors.deepNavy).toBe('#101D35');
-    expect(JUDGE_THEME.colors.primaryBlue).toBe('#1677E8');
-    expect(JUDGE_THEME.colors.successGreen).toBe('#13A879');
-    expect(JUDGE_THEME.colors.backgroundLight).toBe('#F2F5F9');
-    expect(JUDGE_THEME.colors.white).toBe('#FFFFFF');
-    expect(JUDGE_THEME.colors.amberWarning).toBe('#F59E0B');
-    expect(JUDGE_THEME.colors.dangerRed).toBe('#EF4444');
+  it('17 & 18: verifies official design tokens bridge to canonical --field-* vars (palette identity preserved)', () => {
+    // المرحلة 2: الجسر الكنسي — الهوية البصرية نفسها عبر التعريف الموحّد في index.css حصراً
+    expect(JUDGE_THEME.colors.deepNavy).toBe('var(--field-navy, #101D35)');
+    expect(JUDGE_THEME.colors.primaryBlue).toBe('var(--field-blue, #1677E8)');
+    expect(JUDGE_THEME.colors.successGreen).toBe('var(--field-green, #13A879)');
+    expect(JUDGE_THEME.colors.backgroundLight).toBe('var(--field-bg-light, #F2F5F9)');
+    expect(JUDGE_THEME.colors.white).toBe('var(--field-white, #FFFFFF)');
+    expect(JUDGE_THEME.colors.amberWarning).toBe('var(--field-amber, #F59E0B)');
+    expect(JUDGE_THEME.colors.dangerRed).toBe('var(--field-red, #EF4444)');
   });
 });

@@ -55,10 +55,11 @@ describe('Stage 4: Competitions Bureau, Inline Editing & Unified Multi-Format Ex
   };
 
   describe('1. PDF Export Format with Cairo/Amiri Font & RTL Direction', () => {
-    it('generates high-definition HTML for PDF with embedded Cairo and Amiri web fonts', () => {
+    it('generates high-definition HTML for PDF with self-hosted Cairo fonts (offline-first, zero CDN)', () => {
       const html = unifiedExportService.generatePrintableHtml(samplePayload);
-      expect(html).toContain('family=Cairo');
-      expect(html).toContain('family=Amiri');
+      expect(html).toContain('/fonts/cairo-arabic.woff2');
+      expect(html).toContain('@font-face');
+      expect(html).not.toContain('fonts.googleapis.com');
       expect(html).toContain("font-family: 'Cairo', 'Amiri'");
     });
 
