@@ -66,6 +66,9 @@ export interface CompetitionProgressIndicators {
 export interface NationalCompetition {
   id: string;
   name: string;
+  /** التظاهرة الحاضنة للمنافسة (Stage 2: Event-contains-Competitions model) */
+  eventId?: string;
+  eventName?: string;
   date: string;
   endDate?: string;
   venue: string;
@@ -779,6 +782,34 @@ export class CompetitionsService {
     await this.saveCompetition(newComp);
     this.setActiveCompetitionId(id);
     return newComp;
+  }
+
+  /**
+   * Stage 2: links/unlinks a competition to an athletics event (idempotent).
+   * Uses eventsService when available to keep competitionsIds in sync.
+   */
+  public async linkCompetitionToEvent(competitionId: string, eventId: string | null, eventName?: string): Promise<boolean> {
+    const comp = await this.getCompetitionById(competitionId);
+    if (!comp) return false;
+    await this.saveCompetition({
+      ...comp,
+      eventId: eventId || undefined,
+      eventName: eventId ? (eventName || comp.eventName) : undefined,
+      updatedAt: new Date().toISOString()
+    });
+    try {
+      const { eventsService } = await import('./eventsService');
+      if (eventId) {
+        await eventsService.linkCompetition(eventId, competitionId);
+      }
+    } catch {}
+    return true;
+  }
+
+  /** Returns competitions linked to a given event. */
+  public async getCompetitionsByEvent(eventId: string): Promise<NationalCompetition[]> {
+    const list = await this.getCompetitions();
+    return list.filter(c => c.eventId === eventId);
   }
 
   /**
